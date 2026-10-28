@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { hashPassword } from './auth-crypto.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -214,6 +215,39 @@ try { db.exec(`ALTER TABLE admins ADD COLUMN avatar TEXT;`); } catch (e) {}
 try { db.exec(`ALTER TABLE programs ADD COLUMN bannerImg TEXT;`); } catch (e) {}
 try { db.exec(`ALTER TABLE certificates ADD COLUMN verifiedBy TEXT;`); } catch (e) {}
 try { db.exec(`ALTER TABLE certificates ADD COLUMN verificationCode TEXT;`); } catch (e) {}
+try { db.exec(`ALTER TABLE students ADD COLUMN passwordHash TEXT;`); } catch (e) {}
+try { db.exec(`ALTER TABLE students ADD COLUMN salt TEXT;`); } catch (e) {}
+try { db.exec(`ALTER TABLE students ADD COLUMN address TEXT;`); } catch (e) {}
+try { db.exec(`ALTER TABLE students ADD COLUMN houseNo TEXT;`); } catch (e) {}
+try { db.exec(`ALTER TABLE students ADD COLUMN district TEXT;`); } catch (e) {}
+try { db.exec(`ALTER TABLE students ADD COLUMN state TEXT;`); } catch (e) {}
+try { db.exec(`ALTER TABLE students ADD COLUMN pinCode TEXT;`); } catch (e) {}
+try { db.exec(`ALTER TABLE students ADD COLUMN dob TEXT;`); } catch (e) {}
+try { db.exec(`ALTER TABLE admins ADD COLUMN passwordHash TEXT;`); } catch (e) {}
+try { db.exec(`ALTER TABLE admins ADD COLUMN salt TEXT;`); } catch (e) {}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS email_otps (
+    email TEXT PRIMARY KEY,
+    code TEXT NOT NULL,
+    role TEXT NOT NULL,
+    purpose TEXT NOT NULL,
+    payload TEXT,
+    createdAt INTEGER NOT NULL,
+    expiresAt INTEGER NOT NULL
+  );
+`);
+
+// Seed default password hashes if missing
+try {
+  const adminHash = hashPassword('Admin@123');
+  db.prepare(`UPDATE admins SET passwordHash = ?, salt = ? WHERE passwordHash IS NULL OR passwordHash = ''`).run(adminHash.hash, adminHash.salt);
+
+  const studentHash = hashPassword('Student@123');
+  db.prepare(`UPDATE students SET passwordHash = ?, salt = ? WHERE passwordHash IS NULL OR passwordHash = ''`).run(studentHash.hash, studentHash.salt);
+} catch (err) {
+  console.warn('Notice setting initial passwords:', err.message);
+}
 
 // Realistic Certificate SVG generator for seeding and demos
 function generateSampleCertSvg(name, program, issuer, certId, date) {

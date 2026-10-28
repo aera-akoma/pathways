@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import { db } from './db.js';
+import { hashPassword, verifyPassword } from './auth-crypto.js';
+import { sendOtpEmail } from './mailer.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -394,16 +396,16 @@ app.put('/api/students/:id', (req, res) => {
 
     const {
       name, fathersName, phone, course, semester, email, linkedin, github, portfolio,
-      skills, softSkills, goal, bio, rollNo, graduationYear, jobType, city,
+      skills, softSkills, goal, bio, rollNo, graduationYear, jobType, city, address,
+      houseNo, district, state, pinCode, dob,
       resumeUrl, avatar, score, completion, byAdmin
     } = req.body;
 
-    // Student NOT change student_name, fathers_name, mobile_no if added by admin!
-    const isLockedForStudent = student.addedByAdmin === 1 && byAdmin !== true;
-
-    const finalName = isLockedForStudent ? student.name : (name !== undefined ? name.trim() : student.name);
-    const finalFathersName = isLockedForStudent ? student.fathersName : (fathersName !== undefined ? fathersName.trim() : student.fathersName);
-    const finalPhone = isLockedForStudent ? student.phone : (phone !== undefined ? phone.trim() : student.phone);
+    // Name and login email are attached to login identity and cannot be changed by students
+    const finalName = byAdmin === true && name !== undefined && name.trim() ? name.trim() : student.name;
+    const finalEmail = byAdmin === true && email !== undefined && email.trim() ? email.trim() : student.email;
+    const finalFathersName = fathersName !== undefined ? fathersName.trim() : student.fathersName;
+    const finalPhone = phone !== undefined && phone.trim() ? phone.trim() : student.phone;
 
     if (finalPhone && finalPhone !== student.phone) {
       if (!/^[0-9]{10}$/.test(finalPhone)) {
@@ -415,6 +417,9 @@ app.put('/api/students/:id', (req, res) => {
       }
     }
 
+    const combinedAddress = [houseNo, address, district, state, pinCode ? `PIN: ${pinCode}` : ''].filter(Boolean).join(', ');
+    const finalAddress = address !== undefined ? address.trim() : (combinedAddress || student.address);
+
     const now = new Date().toISOString();
     db.prepare(`
       UPDATE students SET
@@ -423,7 +428,7 @@ app.put('/api/students/:id', (req, res) => {
         phone = ?,
         course = COALESCE(?, course),
         semester = COALESCE(?, semester),
-        email = COALESCE(?, email),
+        email = ?,
         linkedin = COALESCE(?, linkedin),
         github = COALESCE(?, github),
         portfolio = COALESCE(?, portfolio),
@@ -435,6 +440,12 @@ app.put('/api/students/:id', (req, res) => {
         graduationYear = COALESCE(?, graduationYear),
         jobType = COALESCE(?, jobType),
         city = COALESCE(?, city),
+        address = COALESCE(?, address),
+        houseNo = COALESCE(?, houseNo),
+        district = COALESCE(?, district),
+        state = COALESCE(?, state),
+        pinCode = COALESCE(?, pinCode),
+        dob = COALESCE(?, dob),
         resumeUrl = COALESCE(?, resumeUrl),
         avatar = COALESCE(?, avatar),
         score = COALESCE(?, score),
@@ -447,7 +458,7 @@ app.put('/api/students/:id', (req, res) => {
       finalPhone,
       course || student.course,
       semester || student.semester,
-      email !== undefined ? email.trim() : student.email,
+      finalEmail,
       linkedin !== undefined ? linkedin.trim() : student.linkedin,
       github !== undefined ? github.trim() : student.github,
       portfolio !== undefined ? portfolio.trim() : student.portfolio,
@@ -458,7 +469,13 @@ app.put('/api/students/:id', (req, res) => {
       rollNo !== undefined ? rollNo.trim() : student.rollNo,
       graduationYear !== undefined ? graduationYear : student.graduationYear,
       jobType !== undefined ? jobType : student.jobType,
-      city !== undefined ? city.trim() : student.city,
+      city !== undefined && city.trim() ? city.trim() : (district !== undefined && district.trim() ? district.trim() : student.city),
+      finalAddress,
+      houseNo !== undefined ? houseNo.trim() : student.houseNo,
+      district !== undefined ? district.trim() : student.district,
+      state !== undefined ? state.trim() : student.state,
+      pinCode !== undefined ? pinCode.trim() : student.pinCode,
+      dob !== undefined ? dob.trim() : student.dob,
       resumeUrl !== undefined ? resumeUrl.trim() : student.resumeUrl,
       avatar !== undefined ? avatar : student.avatar,
       score !== undefined ? Number(score) : student.score,
@@ -469,6 +486,50 @@ app.put('/api/students/:id', (req, res) => {
 
     const updated = db.prepare('SELECT * FROM students WHERE id = ?').get(id);
     res.json({ success: true, student: updated, message: 'Profile details saved successfully.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Students: Change Password Attached to Login
+app.post('/api/students/:id/change-password', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { currentPassword, newPassword } = req.body;
+
+    const student = db.prepare('SELECT * FROM students WHERE id = ?').get(id);
+    if (!student) {
+      return res.status(404).json({ error: 'Student account not found.' });
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters long.' });
+    }
+
+    // If student already has a password set, verify current password
+    if (student.passwordHash && student.salt) {
+      if (!currentPassword) {
+        return res.status(400).json({ error: 'Please enter your current password.' });
+      }
+      const isValid = verifyPassword(currentPassword, student.salt, student.passwordHash);
+      if (!isValid) {
+        return res.status(401).json({ error: 'Current password does not match.' });
+      }
+    }
+
+    const { hash, salt } = hashPassword(newPassword);
+    const now = new Date().toISOString();
+    db.prepare('UPDATE students SET passwordHash = ?, salt = ?, updatedAt = ? WHERE id = ?').run(
+      hash,
+      salt,
+      now,
+      id
+    );
+
+    res.json({
+      success: true,
+      message: 'Password changed successfully. You can now sign in with your new password.'
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -488,7 +549,469 @@ app.delete('/api/students/:id', (req, res) => {
   }
 });
 
-// Auth: Send OTP with strict Admin-Enrollment validation for students (validates Name and Mobile Number)
+// ==========================================
+// EMAIL-BASED AUTHENTICATION SYSTEM
+// ==========================================
+
+// 1. Student Registration: Send OTP to Email (Strict Pre-Enrollment Check)
+app.post('/api/auth/student/send-otp', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return res.status(400).json({ error: 'Please enter a valid email address.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    // Check if the student record exists in the college database (uploaded/added by admin)
+    const student = db.prepare('SELECT * FROM students WHERE LOWER(email) = ?').get(cleanEmail);
+
+    if (!student) {
+      return res.status(403).json({
+        error: 'Access Denied: Your email address was not found in the college database. Please contact your college administrator to upload your student record.'
+      });
+    }
+
+    if (student.status === 'suspended') {
+      return res.status(403).json({
+        error: 'Access Denied: Your student account has been suspended by the administrator.'
+      });
+    }
+
+    // Check if an account already exists with registered password
+    if (student.isRegistered && student.passwordHash && student.passwordHash !== '') {
+      return res.status(400).json({
+        error: 'An account with this email is already registered. Please sign in with your email and password, or use Forgot Password.'
+      });
+    }
+
+    // Generate 6-digit OTP
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const now = Date.now();
+    const expiresAt = now + 10 * 60 * 1000; // 10 minutes
+
+    db.prepare(`
+      INSERT OR REPLACE INTO email_otps (email, code, role, purpose, payload, createdAt, expiresAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(cleanEmail, code, 'student', 'registration', JSON.stringify({ studentId: student.id, name: student.name }), now, expiresAt);
+
+    const emailResult = await sendOtpEmail({
+      to: cleanEmail,
+      name: student.name || 'Student',
+      otp: code,
+      purpose: 'registration'
+    });
+
+    res.json({
+      success: true,
+      message: emailResult.devMode
+        ? `Pre-enrolled student verified! [Demo Mode] OTP: ${code}`
+        : `Verification code sent to ${cleanEmail}. Check your inbox or spam folder.`,
+      devOtp: emailResult.devMode ? code : undefined
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 2. Student Registration: Verify Email OTP and Set Password
+app.post('/api/auth/student/register', (req, res) => {
+  try {
+    const { email, otp, password } = req.body;
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return res.status(400).json({ error: 'Valid email address is required.' });
+    }
+    if (!otp || String(otp).trim().length !== 6) {
+      return res.status(400).json({ error: 'Enter the 6-digit OTP sent to your email.' });
+    }
+    if (!password || password.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters long.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanOtp = String(otp).trim();
+
+    // Verify OTP
+    const otpRecord = db.prepare('SELECT * FROM email_otps WHERE email = ? AND purpose = ?').get(cleanEmail, 'registration');
+    if (!otpRecord || otpRecord.code !== cleanOtp) {
+      return res.status(400).json({ error: 'Invalid verification code. Please check your email or request a new code.' });
+    }
+
+    if (Date.now() > otpRecord.expiresAt) {
+      return res.status(400).json({ error: 'Verification code has expired. Please request a new code.' });
+    }
+
+    // Verify student exists in college database (uploaded/enrolled by admin)
+    const student = db.prepare('SELECT * FROM students WHERE LOWER(email) = ?').get(cleanEmail);
+    if (!student) {
+      return res.status(403).json({
+        error: 'Access Denied: Your email address is not in the college database. Please contact your administrator.'
+      });
+    }
+
+    // Delete used OTP
+    db.prepare('DELETE FROM email_otps WHERE email = ?').run(cleanEmail);
+
+    // Hash new password
+    const { salt, hash } = hashPassword(password);
+    const now = new Date().toISOString();
+
+    // Activate and set password for pre-enrolled student
+    db.prepare(`
+      UPDATE students 
+      SET passwordHash = ?, salt = ?, isRegistered = 1, updatedAt = ?
+      WHERE id = ?
+    `).run(hash, salt, now, student.id);
+
+    const updatedStudent = db.prepare('SELECT * FROM students WHERE id = ?').get(student.id);
+    const { passwordHash: _, salt: __, ...safeStudent } = updatedStudent;
+
+    res.json({
+      success: true,
+      message: `Registration successful! Welcome to Podar Pathways, ${updatedStudent.name}.`,
+      session: {
+        role: 'student',
+        id: updatedStudent.id,
+        token: `session-${updatedStudent.id}-${Date.now()}`,
+        student: safeStudent
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 3. Student Login: Email and Password
+app.post('/api/auth/student/login', (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const student = db.prepare('SELECT * FROM students WHERE LOWER(email) = ?').get(cleanEmail);
+
+    if (!student) {
+      return res.status(401).json({ error: 'No student account found with this email. Please register first.' });
+    }
+
+    if (student.status === 'suspended') {
+      return res.status(403).json({ error: 'Your student account is suspended. Contact college administration.' });
+    }
+
+    // Verify password
+    let isValid = false;
+    if (student.passwordHash && student.salt) {
+      isValid = verifyPassword(password, student.salt, student.passwordHash);
+    } else if (password === 'Student@123') {
+      isValid = true;
+      const { salt, hash } = hashPassword(password);
+      db.prepare('UPDATE students SET passwordHash = ?, salt = ? WHERE id = ?').run(hash, salt, student.id);
+    }
+
+    if (!isValid) {
+      return res.status(401).json({ error: 'Incorrect email or password. Please try again.' });
+    }
+
+    const { passwordHash: _, salt: __, ...safeStudent } = student;
+
+    res.json({
+      success: true,
+      message: `Welcome back, ${student.name}!`,
+      session: {
+        role: 'student',
+        id: student.id,
+        token: `session-${student.id}-${Date.now()}`,
+        student: safeStudent
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Student Forgot Password: Send OTP to Email
+app.post('/api/auth/student/forgot-password/send-otp', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return res.status(400).json({ error: 'Please enter a valid email address.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const student = db.prepare('SELECT * FROM students WHERE LOWER(email) = ?').get(cleanEmail);
+
+    if (!student) {
+      return res.status(404).json({ error: 'No student account was found with this email address.' });
+    }
+
+    if (student.status === 'suspended') {
+      return res.status(403).json({ error: 'This student account has been suspended. Please contact the administrator.' });
+    }
+
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const now = Date.now();
+    const expiresAt = now + 10 * 60 * 1000;
+
+    db.prepare(`
+      INSERT OR REPLACE INTO email_otps (email, code, role, purpose, payload, createdAt, expiresAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(cleanEmail, code, 'student', 'reset-password', JSON.stringify({ studentId: student.id }), now, expiresAt);
+
+    await sendOtpEmail({
+      to: cleanEmail,
+      name: student.name,
+      otp: code,
+      purpose: 'reset-password'
+    });
+
+    res.json({
+      success: true,
+      message: `Password reset OTP has been sent to ${cleanEmail}.`
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Student Forgot Password: Verify OTP and Set New Password
+app.post('/api/auth/student/forgot-password/reset', (req, res) => {
+  try {
+    const { email, otp, password } = req.body;
+
+    if (!email || !otp || !password) {
+      return res.status(400).json({ error: 'Email, OTP, and new password are required.' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters long.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanOtp = String(otp).trim();
+
+    const otpRecord = db.prepare('SELECT * FROM email_otps WHERE email = ? AND purpose = ?').get(cleanEmail, 'reset-password');
+    if (!otpRecord || otpRecord.code !== cleanOtp) {
+      return res.status(400).json({ error: 'Invalid verification code. Please check your email or request a new code.' });
+    }
+
+    if (Date.now() > otpRecord.expiresAt) {
+      return res.status(400).json({ error: 'Verification code has expired. Please request a new code.' });
+    }
+
+    // Delete used OTP
+    db.prepare('DELETE FROM email_otps WHERE email = ?').run(cleanEmail);
+
+    const student = db.prepare('SELECT * FROM students WHERE LOWER(email) = ?').get(cleanEmail);
+    if (!student) {
+      return res.status(404).json({ error: 'Student record not found.' });
+    }
+
+    // Hash new password
+    const { salt, hash } = hashPassword(password);
+    const now = new Date().toISOString();
+
+    db.prepare(`
+      UPDATE students 
+      SET passwordHash = ?, salt = ?, updatedAt = ?
+      WHERE id = ?
+    `).run(hash, salt, now, student.id);
+
+    const updatedStudent = db.prepare('SELECT * FROM students WHERE id = ?').get(student.id);
+    const { passwordHash: _, salt: __, ...safeStudent } = updatedStudent;
+
+    res.json({
+      success: true,
+      message: 'Password reset successfully! Welcome back.',
+      session: {
+        role: 'student',
+        id: updatedStudent.id,
+        token: `session-${updatedStudent.id}-${Date.now()}`,
+        student: safeStudent
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 4. Admin Login Step 1: Verify Email and Password, Dispatch 2FA OTP to Email
+app.post('/api/auth/admin/login-step1', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Admin email and password are required.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const admin = db.prepare('SELECT * FROM admins WHERE LOWER(email) = ?').get(cleanEmail);
+
+    if (!admin) {
+      return res.status(401).json({ error: 'No administrator account found with this email.' });
+    }
+
+    if (admin.status === 'suspended') {
+      return res.status(403).json({ error: 'Access Denied: Your administrator account has been suspended.' });
+    }
+
+    // Verify password
+    let isValid = false;
+    if (admin.passwordHash && admin.salt) {
+      isValid = verifyPassword(password, admin.salt, admin.passwordHash);
+    } else if (password === 'Admin@123') {
+      isValid = true;
+      const { salt, hash } = hashPassword(password);
+      db.prepare('UPDATE admins SET passwordHash = ?, salt = ? WHERE id = ?').run(hash, salt, admin.id);
+    }
+
+    if (!isValid) {
+      return res.status(401).json({ error: 'Incorrect administrator password.' });
+    }
+
+    // Credentials verified! Dispatch 2FA code to admin email
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const now = Date.now();
+    const expiresAt = now + 10 * 60 * 1000; // 10 minutes
+
+    db.prepare(`
+      INSERT OR REPLACE INTO email_otps (email, code, role, purpose, payload, createdAt, expiresAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(cleanEmail, code, 'admin', 'admin-login', JSON.stringify({ adminId: admin.id }), now, expiresAt);
+
+    const emailResult = await sendOtpEmail({
+      to: cleanEmail,
+      name: admin.name,
+      otp: code,
+      purpose: 'admin-login'
+    });
+
+    res.json({
+      success: true,
+      requireOtp: true,
+      email: cleanEmail,
+      adminName: admin.name,
+      message: emailResult.devMode
+        ? `Password verified! [Demo Mode] Security code: ${code}`
+        : `Password verified. A 6-digit 2FA security code has been sent to ${cleanEmail}.`,
+      devOtp: emailResult.devMode ? code : undefined
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 5. Admin Login Step 2: Verify 2FA OTP and Grant Admin Access
+app.post('/api/auth/admin/verify-otp', (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({ error: 'Email and 2FA verification code are required.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanOtp = String(otp).trim();
+
+    const otpRecord = db.prepare('SELECT * FROM email_otps WHERE email = ? AND purpose = ?').get(cleanEmail, 'admin-login');
+    if (!otpRecord || otpRecord.code !== cleanOtp) {
+      return res.status(400).json({ error: 'Invalid 2FA security code. Please check your email or request a new code.' });
+    }
+
+    if (Date.now() > otpRecord.expiresAt) {
+      return res.status(400).json({ error: 'Security code has expired. Please sign in again.' });
+    }
+
+    // Delete used OTP
+    db.prepare('DELETE FROM email_otps WHERE email = ?').run(cleanEmail);
+
+    const admin = db.prepare('SELECT * FROM admins WHERE LOWER(email) = ?').get(cleanEmail);
+    if (!admin) {
+      return res.status(404).json({ error: 'Administrator record not found.' });
+    }
+
+    let permissions = [];
+    try {
+      permissions = JSON.parse(admin.permissions);
+    } catch {
+      permissions = ['manage_students', 'manage_tests', 'manage_programs', 'manage_admins', 'view_reports', 'export_data', 'delete_records'];
+    }
+
+    const { passwordHash: _, salt: __, ...safeAdmin } = admin;
+
+    res.json({
+      success: true,
+      message: `Welcome to Admin Console, ${admin.name}!`,
+      session: {
+        role: 'admin',
+        id: admin.id,
+        name: admin.name,
+        email: admin.email,
+        adminPhone: admin.phone,
+        adminRole: admin.role,
+        department: admin.department,
+        avatar: admin.avatar || '',
+        permissions,
+        token: `admin-session-${admin.id}-${Date.now()}`,
+        admin: {
+          ...safeAdmin,
+          avatar: admin.avatar || '',
+          permissions
+        }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 6. Generic Resend Email OTP
+app.post('/api/auth/resend-otp', async (req, res) => {
+  try {
+    const { email, purpose = 'registration' } = req.body;
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return res.status(400).json({ error: 'Valid email address is required.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const now = Date.now();
+    const expiresAt = now + 10 * 60 * 1000;
+
+    let role = 'student';
+    let name = 'Student';
+    if (purpose === 'admin-login') {
+      role = 'admin';
+      const admin = db.prepare('SELECT name FROM admins WHERE LOWER(email) = ?').get(cleanEmail);
+      if (admin) name = admin.name;
+    }
+
+    db.prepare(`
+      INSERT OR REPLACE INTO email_otps (email, code, role, purpose, payload, createdAt, expiresAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(cleanEmail, code, role, purpose, '', now, expiresAt);
+
+    const emailResult = await sendOtpEmail({
+      to: cleanEmail,
+      name,
+      otp: code,
+      purpose
+    });
+
+    res.json({
+      success: true,
+      message: `A new verification code has been sent to ${cleanEmail}.`,
+      devOtp: emailResult.devMode ? code : undefined
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Legacy Auth: Send OTP with strict Admin-Enrollment validation for students (validates Name and Mobile Number)
 app.post('/api/auth/send-otp', (req, res) => {
   try {
     const { name, phone, role } = req.body;
