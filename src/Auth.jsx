@@ -385,21 +385,22 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
       });
 
       // Update state if new student created
-      if (res.session?.student) {
+      const sessionData = res.session || res;
+      if (sessionData?.student) {
         setState(prev => {
           const list = prev.students || [];
-          const exists = list.find(s => s.id === res.session.student.id || s.email === res.session.student.email);
+          const exists = list.find(s => s.id === sessionData.student.id || s.email === sessionData.student.email);
           return {
             ...prev,
             students: exists
-              ? list.map(s => s.id === exists.id ? { ...exists, ...res.session.student } : s)
-              : [res.session.student, ...list]
+              ? list.map(s => s.id === exists.id ? { ...exists, ...sessionData.student } : s)
+              : [sessionData.student, ...list]
           };
         });
       }
 
       notify(res.message || 'Registration successful!');
-      onLogin(res.session);
+      onLogin(sessionData);
     } catch (err) {
       setNotice({ type: 'error', text: err.message });
     }
@@ -423,21 +424,22 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
         password
       });
 
-      if (res.session?.student) {
+      const sessionData = res.session || res;
+      if (sessionData?.student) {
         setState(prev => {
           const list = prev.students || [];
-          const exists = list.find(s => s.id === res.session.student.id || s.email === res.session.student.email);
+          const exists = list.find(s => s.id === sessionData.student.id || s.email === sessionData.student.email);
           return {
             ...prev,
             students: exists
-              ? list.map(s => s.id === exists.id ? { ...exists, ...res.session.student } : s)
-              : [res.session.student, ...list]
+              ? list.map(s => s.id === exists.id ? { ...exists, ...sessionData.student } : s)
+              : [sessionData.student, ...list]
           };
         });
       }
 
       notify(res.message || 'Logged in successfully!');
-      onLogin(res.session);
+      onLogin(sessionData);
     } catch (err) {
       setNotice({ type: 'error', text: err.message });
     }
@@ -503,8 +505,9 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
         });
       }
 
+      const sessionData = res.session || res;
       notify(res.message || 'Password reset successfully!');
-      onLogin(res.session);
+      onLogin(sessionData);
     } catch (err) {
       setNotice({ type: 'error', text: err.message });
     }
@@ -528,8 +531,9 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
           otp: otp.trim()
         });
 
+        const sessionData = res.session || res;
         notify(res.message || 'Welcome to Admin Console!');
-        onLogin(res.session);
+        onLogin(sessionData);
       } catch (err) {
         setNotice({ type: 'error', text: err.message });
       }

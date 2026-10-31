@@ -2,14 +2,22 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Search,
   X,
-  Briefcase,
-  Sparkles,
-  Target,
-  BookOpen,
-  UserRound,
+  Mic,
+  MicOff,
+  Clock,
+  History,
+  TrendingUp,
+  Trash2,
+  ArrowLeft,
+  CornerDownLeft,
+  ArrowRight,
   ChevronRight,
+  Sparkles,
+  BookOpen,
+  Briefcase,
   GraduationCap,
   Building2,
+  Building,
   FileText,
   BarChart3,
   Trophy,
@@ -17,16 +25,35 @@ import {
   MessageSquareText,
   LayoutDashboard,
   Users,
+  UserRound,
   Code,
   Cpu,
   Globe,
   Award,
   Compass,
-  Layers,
-  Building,
-  CornerDownLeft,
-  ArrowRight
+  Layers
 } from 'lucide-react';
+
+const SEARCH_HISTORY_STORAGE_KEY = 'podar_youtube_search_history_v2';
+
+const DEFAULT_RECENT_SEARCHES = [
+  'Meta Front-End Developer Specialization',
+  'CampusKart - Student Marketplace',
+  'AWS Certified Cloud Practitioner Track',
+  'AI Career Coach',
+  'P-CARE Employability Score Breakdown'
+];
+
+const TRENDING_TOPICS = [
+  { text: 'Meta Front-End Developer', tag: 'Course', page: 'courses' },
+  { text: 'CampusKart Marketplace', tag: 'Project', page: 'projects' },
+  { text: 'AWS Cloud Practitioner', tag: 'Certification', page: 'courses' },
+  { text: 'AI Career Coach', tag: 'Tool', page: 'coach' },
+  { text: 'PathAI Neural Analyzer', tag: 'Project', page: 'projects' },
+  { text: 'TCS Campus Hiring 2026', tag: 'Placement', page: 'placements' },
+  { text: 'Smart India Hackathon', tag: 'Hackathon', page: 'opportunities' },
+  { text: 'Resume ATS Optimizer', tag: 'Tool', page: 'resume' }
+];
 
 // Helper to highlight matching keyword in search results
 function HighlightMatch({ text, query }) {
@@ -43,7 +70,7 @@ function HighlightMatch({ text, query }) {
       <>
         {parts.map((part, i) =>
           regex.test(part) ? (
-            <mark key={i} className="search-highlight">
+            <mark key={i} className="yt-search-highlight">
               {part}
             </mark>
           ) : (
@@ -62,8 +89,145 @@ export function GlobalSearch({ session, state, navigate, notify }) {
   const [activeTab, setActiveTab] = useState('all');
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [isFocused, setIsFocused] = useState(false);
+  const [isMobileSearchActive, setIsMobileSearchActive] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [history, setHistory] = useState(() => {
+    try {
+      const saved = localStorage.getItem(SEARCH_HISTORY_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : DEFAULT_RECENT_SEARCHES;
+    } catch {
+      return DEFAULT_RECENT_SEARCHES;
+    }
+  });
+
+  const [liveProjects, setLiveProjects] = useState([]);
+  const [liveCertificates, setLiveCertificates] = useState([]);
+
   const containerRef = useRef(null);
   const inputRef = useRef(null);
+  const mobileInputRef = useRef(null);
+  const recognitionRef = useRef(null);
+
+  // Initialize Speech Recognition
+  useEffect(() => {
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRec) {
+      setSpeechSupported(true);
+      try {
+        const rec = new SpeechRec();
+        rec.continuous = false;
+        rec.interimResults = false;
+        rec.lang = 'en-US';
+
+        rec.onresult = (event) => {
+          const transcript = event.results[0]?.[0]?.transcript;
+          if (transcript) {
+            setQuery(transcript);
+            setIsOpen(true);
+            saveHistory(transcript);
+            notify?.(`Voice recognized: "${transcript}"`);
+          }
+          setIsListening(false);
+        };
+
+        rec.onerror = (e) => {
+          setIsListening(false);
+          if (e.error === 'not-allowed') {
+            notify?.('Microphone permission denied. Allow microphone access in your browser.');
+          } else if (e.error !== 'no-speech') {
+            notify?.('Voice could not be recognized. Please try again.');
+          }
+        };
+
+        rec.onend = () => {
+          setIsListening(false);
+        };
+
+        recognitionRef.current = rec;
+      } catch (err) {
+        console.warn('SpeechRecognition init error:', err);
+      }
+    }
+  }, [notify]);
+
+  // Fetch live projects from PHP API
+  useEffect(() => {
+    fetch('/api/projects')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.posts && Array.isArray(data.posts)) {
+          setLiveProjects(data.posts);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Fetch live certificates from PHP API
+  useEffect(() => {
+    fetch('/api/certificates')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setLiveCertificates(data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Save history helper
+  const saveHistory = (term) => {
+    if (!term || !term.trim()) return;
+    const clean = term.trim();
+    setHistory((prev) => {
+      const filtered = prev.filter((item) => item.toLowerCase() !== clean.toLowerCase());
+      const updated = [clean, ...filtered].slice(0, 8);
+      try {
+        localStorage.setItem(SEARCH_HISTORY_STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+
+  const removeHistoryItem = (term, e) => {
+    e?.stopPropagation();
+    setHistory((prev) => {
+      const updated = prev.filter((item) => item !== term);
+      try {
+        localStorage.setItem(SEARCH_HISTORY_STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+
+  const clearAllHistory = (e) => {
+    e?.stopPropagation();
+    setHistory([]);
+    try {
+      localStorage.removeItem(SEARCH_HISTORY_STORAGE_KEY);
+    } catch {}
+    notify?.('Search history cleared.');
+  };
+
+  const toggleVoiceSearch = () => {
+    if (!speechSupported) {
+      notify?.('Voice search requires Google Chrome, Edge or Safari with speech permission enabled.');
+      return;
+    }
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+    } else {
+      try {
+        recognitionRef.current?.start();
+        setIsListening(true);
+        notify?.('Listening... Speak your search query.');
+      } catch (err) {
+        console.warn('Speech recognition start error:', err);
+      }
+    }
+  };
 
   // Keyboard shortcut: Ctrl+K or Cmd+K to focus, Esc to close
   useEffect(() => {
@@ -71,23 +235,23 @@ export function GlobalSearch({ session, state, navigate, notify }) {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         inputRef.current?.focus();
-        if (query.trim()) {
-          setIsOpen(true);
-        }
+        setIsOpen(true);
       } else if (e.key === 'Escape') {
         setIsOpen(false);
+        setIsMobileSearchActive(false);
         inputRef.current?.blur();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [query]);
+  }, []);
 
   // Click outside listener
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (containerRef.current && !containerRef.current.contains(e.target)) {
         setIsOpen(false);
+        setIsFocused(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -96,18 +260,19 @@ export function GlobalSearch({ session, state, navigate, notify }) {
 
   const q = query.trim().toLowerCase();
 
-  // 1. Pages, Tools & Workspaces
+  // 1. Pages & Workspaces
   const allPages = [
     { id: 'dashboard', title: 'Dashboard', desc: 'Overview, stats and readiness score', category: 'Overview', icon: LayoutDashboard },
     { id: 'coach', title: 'AI Career Coach', desc: 'Ask career questions, interview & resume prep', category: 'AI Tools', icon: Sparkles },
     { id: 'roadmap', title: 'Learning Roadmap', desc: 'Step-by-step career pathway and milestones', category: 'Roadmap', icon: Compass },
     { id: 'score', title: 'P-CARE Employability Score', desc: 'Academic & career readiness breakdown (82%)', category: 'Assessments', icon: BarChart3 },
     { id: 'resume', title: 'Resume Builder', desc: 'Create and AI-optimize your ATS resume', category: 'Career Assets', icon: FileText },
+    { id: 'projects', title: 'Student Projects Platform', desc: 'Instagram-style showcase of peer academic and live projects', category: 'Portfolio', icon: Target },
+    { id: 'courses', title: 'Course Catalog', desc: 'Browse and elect certified partner courses', category: 'Academics', icon: BookOpen },
+    { id: 'certificates', title: 'Certificates & Credentials', desc: 'Verified certifications, courses and badges', category: 'Portfolio', icon: Trophy },
     { id: 'opportunities', title: 'Opportunities Marketplace', desc: 'Jobs, internships, hackathons and challenges', category: 'Opportunities', icon: Briefcase },
     { id: 'internships', title: 'Internship Tracker', desc: 'Track ongoing applications & interview rounds', category: 'Opportunities', icon: GraduationCap },
     { id: 'placements', title: 'Placement Centre', desc: 'Campus placements and company offers', category: 'Opportunities', icon: Building2 },
-    { id: 'projects', title: 'Projects Portfolio', desc: 'Showcase academic, personal and live client projects', category: 'Portfolio', icon: Target },
-    { id: 'certificates', title: 'Certificates & Credentials', desc: 'Verified certifications, courses and badges', category: 'Portfolio', icon: Trophy },
     { id: 'passport', title: 'Digital Career Passport', desc: 'Verified digital QR career identity', category: 'Portfolio', icon: Award },
     { id: 'profile', title: 'Profile & Settings', desc: 'Personal details, career goals and contacts', category: 'Account', icon: UserRound },
   ];
@@ -115,7 +280,10 @@ export function GlobalSearch({ session, state, navigate, notify }) {
   if (session?.role === 'admin') {
     allPages.unshift(
       { id: 'students', title: 'Student Directory', desc: 'Manage enrolled student accounts & college roster', category: 'Admin Tools', icon: Users },
-      { id: 'courses', title: 'Course Catalog', desc: 'Publish and manage college courses', category: 'Admin Tools', icon: BookOpen },
+      { id: 'courses', title: 'Manage Courses', desc: 'Publish and manage college courses', category: 'Admin Tools', icon: BookOpen },
+      { id: 'certificates', title: 'Certificates Desk', desc: 'Verify and approve student certificates', category: 'Admin Tools', icon: Trophy },
+      { id: 'projects', title: 'Moderate Projects', desc: 'Review, pin and govern student project submissions', category: 'Admin Tools', icon: Target },
+      { id: 'admins', title: 'Admin Governance', desc: 'User permissions and team administrator roles', category: 'Admin Tools', icon: ShieldCheck },
       { id: 'admin-profile', title: 'Admin Profile', desc: 'Administrator workspace settings', category: 'Admin Tools', icon: ShieldCheck }
     );
   }
@@ -133,38 +301,11 @@ export function GlobalSearch({ session, state, navigate, notify }) {
     { title: 'UI/UX Product Design Challenge', company: 'CreativePulse Studio', tags: 'Figma • Design Systems • Wireframing', type: 'Design Challenge', page: 'opportunities', icon: Layers },
     { title: 'Smart India Hackathon (SIH 2026)', company: 'Ministry of Education & AICTE', tags: 'National Contest • Innovation • Cash Prizes', type: 'Hackathon', page: 'opportunities', icon: Trophy },
     { title: 'Podar Campus Placement Drive 2026', company: 'Podar Placement Cell', tags: 'BCA / BSc / BBA Final Year • On-Campus', type: 'Placements', page: 'placements', icon: Building2 },
-    { title: 'Software engineering internship', company: 'Global Tech Corp', tags: 'Remote • 3 months • Full Stack', type: 'Internship', page: 'opportunities', icon: Briefcase },
+    { title: 'Tata Consultancy Services (TCS)', company: 'TCS Digital & Ninja', tags: 'Campus Recruitment • ₹7.5 LPA • Mumbai / Pune', type: 'Placements', page: 'placements', icon: Building2 },
+    { title: 'Infosys Springboard', company: 'Infosys Technologies', tags: 'Systems Engineer & Specialist Programmer', type: 'Placements', page: 'placements', icon: Building2 },
   ];
 
-  // 3. Top Companies & Employers
-  const allCompanies = [
-    { name: 'Google / Alphabet', role: 'Software Engineering Apprentice & Cloud Intern', location: 'Bengaluru / Hyderabad', page: 'opportunities', icon: Building },
-    { name: 'Microsoft', role: 'SWE Internship & Azure Cloud Solutions', location: 'Noida / Hyderabad / Remote', page: 'opportunities', icon: Building },
-    { name: 'Amazon (AWS)', role: 'Cloud Support Associate & SDE Intern', location: 'Bengaluru / Pune', page: 'opportunities', icon: Building },
-    { name: 'Tata Consultancy Services (TCS)', role: 'TCS Digital & Ninja Campus Hiring', location: 'Mumbai / Pune / Pan-India', page: 'placements', icon: Building2 },
-    { name: 'Infosys', role: 'Springboard Tech Fellowship & Systems Engineer', location: 'Mysore / Bengaluru', page: 'placements', icon: Building2 },
-    { name: 'Wipro', role: 'Elite Turbo National Talent Hunt', location: 'Bengaluru / Hyderabad', page: 'placements', icon: Building2 },
-    { name: 'Deloitte', role: 'Technology & Risk Advisory Analyst', location: 'Mumbai / Gurugram', page: 'placements', icon: Building2 },
-    { name: 'Tech Innovation Labs', role: 'Full Stack & Mobile App Developer', location: 'Remote / Mumbai', page: 'opportunities', icon: Building },
-  ];
-
-  // 4. Skills, Technologies & Interview Prep
-  const allSkills = [
-    { title: 'Data Structures & Algorithms (DSA)', desc: 'Arrays, Trees, Graphs, DP, LeetCode, Java/C++', page: 'roadmap', icon: Code, badge: 'High Priority' },
-    { title: 'React.js & Modern Frontend', desc: 'Hooks, State Management, Next.js, Tailwind CSS', page: 'roadmap', icon: Globe, badge: 'Tech Skill' },
-    { title: 'Node.js & Backend Architecture', desc: 'Express.js, RESTful APIs, JWT Auth, Microservices', page: 'roadmap', icon: Cpu, badge: 'Tech Skill' },
-    { title: 'Python Programming & Data Analysis', desc: 'NumPy, Pandas, Matplotlib, Automation Scripting', page: 'coach', icon: Sparkles, badge: 'In Demand' },
-    { title: 'SQL & Database Design', desc: 'PostgreSQL, MySQL, SQLite, MongoDB, Indexing', page: 'roadmap', icon: Layers, badge: 'Tech Skill' },
-    { title: 'Cloud Computing (AWS & Azure)', desc: 'EC2, S3, Lambda, Docker, Kubernetes, Cloud Ops', page: 'roadmap', icon: Globe, badge: 'Cloud' },
-    { title: 'Artificial Intelligence & Machine Learning', desc: 'Scikit-Learn, PyTorch, Neural Networks, Computer Vision', page: 'coach', icon: Sparkles, badge: 'AI & ML' },
-    { title: 'Generative AI & Prompt Engineering', desc: 'LLMs, OpenAI APIs, LangChain, RAG Systems', page: 'coach', icon: Sparkles, badge: 'Trending' },
-    { title: 'Cybersecurity & Network Defense', desc: 'OWASP Top 10, VAPT, Penetration Testing, Ethical Hacking', page: 'roadmap', icon: ShieldCheck, badge: 'Security' },
-    { title: 'Git, GitHub & Version Control', desc: 'Git Workflow, Branching, Pull Requests, CI/CD Actions', page: 'roadmap', icon: Code, badge: 'Core Tool' },
-    { title: 'Interview Preparation & HR Rounds', desc: 'Mock interviews, Behavioral STAR method, Salary negotiation', page: 'coach', icon: MessageSquareText, badge: 'Soft Skill' },
-    { title: 'Campus Aptitude & Logical Reasoning', desc: 'Quantitative Aptitude, Verbal Ability, Coding rounds', page: 'score', icon: BarChart3, badge: 'Placement' },
-  ];
-
-  // 5. Courses & Learning Tracks
+  // 3. Courses (State + Defaults)
   const defaultCourses = [
     { id: 'c1', title: 'Career Readiness Foundations', desc: 'Core career curriculum, goal setting & professional ethics', page: 'courses', category: 'Foundation', icon: BookOpen },
     { id: 'c2', title: 'Google IT Automation with Python', desc: 'Professional Certificate: Automating real-world tasks with Python', page: 'courses', category: 'Professional Cert', icon: BookOpen },
@@ -173,343 +314,586 @@ export function GlobalSearch({ session, state, navigate, notify }) {
     { id: 'c5', title: 'Data Structures Masterclass in Java', desc: 'Master coding patterns for top tech interviews', page: 'courses', category: 'Coding Track', icon: BookOpen },
   ];
 
-  // Combine with dynamic courses from state
-  const dynamicCourses = (state?.courses || []).map(c => ({
+  const dynamicCourses = (state?.courses || []).map((c) => ({
     id: c.id,
     title: c.title,
-    desc: c.description || 'Course shared by your college.',
+    desc: c.description || c.issuer || 'Course shared by your college.',
     page: 'courses',
-    category: 'College Course',
+    category: c.issuer || 'College Course',
     icon: BookOpen
   }));
 
-  const allCourses = [...defaultCourses, ...dynamicCourses.filter(dc => !defaultCourses.some(df => df.title.toLowerCase() === dc.title.toLowerCase()))];
+  const allCourses = [...defaultCourses, ...dynamicCourses.filter((dc) => !defaultCourses.some((df) => df.title.toLowerCase() === dc.title.toLowerCase()))];
 
-  // 6. Quick Career Actions
-  const careerActions = [
-    { title: 'Ask AI Career Coach a Question', desc: 'Get instant personalized guidance for your career goal', page: 'coach', icon: Sparkles },
-    { title: 'Run AI Resume Optimization', desc: 'Check ATS score, keywords and improvement tips', page: 'resume', icon: FileText },
-    { title: 'Check P-CARE Score Breakdown', desc: 'View technical skills, projects and certifications scores', page: 'score', icon: BarChart3 },
-    { title: 'Explore Open Placement Drives', desc: 'View upcoming company visits and campus recruitment', page: 'placements', icon: Building2 },
-    { title: 'View Digital Career Passport', desc: 'Access your QR-ready verified academic identity', page: 'passport', icon: Award },
-  ];
+  // 4. Student Projects (Live from PHP API + Fallbacks)
+  const formattedProjects = liveProjects.map((p) => ({
+    id: p.id,
+    title: p.title,
+    desc: `By ${p.studentName} (${p.studentCourse || 'Student'}) • ${p.category || 'Project'} • ${(p.tags || []).join(', ')}`,
+    page: 'projects',
+    category: p.category || 'Student Project',
+    icon: Target,
+    badge: p.category || 'Live Project'
+  }));
 
-  // 7. Dynamic Students (if admin)
-  const students = session?.role === 'admin' ? (state?.students || []).map(s => ({
-    id: s.id,
-    title: s.name,
-    desc: `${s.course} • Sem ${s.semester} • ${s.phone}`,
-    page: `admin-student:${s.id}`,
-    category: 'Student',
-    icon: UserRound
-  })) : [];
+  // 5. Certificates (Live from PHP API)
+  const formattedCertificates = liveCertificates.map((c) => ({
+    id: c.id,
+    title: c.programTitle || 'Course Certificate',
+    desc: `Awarded to ${c.studentName} • Status: ${c.status || 'Verified'} • Code: ${c.verificationCode || c.credentialId || 'N/A'}`,
+    page: 'certificates',
+    category: 'Verified Credential',
+    icon: Trophy,
+    badge: c.status === 'verified' ? 'Verified' : 'Under Review'
+  }));
 
-  // Filter items based on query & active tab - strictly active when query is non-empty
+  // 6. Dynamic Students (for admin)
+  const students = session?.role === 'admin'
+    ? (state?.students || []).map((s) => ({
+        id: s.id,
+        title: s.name,
+        desc: `${s.course} • Sem ${s.semester} • ${s.phone} • Score: ${s.score}/100`,
+        page: `admin-student:${s.id}`,
+        category: 'Student Account',
+        icon: UserRound
+      }))
+    : [];
+
+  // 7. Filter items when query is present
   const matchedPages = q && (activeTab === 'all' || activeTab === 'tools')
-    ? allPages.filter(p => p.title.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q) || p.category.toLowerCase().includes(q))
-    : [];
-
-  const matchedOpps = q && (activeTab === 'all' || activeTab === 'opportunities')
-    ? allOpportunities.filter(o => o.title.toLowerCase().includes(q) || o.company.toLowerCase().includes(q) || o.tags.toLowerCase().includes(q) || o.type.toLowerCase().includes(q))
-    : [];
-
-  const matchedCompanies = q && (activeTab === 'all' || activeTab === 'companies')
-    ? allCompanies.filter(c => c.name.toLowerCase().includes(q) || c.role.toLowerCase().includes(q) || c.location.toLowerCase().includes(q))
-    : [];
-
-  const matchedSkills = q && (activeTab === 'all' || activeTab === 'skills')
-    ? allSkills.filter(s => s.title.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q) || (s.badge && s.badge.toLowerCase().includes(q)))
+    ? allPages.filter((p) => p.title.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q) || p.category.toLowerCase().includes(q))
     : [];
 
   const matchedCourses = q && (activeTab === 'all' || activeTab === 'courses')
-    ? allCourses.filter(c => c.title.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q))
+    ? allCourses.filter((c) => c.title.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q))
     : [];
 
-  const matchedActions = q && (activeTab === 'all' || activeTab === 'tools')
-    ? careerActions.filter(a => a.title.toLowerCase().includes(q) || a.desc.toLowerCase().includes(q))
+  const matchedProjects = q && (activeTab === 'all' || activeTab === 'projects')
+    ? formattedProjects.filter((p) => p.title.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q))
+    : [];
+
+  const matchedOpps = q && (activeTab === 'all' || activeTab === 'opportunities')
+    ? allOpportunities.filter((o) => o.title.toLowerCase().includes(q) || o.company.toLowerCase().includes(q) || o.tags.toLowerCase().includes(q) || o.type.toLowerCase().includes(q))
+    : [];
+
+  const matchedCerts = q && (activeTab === 'all' || activeTab === 'certificates')
+    ? formattedCertificates.filter((c) => c.title.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q))
     : [];
 
   const matchedStudents = q && (activeTab === 'all' || activeTab === 'students')
-    ? students.filter(s => s.title.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q))
+    ? students.filter((s) => s.title.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q))
     : [];
 
-  // Organized categorized groups for professional sectioning
+  // Organized categorized groups
   const groups = [
-    { id: 'pages', title: 'Pages & Portals', items: matchedPages, type: 'page' },
-    { id: 'opps', title: 'Opportunities & Contests', items: matchedOpps, type: 'opp' },
-    { id: 'companies', title: 'Companies & Partners', items: matchedCompanies, type: 'company' },
-    { id: 'skills', title: 'Skills & Tech Roadmap', items: matchedSkills, type: 'skill' },
     { id: 'courses', title: 'Courses & Certifications', items: matchedCourses, type: 'course' },
-    { id: 'actions', title: 'Career Actions & Tools', items: matchedActions, type: 'action' },
-    { id: 'students', title: 'Student Directory', items: matchedStudents, type: 'student' }
-  ].filter(g => g.items.length > 0);
+    { id: 'projects', title: 'Student Projects', items: matchedProjects, type: 'project' },
+    { id: 'opps', title: 'Opportunities & Drives', items: matchedOpps, type: 'opp' },
+    { id: 'certificates', title: 'Certificates & Credentials', items: matchedCerts, type: 'cert' },
+    { id: 'pages', title: 'Platform Pages & Tools', items: matchedPages, type: 'page' },
+    { id: 'students', title: 'Student Accounts', items: matchedStudents, type: 'student' }
+  ].filter((g) => g.items.length > 0);
 
-  // Flatten for keyboard navigation
-  const flatResults = groups.flatMap(g => g.items.map(item => ({ ...item, groupType: g.type })));
+  const flatResults = groups.flatMap((g) => g.items.map((item) => ({ ...item, groupType: g.type })));
   const totalCount = flatResults.length;
 
-  // Auto-scroll selected item into view smoothly
-  useEffect(() => {
-    if (isOpen && totalCount > 0) {
-      const selectedEl = containerRef.current?.querySelector('.search-item.is-selected');
-      if (selectedEl) {
-        selectedEl.scrollIntoView({ block: 'nearest' });
-      }
-    }
-  }, [selectedIndex, isOpen, totalCount]);
-
   const handleSelect = (page, itemTitle) => {
+    if (itemTitle) {
+      saveHistory(itemTitle);
+    } else if (query.trim()) {
+      saveHistory(query.trim());
+    }
+
     if (page && navigate) {
       navigate(page);
     }
     setIsOpen(false);
+    setIsMobileSearchActive(false);
     setQuery('');
     if (notify && itemTitle) {
-      notify(`Opened ${itemTitle}`);
+      notify(`Navigating to ${itemTitle}`);
     }
+  };
+
+  const handleSearchSubmit = (e) => {
+    if (e) e.preventDefault();
+    const trimmed = query.trim();
+    if (!trimmed) {
+      inputRef.current?.focus();
+      setIsOpen(true);
+      return;
+    }
+
+    saveHistory(trimmed);
+
+    // If a suggestion is highlighted via arrow keys
+    if (flatResults.length > 0 && selectedIndex >= 0 && selectedIndex < flatResults.length) {
+      const selected = flatResults[selectedIndex];
+      handleSelect(selected.page || selected.id, selected.title || selected.name);
+      return;
+    }
+
+    // If there are search matches, pick the top result
+    if (flatResults.length > 0) {
+      const top = flatResults[0];
+      handleSelect(top.page || top.id, top.title || top.name);
+      return;
+    }
+
+    // Smart semantic navigation fallback
+    const lower = trimmed.toLowerCase();
+    if (lower.includes('project') || lower.includes('campuskart') || lower.includes('pathai') || lower.includes('medvault')) {
+      navigate('projects');
+    } else if (lower.includes('course') || lower.includes('meta') || lower.includes('aws') || lower.includes('python') || lower.includes('google')) {
+      navigate('courses');
+    } else if (lower.includes('cert') || lower.includes('badge')) {
+      navigate('certificates');
+    } else if (lower.includes('resume') || lower.includes('cv')) {
+      navigate('resume');
+    } else if (lower.includes('coach') || lower.includes('ai') || lower.includes('chat')) {
+      navigate('coach');
+    } else if (lower.includes('roadmap') || lower.includes('dsa')) {
+      navigate('roadmap');
+    } else if (lower.includes('score') || lower.includes('p-care')) {
+      navigate('score');
+    } else if (lower.includes('intern') || lower.includes('job') || lower.includes('placement')) {
+      navigate('opportunities');
+    } else if (session?.role === 'admin' && (lower.includes('student') || lower.includes('roster'))) {
+      navigate('students');
+    } else {
+      navigate('dashboard');
+    }
+
+    setIsOpen(false);
+    setIsMobileSearchActive(false);
+    notify?.(`Searching for "${trimmed}"`);
   };
 
   const handleKeyDown = (e) => {
-    if (!isOpen || totalCount === 0) return;
+    if (!isOpen) return;
+
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setSelectedIndex((prev) => (prev + 1) % totalCount);
+      if (flatResults.length > 0) {
+        setSelectedIndex((prev) => (prev + 1) % flatResults.length);
+      }
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setSelectedIndex((prev) => (prev - 1 + totalCount) % totalCount);
+      if (flatResults.length > 0) {
+        setSelectedIndex((prev) => (prev - 1 + flatResults.length) % flatResults.length);
+      }
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      const current = flatResults[selectedIndex] || flatResults[0];
-      if (current) {
-        handleSelect(current.page || current.id, current.title || current.name);
-      }
+      handleSearchSubmit();
+    } else if (e.key === 'Escape') {
+      setIsOpen(false);
+      setIsMobileSearchActive(false);
+      inputRef.current?.blur();
     }
   };
 
-  // Tab definitions with dynamic match counters
+  // Filter Tabs
   const tabs = [
     { id: 'all', label: 'All', count: totalCount },
-    {
-      id: 'opportunities',
-      label: 'Opportunities',
-      count: allOpportunities.filter(o => o.title.toLowerCase().includes(q) || o.company.toLowerCase().includes(q) || o.tags.toLowerCase().includes(q)).length
-    },
-    {
-      id: 'companies',
-      label: 'Companies',
-      count: allCompanies.filter(c => c.name.toLowerCase().includes(q) || c.role.toLowerCase().includes(q)).length
-    },
-    {
-      id: 'skills',
-      label: 'Skills',
-      count: allSkills.filter(s => s.title.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q)).length
-    },
-    {
-      id: 'courses',
-      label: 'Courses',
-      count: allCourses.filter(c => c.title.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q)).length
-    },
-    {
-      id: 'tools',
-      label: 'Tools',
-      count: allPages.filter(p => p.title.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q)).length +
-             careerActions.filter(a => a.title.toLowerCase().includes(q) || a.desc.toLowerCase().includes(q)).length
-    },
+    { id: 'courses', label: 'Courses', count: allCourses.filter((c) => c.title.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q)).length },
+    { id: 'projects', label: 'Projects', count: formattedProjects.filter((p) => p.title.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q)).length },
+    { id: 'opportunities', label: 'Opportunities', count: allOpportunities.filter((o) => o.title.toLowerCase().includes(q) || o.company.toLowerCase().includes(q)).length },
+    { id: 'certificates', label: 'Certificates', count: formattedCertificates.filter((c) => c.title.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q)).length },
+    { id: 'tools', label: 'Tools', count: allPages.filter((p) => p.title.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q)).length }
   ];
 
   if (session?.role === 'admin') {
     tabs.push({
       id: 'students',
       label: 'Students',
-      count: students.filter(s => s.title.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q)).length
+      count: students.filter((s) => s.title.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q)).length
     });
   }
 
-  const showDropdown = isOpen && Boolean(q);
   let runningIndex = 0;
 
   return (
-    <div className="global-search-container" ref={containerRef}>
-      <div 
-        className={`global-search-bar ${showDropdown ? 'active' : ''}`}
+    <>
+      {/* 1. Mobile Search Trigger Button (Visible only on small screens) */}
+      <button
+        type="button"
+        className="yt-mobile-search-trigger"
         onClick={() => {
-          inputRef.current?.focus();
+          setIsMobileSearchActive(true);
+          setIsOpen(true);
+          setTimeout(() => mobileInputRef.current?.focus(), 80);
         }}
+        aria-label="Open search"
+        title="Search"
       >
-        <Search size={16} className="search-icon" />
-        <input
-          ref={inputRef}
-          type="text"
-          className="search-input"
-          value={query}
-          onChange={(e) => {
-            const val = e.target.value;
-            setQuery(val);
-            setIsOpen(Boolean(val.trim()));
-            setSelectedIndex(0);
-          }}
-          onFocus={() => {
-            if (query.trim()) setIsOpen(true);
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder="Search opportunities, skills, companies, tools..."
-          aria-label="Search opportunities, skills, companies, tools"
-        />
-        {query ? (
+        <Search size={20} />
+      </button>
+
+      {/* 2. Main YouTube Navbar Search Bar Container */}
+      <div
+        className={`yt-search-container ${isMobileSearchActive ? 'mobile-active' : ''}`}
+        ref={containerRef}
+      >
+        {/* Mobile Back Button (when mobile search is open) */}
+        {isMobileSearchActive && (
           <button
             type="button"
-            className="search-clear-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              setQuery('');
+            className="yt-mobile-back-btn"
+            onClick={() => {
+              setIsMobileSearchActive(false);
               setIsOpen(false);
-              inputRef.current?.focus();
             }}
-            title="Clear search (Esc)"
+            aria-label="Back"
           >
-            <X size={14} />
+            <ArrowLeft size={20} />
           </button>
-        ) : (
-          <div className="search-shortcut-badge" title="Press Ctrl+K or Cmd+K to search">
-            <span className="search-kbd">Ctrl</span>
-            <span className="search-kbd">K</span>
-          </div>
         )}
-      </div>
 
-      {showDropdown && (
-        <div className="search-dropdown-menu">
-          {/* Quick Filter Category Tabs */}
-          <div className="search-tabs">
-            {tabs.map((tab) => (
+        {/* The YouTube Pill Search Form */}
+        <form
+          className={`yt-search-box ${isFocused || isOpen ? 'is-focused' : ''}`}
+          onSubmit={handleSearchSubmit}
+          role="search"
+        >
+          {/* Left Pill: Input Wrap */}
+          <div className="yt-search-input-wrap">
+            {/* Active search icon inside input on focus (YouTube style) */}
+            <div className={`yt-search-input-icon ${isFocused ? 'active' : ''}`}>
+              <Search size={16} />
+            </div>
+
+            <input
+              ref={isMobileSearchActive ? mobileInputRef : inputRef}
+              type="text"
+              className="yt-search-input"
+              value={query}
+              onChange={(e) => {
+                const val = e.target.value;
+                setQuery(val);
+                setIsOpen(true);
+                setSelectedIndex(0);
+              }}
+              onFocus={() => {
+                setIsFocused(true);
+                setIsOpen(true);
+              }}
+              onBlur={() => {
+                setIsFocused(false);
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder="Search courses, projects, certificates..."
+              aria-label="Search"
+              autoComplete="off"
+              spellCheck="false"
+            />
+
+            {/* Clear Button (X) */}
+            {query && (
               <button
-                key={tab.id}
                 type="button"
-                className={`search-tab-pill ${activeTab === tab.id ? 'active' : ''}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setActiveTab(tab.id);
+                className="yt-search-clear-btn"
+                onClick={() => {
+                  setQuery('');
                   setSelectedIndex(0);
+                  inputRef.current?.focus();
+                  mobileInputRef.current?.focus();
                 }}
+                title="Clear search"
+                aria-label="Clear search"
               >
-                <span>{tab.label}</span>
-                {tab.count > 0 && <span className="search-tab-count">{tab.count}</span>}
+                <X size={16} />
               </button>
-            ))}
-          </div>
+            )}
 
-          {/* Results Scroll Area */}
-          <div className="search-results-scroll">
-            {totalCount === 0 ? (
-              <div className="search-empty-state">
-                <div className="search-empty-icon-wrap">
-                  <Search size={22} />
-                </div>
-                <strong>No matches found for "{query.trim()}"</strong>
-                <p>Try searching by role, skill, company or system feature</p>
-                <div className="search-quick-tags">
-                  {['React', 'Internship', 'DSA', 'Google', 'Python', 'AWS', 'Resume'].map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      className="search-quick-chip"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setQuery(tag);
-                        setIsOpen(true);
-                        setSelectedIndex(0);
-                        inputRef.current?.focus();
-                      }}
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
+            {/* Ctrl+K shortcut badge (Desktop) */}
+            {!query && !isFocused && (
+              <div className="yt-search-shortcut-badge" title="Press Ctrl+K to search">
+                <span className="yt-kbd">Ctrl</span>
+                <span className="yt-kbd">K</span>
               </div>
-            ) : (
-              groups.map((group) => (
-                <div key={group.id} className="search-group">
-                  <div className="search-group-header">
-                    <span className="search-group-title">{group.title}</span>
-                    <span className="search-group-count">{group.items.length}</span>
-                  </div>
-
-                  {group.items.map((item, idx) => {
-                    const currentFlatIdx = runningIndex++;
-                    const isSelected = currentFlatIdx === selectedIndex;
-                    const IconComponent = item.icon || Search;
-                    const itemTitle = item.title || item.name;
-                    const itemPage = item.page || item.id;
-                    const itemDesc = item.desc || item.tags || (item.role ? `${item.role} • ${item.location}` : '');
-                    const badgeText = item.badge || item.type || item.category;
-
-                    return (
-                      <div
-                        key={`${group.id}-${idx}`}
-                        className={`search-item ${isSelected ? 'is-selected' : ''}`}
-                        onMouseEnter={() => setSelectedIndex(currentFlatIdx)}
-                        onClick={() => handleSelect(itemPage, itemTitle)}
-                      >
-                        <div className={`search-item-icon ${group.type}-icon`}>
-                          <IconComponent size={16} />
-                        </div>
-                        <div className="search-item-info">
-                          <div className="search-item-title-row">
-                            <strong className="search-item-title">
-                              <HighlightMatch text={itemTitle} query={q} />
-                            </strong>
-                            {badgeText && (
-                              <span className={`search-badge ${group.type}-badge`}>
-                                {badgeText}
-                              </span>
-                            )}
-                          </div>
-                          {itemDesc && (
-                            <span className="search-item-desc">
-                              <HighlightMatch text={itemDesc} query={q} />
-                            </span>
-                          )}
-                        </div>
-
-                        {isSelected ? (
-                          <div className="search-item-enter-hint">
-                            <span>Open</span>
-                            <CornerDownLeft size={12} />
-                          </div>
-                        ) : (
-                          <ChevronRight size={14} className="search-item-arrow" />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))
             )}
           </div>
 
-          {/* Linear-style Professional Footer */}
-          <div className="search-footer">
-            <div className="search-footer-shortcuts">
-              <span className="search-shortcut-item">
-                <kbd className="search-mini-kbd">↑</kbd>
-                <kbd className="search-mini-kbd">↓</kbd>
-                <span className="search-shortcut-label">Navigate</span>
-              </span>
-              <span className="search-shortcut-item">
-                <kbd className="search-mini-kbd">↵</kbd>
-                <span className="search-shortcut-label">Select</span>
-              </span>
-              <span className="search-shortcut-item">
-                <kbd className="search-mini-kbd">esc</kbd>
-                <span className="search-shortcut-label">Close</span>
-              </span>
+          {/* Right Pill: Attached Search Submit Button */}
+          <button
+            type="submit"
+            className="yt-search-btn"
+            title="Search"
+            aria-label="Search"
+          >
+            <Search size={19} />
+          </button>
+        </form>
+
+        {/* Circular Voice Search Button (YouTube Mic) */}
+        <button
+          type="button"
+          className={`yt-voice-btn ${isListening ? 'listening' : ''}`}
+          onClick={toggleVoiceSearch}
+          title={isListening ? 'Listening... click to stop' : 'Search with your voice'}
+          aria-label="Voice search"
+        >
+          {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+          {isListening && <span className="yt-voice-ripple" />}
+        </button>
+
+        {/* YouTube Autocomplete Dropdown Popup */}
+        {isOpen && (
+          <div className="yt-search-dropdown" role="listbox">
+            {/* Category Filter Pills (when query typed) */}
+            {Boolean(q) && (
+              <div className="yt-search-tabs">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    className={`yt-search-tab-pill ${activeTab === tab.id ? 'active' : ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveTab(tab.id);
+                      setSelectedIndex(0);
+                    }}
+                  >
+                    <span>{tab.label}</span>
+                    {tab.count > 0 && <span className="yt-tab-count">{tab.count}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="yt-search-scroll-area">
+              {/* STATE A: EMPTY QUERY -> SHOW RECENT SEARCHES & TRENDING */}
+              {!q && (
+                <div className="yt-empty-query-menu">
+                  {/* Recent Searches Section */}
+                  {history.length > 0 && (
+                    <div className="yt-history-section">
+                      <div className="yt-section-header">
+                        <span className="yt-section-title">
+                          <History size={13} style={{ display: 'inline', marginRight: 6 }} />
+                          Recent searches
+                        </span>
+                        <button
+                          type="button"
+                          className="yt-clear-history-btn"
+                          onClick={clearAllHistory}
+                        >
+                          Clear all
+                        </button>
+                      </div>
+
+                      <div className="yt-history-list">
+                        {history.map((term, idx) => (
+                          <div
+                            key={`hist-${idx}`}
+                            className="yt-history-row"
+                            onClick={() => {
+                              setQuery(term);
+                              inputRef.current?.focus();
+                              handleSelect(null, term);
+                            }}
+                          >
+                            <div className="yt-history-left">
+                              <Clock size={16} className="yt-history-icon" />
+                              <strong className="yt-history-text">{term}</strong>
+                            </div>
+                            <button
+                              type="button"
+                              className="yt-remove-history-btn"
+                              onClick={(e) => removeHistoryItem(term, e)}
+                              title="Delete from history"
+                              aria-label={`Remove ${term}`}
+                            >
+                              <X size={15} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Trending / Recommended Topics */}
+                  <div className="yt-trending-section">
+                    <div className="yt-section-header">
+                      <span className="yt-section-title">
+                        <TrendingUp size={13} style={{ display: 'inline', marginRight: 6, color: '#0d9488' }} />
+                        Trending across Podar Pathways
+                      </span>
+                    </div>
+
+                    <div className="yt-trending-chips">
+                      {TRENDING_TOPICS.map((topic, i) => (
+                        <button
+                          key={`trend-${i}`}
+                          type="button"
+                          className="yt-trending-chip"
+                          onClick={() => {
+                            setQuery(topic.text);
+                            handleSelect(topic.page, topic.text);
+                          }}
+                        >
+                          <TrendingUp size={13} className="yt-trend-icon" />
+                          <span className="yt-trend-text">{topic.text}</span>
+                          <span className="yt-trend-badge">{topic.tag}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* STATE B: QUERY ACTIVE WITH 0 MATCHES */}
+              {Boolean(q) && totalCount === 0 && (
+                <div className="yt-search-no-results">
+                  <div className="yt-no-results-icon">
+                    <Search size={24} />
+                  </div>
+                  <strong>No exact matches for "{query}"</strong>
+                  <p>Try searching for a course, project name, or career skill.</p>
+                  <div className="yt-suggested-queries">
+                    {['React', 'AWS', 'CampusKart', 'PathAI', 'Resume', 'Interview'].map((chip) => (
+                      <button
+                        key={chip}
+                        type="button"
+                        className="yt-suggestion-chip"
+                        onClick={() => {
+                          setQuery(chip);
+                          setSelectedIndex(0);
+                        }}
+                      >
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* STATE C: QUERY ACTIVE WITH MATCHES */}
+              {Boolean(q) && totalCount > 0 && (
+                <div className="yt-search-results-list">
+                  {groups.map((group) => (
+                    <div key={group.id} className="yt-result-group">
+                      <div className="yt-result-group-header">
+                        <span className="yt-group-title">{group.title}</span>
+                        <span className="yt-group-count">{group.items.length}</span>
+                      </div>
+
+                      {group.items.map((item, idx) => {
+                        const currentFlatIdx = runningIndex++;
+                        const isSelected = currentFlatIdx === selectedIndex;
+                        const IconComponent = item.icon || Search;
+                        const itemTitle = item.title || item.name;
+                        const itemPage = item.page || item.id;
+                        const itemDesc = item.desc || item.tags || '';
+                        const badgeText = item.badge || item.category;
+
+                        return (
+                          <div
+                            key={`${group.id}-${idx}`}
+                            className={`yt-result-row ${isSelected ? 'is-selected' : ''}`}
+                            onMouseEnter={() => setSelectedIndex(currentFlatIdx)}
+                            onClick={() => handleSelect(itemPage, itemTitle)}
+                            role="option"
+                            aria-selected={isSelected}
+                          >
+                            {/* Icon / Avatar */}
+                            <div className={`yt-row-icon yt-icon-${group.type}`}>
+                              <IconComponent size={16} />
+                            </div>
+
+                            {/* Content */}
+                            <div className="yt-row-content">
+                              <div className="yt-row-title-line">
+                                <span className="yt-row-title">
+                                  <HighlightMatch text={itemTitle} query={q} />
+                                </span>
+                                {badgeText && (
+                                  <span className={`yt-row-badge yt-badge-${group.type}`}>
+                                    {badgeText}
+                                  </span>
+                                )}
+                              </div>
+                              {itemDesc && (
+                                <span className="yt-row-desc">
+                                  <HighlightMatch text={itemDesc} query={q} />
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Action indicator */}
+                            <div className="yt-row-action">
+                              {isSelected ? (
+                                <div className="yt-enter-pill">
+                                  <span>Open</span>
+                                  <CornerDownLeft size={11} />
+                                </div>
+                              ) : (
+                                <ChevronRight size={14} className="yt-row-arrow" />
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="search-footer-count">
-              <span>{totalCount} {totalCount === 1 ? 'result' : 'results'}</span>
+
+            {/* Footer with YouTube / Keyboard Shortcuts */}
+            <div className="yt-search-footer">
+              <div className="yt-footer-shortcuts">
+                <span className="yt-shortcut-item">
+                  <kbd className="yt-mini-kbd">↑</kbd>
+                  <kbd className="yt-mini-kbd">↓</kbd>
+                  <span className="yt-shortcut-lbl">Navigate</span>
+                </span>
+                <span className="yt-shortcut-item">
+                  <kbd className="yt-mini-kbd">↵</kbd>
+                  <span className="yt-shortcut-lbl">Select</span>
+                </span>
+                <span className="yt-shortcut-item">
+                  <kbd className="yt-mini-kbd">esc</kbd>
+                  <span className="yt-shortcut-lbl">Close</span>
+                </span>
+              </div>
+              <div className="yt-footer-count">
+                <span>{Boolean(q) ? `${totalCount} results` : 'Search Podar Pathways'}</span>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+
+        {/* Full-screen Voice Listening Modal Backdrop */}
+        {isListening && (
+          <div className="yt-voice-modal-backdrop" onClick={toggleVoiceSearch}>
+            <div className="yt-voice-modal-card" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                className="yt-voice-modal-close"
+                onClick={toggleVoiceSearch}
+                aria-label="Close voice search"
+              >
+                <X size={20} />
+              </button>
+              <div className="yt-voice-pulsing-ring">
+                <Mic size={38} className="yt-voice-modal-mic" />
+              </div>
+              <h3 className="yt-voice-modal-title">Listening...</h3>
+              <p className="yt-voice-modal-prompt">
+                Say something like <em>"Meta Front-End"</em>, <em>"CampusKart"</em>, or <em>"AI Career Coach"</em>
+              </p>
+              <button
+                type="button"
+                className="yt-voice-cancel-btn"
+                onClick={toggleVoiceSearch}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }

@@ -216,17 +216,20 @@ try {
         unset($updated['passwordHash'], $updated['salt']);
 
         $token = 'podar-token-' . bin2hex(random_bytes(24));
-        jsonResponse([
-            'success' => true,
+        $sessionObj = [
             'token'   => $token,
             'role'    => 'student',
             'id'      => $updated['id'],
             'name'    => $updated['name'],
             'email'   => $updated['email'],
             'avatar'  => $updated['avatar'] ?? '',
-            'student' => $updated,
+            'student' => $updated
+        ];
+        jsonResponse(array_merge([
+            'success' => true,
+            'session' => $sessionObj,
             'message' => 'Registration complete! Welcome to Podar Pathways.'
-        ]);
+        ], $sessionObj));
     }
 
     // Student Login
@@ -256,9 +259,7 @@ try {
 
         unset($student['passwordHash'], $student['salt']);
         $token = 'podar-token-' . bin2hex(random_bytes(24));
-
-        jsonResponse([
-            'success' => true,
+        $sessionObj = [
             'token'   => $token,
             'role'    => 'student',
             'id'      => $student['id'],
@@ -266,7 +267,13 @@ try {
             'email'   => $student['email'],
             'avatar'  => $student['avatar'] ?? '',
             'student' => $student
-        ]);
+        ];
+
+        jsonResponse(array_merge([
+            'success' => true,
+            'session' => $sessionObj,
+            'message' => "Welcome back, {$student['name']}!"
+        ], $sessionObj));
     }
 
     // Forgot Password: Send OTP
@@ -318,14 +325,21 @@ try {
 
         unset($student['passwordHash'], $student['salt']);
         $token = 'podar-token-' . bin2hex(random_bytes(24));
-        jsonResponse([
-            'success' => true,
+        $sessionObj = [
             'token'   => $token,
             'role'    => 'student',
             'id'      => $student['id'],
-            'student' => $student,
+            'name'    => $student['name'],
+            'email'   => $student['email'],
+            'avatar'  => $student['avatar'] ?? '',
+            'student' => $student
+        ];
+
+        jsonResponse(array_merge([
+            'success' => true,
+            'session' => $sessionObj,
             'message' => 'Password reset successfully! Welcome back.'
-        ]);
+        ], $sessionObj));
     }
 
     // Admin Login Step 1: Verify Password & Send 2FA
@@ -429,8 +443,7 @@ try {
 
         $token = 'podar-admin-token-' . bin2hex(random_bytes(24));
 
-        jsonResponse([
-            'success'     => true,
+        $sessionObj = [
             'token'       => $token,
             'role'        => 'admin',
             'id'          => $admin['id'],
@@ -440,9 +453,14 @@ try {
             'department'  => $admin['department'],
             'permissions' => $admin['permissions'],
             'avatar'      => $admin['avatar'] ?? '',
-            'admin'       => $admin,
+            'admin'       => $admin
+        ];
+
+        jsonResponse(array_merge([
+            'success'     => true,
+            'session'     => $sessionObj,
             'message'     => 'Welcome back to the Podar Pathways Executive Console.'
-        ]);
+        ], $sessionObj));
     }
 
     // Resend OTP
