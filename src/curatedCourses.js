@@ -1,7 +1,7 @@
 // Minimal curated courses with real banner images and validity dates
 export const CURATED_COURSES = [
   {
-    id: 'course-demo-1',
+    id: 'course-readiness-01',
     title: 'Career Readiness Foundations',
     url: 'https://www.coursera.org/learn/career-success',
     image: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=600&auto=format&fit=crop&q=80',

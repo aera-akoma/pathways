@@ -726,18 +726,6 @@ export function CourseCatalog({
                     <strong className="dropzone-prompt">Choose photo or take camera picture</strong>
                     <span className="dropzone-hint">Supports all image formats • Automatically optimized</span>
                   </label>
-
-                  <div className="demo-generator-box">
-                    <span className="or-divider">OR</span>
-                    <button
-                      type="button"
-                      className="button demo-gen-btn"
-                      onClick={handleGenerateSampleCertificate}
-                    >
-                      <Sparkles size={14} />
-                      <span>Generate SVG Certificate</span>
-                    </button>
-                  </div>
                 </div>
               )}
             </div>
@@ -808,14 +796,16 @@ export function CourseCatalog({
               >
                 Close
               </button>
-              <button
-                type="button"
-                className="button primary"
-                onClick={() => handleApprovePendingCert(pendingInfoCert)}
-              >
-                <Check size={14} />
-                <span>Approve & Verify</span>
-              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  className="button primary"
+                  onClick={() => handleApprovePendingCert(pendingInfoCert)}
+                >
+                  <Check size={14} />
+                  <span>Approve & Verify</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

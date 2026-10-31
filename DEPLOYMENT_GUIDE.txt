@@ -1,0 +1,53 @@
+=============================================================================
+PODAR PATHWAYS - PRODUCTION DEPLOYMENT GUIDE (cPanel & Apache)
+=============================================================================
+
+1. UPLOAD FILES TO CPANEL:
+   - Log into your cPanel File Manager.
+   - Navigate to 'public_html' (or your target addon domain / subdomain directory).
+   - Upload this zip file directly into 'public_html'.
+   - Right-click the zip file and click "Extract".
+   - Verify that 'index.html', '.htaccess', 'api/', and 'assets/' are in the web root.
+
+2. IMPORT THE DATABASE IN phpMyAdmin:
+   - In cPanel, open "MySQL Databases" and create the 3 databases:
+       * Main DB:         podar_pathways      (or <cpanel_user>_pathways)
+       * Certificates DB: podar_certificates  (or <cpanel_user>_certificates)
+       * Projects DB:     podar_projects      (or <cpanel_user>_projects)
+     (Note: You can also use a single database for all tables if preferred.)
+   - Create a database user with ALL PRIVILEGES and assign it to the database(s).
+   - In cPanel, open "phpMyAdmin".
+   - Select your main database and click "Import".
+   - Select the included 'database.sql' file and click "Go / Import".
+   - The tables (students, admins, certificates, programs, project_posts, etc.)
+     will be created with the main admin account (jatp22316@gmail.com).
+
+3. CONFIGURE ENVIRONMENT (.env):
+   - Rename '.env.example' to '.env' (in the web root or inside 'api/').
+   - Open '.env' in the cPanel Code Editor.
+   - Set your database credentials:
+       DB_DRIVER=mysql
+       DB_HOST=localhost
+       DB_PORT=3306
+       DB_NAME=<your_main_db_name>
+       DB_USER=<your_db_username>
+       DB_PASS=<your_db_password>
+       DB_CERTIFICATES_NAME=<your_certificates_db_name>
+       DB_PROJECTS_NAME=<your_projects_db_name>
+   - Set your SMTP email credentials (for sending real 6-digit OTP verification codes):
+       SMTP_HOST=smtp.gmail.com (or your mail server)
+       SMTP_PORT=587
+       SMTP_USER=<your_email@gmail.com>
+       SMTP_PASS=<your_gmail_app_password>
+       EMAIL_FROM="Podar Pathways Academic Board <your_email@gmail.com>"
+   - Save the file.
+
+4. DEFAULT SUPER ADMIN LOGIN:
+   - Admin Email:    jatp22316@gmail.com
+   - Authentication: Direct 6-digit OTP sent to email (or password if set).
+
+5. ZERO DEMO MODE:
+   - All demo data, sample student accounts, and mock generators have been removed.
+   - The site operates in live production mode with real student registrations,
+     real OTP verification, real certificate uploads, and real admin governance.
+=============================================================================

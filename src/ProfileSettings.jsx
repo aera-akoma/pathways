@@ -194,7 +194,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
   const username = useMemo(() => {
     if (student?.username) return student.username;
     if (student?.name) return student.name.toLowerCase().replace(/\s+/g, '.');
-    return 'student.demo';
+    return 'student';
   }, [student]);
 
   // Quick View Project Lightbox
@@ -774,7 +774,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
     setShowShareModal(true);
   };
 
-  const studentName = formData.name || student?.name || 'Student Demo';
+  const studentName = formData.name || student?.name || 'Student';
   const studentSem = formData.semester ? (String(formData.semester).toLowerCase().startsWith('sem') ? formData.semester : `Semester ${formData.semester}`) : 'Semester V';
   const studentScore = student?.score || 78;
   const studentCompletion = student?.completion || 92;
