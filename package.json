@@ -4,13 +4,11 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k \"node --watch server/index.js\" \"vite\"",
-    "dev:php": "concurrently -k \"start-php-backend.bat\" \"vite\"",
-    "client": "vite",
-    "server": "node server/index.js",
-    "server:php": "start-php-backend.bat",
-    "build": "vite build",
-    "preview": "vite preview"
+    "start": "start-php-backend.bat",
+    "dev": "start-php-backend.bat",
+    "server": "start-php-backend.bat",
+    "build": "vite build && powershell Copy-Item -Recurse -Force public/api dist/ && powershell Copy-Item -Force router.php dist/router.php",
+    "client:dev": "vite"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",

@@ -681,7 +681,7 @@ try {
     // ----------------------------------------------------
     // 5. PROGRAMS / COURSES PLATFORM
     // ----------------------------------------------------
-    if ($route === '/programs' && $method === 'GET') {
+    if (($route === '/programs' || $route === '/courses') && $method === 'GET') {
         $studentId = cleanString($_GET['studentId'] ?? '');
         $programs = Database::fetchAll("SELECT * FROM programs ORDER BY createdAt DESC");
 
@@ -716,7 +716,7 @@ try {
         jsonResponse($enriched);
     }
 
-    if ($route === '/programs' && $method === 'POST') {
+    if (($route === '/programs' || $route === '/courses') && $method === 'POST') {
         $title          = cleanString($body['title'] ?? '');
         $issuer         = cleanString($body['issuer'] ?? 'Podar Pathways');
         $description    = trim($body['description'] ?? '');
@@ -743,7 +743,7 @@ try {
         jsonResponse($created, 201);
     }
 
-    if (preg_match('#^/programs/([^/]+)(?:/(click|clicks))?$#', $route, $matches)) {
+    if (preg_match('#^/(?:programs|courses)/([^/]+)(?:/(click|clicks))?$#', $route, $matches)) {
         $progId = $matches[1];
         $sub = $matches[2] ?? '';
 

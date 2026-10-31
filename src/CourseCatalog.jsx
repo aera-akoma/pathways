@@ -205,9 +205,9 @@ export function CourseCatalog({
   const currentStudentId = student?.id || session?.id || 'student-demo';
   const currentStudentName = student?.name || session?.name || 'Student Demo';
 
-  // Determine API base url dynamically (development vs production/mobile)
+  // Determine API base url dynamically (relative for unified PHP server)
   const apiBase = useMemo(() => {
-    if (typeof window !== 'undefined' && (window.location.port === '5173' || window.location.hostname === 'localhost')) {
+    if (typeof window !== 'undefined' && window.location.port === '5173') {
       return 'http://localhost:5000';
     }
     return '';
