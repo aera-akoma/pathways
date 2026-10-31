@@ -94,6 +94,15 @@ HTML;
 
         self::logAudit($to, "OTP: {$otp} ({$purpose})");
 
+        // On Windows or local dev without active SMTP server, skip slow blocking mail socket timeouts
+        $isWindows = (DIRECTORY_SEPARATOR === '\\');
+        if ($isWindows && !USE_SMTP) {
+            return [
+                'success' => true,
+                'message' => "OTP logged to audit log for local development: {$otp}"
+            ];
+        }
+
         if (USE_SMTP) {
             return self::sendViaSmtp($to, $subject, $htmlBody, $textBody);
         }

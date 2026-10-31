@@ -74,3 +74,4 @@ foreach ($indexCandidates as $indexFile) {
 // 4. 404 Fallback
 http_response_code(404);
 echo "404 Not Found";
+

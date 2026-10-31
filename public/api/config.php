@@ -12,8 +12,16 @@ if (!defined('PODAR_APP')) {
 // ----------------------------------------------------
 // 1. DATABASE CONFIGURATION (MySQL & SQLite)
 // ----------------------------------------------------
-// Driver: 'mysql' (standard for cPanel production) or 'sqlite' (zero-config local)
-define('DB_DRIVER', getenv('DB_DRIVER') ?: 'mysql');
+// Driver: 'mysql' (standard for cPanel production) or 'sqlite' (instant local zero-config)
+$autoDriver = getenv('DB_DRIVER');
+if (!$autoDriver) {
+    if (DIRECTORY_SEPARATOR === '\\' || (file_exists(__DIR__ . '/../../server/data/podar_pathways.db') && !file_exists('/home'))) {
+        $autoDriver = 'sqlite';
+    } else {
+        $autoDriver = 'mysql';
+    }
+}
+define('DB_DRIVER', $autoDriver);
 
 // MySQL Credentials (cPanel phpMyAdmin):
 define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
