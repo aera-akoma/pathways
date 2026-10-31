@@ -31,7 +31,8 @@ import {
   Globe,
   Award,
   Compass,
-  Layers
+  Layers,
+  Target
 } from 'lucide-react';
 
 const SEARCH_HISTORY_STORAGE_KEY = 'podar_youtube_search_history_v2';
