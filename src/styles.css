@@ -524,6 +524,26 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   top:0
 }
 
+@media (min-width: 981px) {
+  .topbar {
+    display: grid;
+    grid-template-columns: 1fr minmax(360px, 660px) 1fr;
+    align-items: center;
+    gap: 16px;
+  }
+  .yt-search-container {
+    grid-column: 2;
+    width: 100%;
+    max-width: 660px;
+    margin: 0 auto;
+    justify-content: center;
+  }
+  .topbar-user {
+    grid-column: 3;
+    justify-self: end;
+  }
+}
+
 /* ========================================================
    YOUTUBE-STYLE SEARCH SYSTEM IN NAVBAR
    ======================================================== */
@@ -540,6 +560,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   justify-content: center;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
+  margin-left: auto;
+  margin-right: 6px;
 }
 
 .yt-mobile-search-trigger:hover {
@@ -2358,6 +2380,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 .yt-mobile-search-trigger {
   display: flex !important;
+  margin-left: auto;
+  margin-right: 6px;
 }
 
 .yt-search-container {
