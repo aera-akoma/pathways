@@ -7,3 +7,4 @@ app-debug.apk
 *.db-shm
 *.db-wal
 *.zip
+scratch/

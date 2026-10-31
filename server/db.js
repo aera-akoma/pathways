@@ -385,53 +385,27 @@ if (!adminPhoneCheck) {
 }
 
 // Seed default administrators if empty
-const adminCountCheck = db.prepare('SELECT COUNT(*) as count FROM admins').get().count;
-if (adminCountCheck === 0) {
+const defaultAdminExists = db.prepare("SELECT * FROM admins WHERE LOWER(email) = 'admin@podar.edu'").get();
+if (!defaultAdminExists) {
   const now = new Date().toISOString();
-  const insertAdmin = db.prepare(`
-    INSERT INTO admins (id, name, phone, email, role, department, permissions, status, createdAt, updatedAt)
+  db.prepare(`
+    INSERT OR REPLACE INTO admins (id, name, phone, email, role, department, permissions, status, createdAt, updatedAt)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  insertAdmin.run(
-    'admin-super',
-    'Chief Administrator',
-    '9876543210',
-    'director@podarpathways.edu',
+  `).run(
+    'admin-podar-root',
+    'Podar Administrator',
+    '9999988888',
+    'admin@podar.edu',
     'Super Admin',
-    'Executive Directorate & Governance',
-    JSON.stringify(['manage_students', 'manage_tests', 'manage_programs', 'manage_admins', 'view_reports', 'export_data', 'delete_records']),
-    'active',
-    now,
-    now
-  );
-
-  insertAdmin.run(
-    'admin-placement',
-    'Dr. Neha Kulkarni',
-    '9822001122',
-    'neha.kulkarni@podarpathways.edu',
-    'Placement Officer',
-    'Corporate Relations & Placements',
-    JSON.stringify(['manage_students', 'view_reports', 'export_data']),
-    'active',
-    now,
-    now
-  );
-
-  insertAdmin.run(
-    'admin-examiner',
-    'Prof. Rajesh Mehra',
-    '9833004455',
-    'rajesh.mehra@podarpathways.edu',
-    'Academic Examiner',
-    'Assessment & Evaluation Cell',
-    JSON.stringify(['manage_tests', 'manage_programs', 'view_reports']),
+    'Career & Placement Cell',
+    JSON.stringify(['all', 'manage_students', 'manage_courses', 'manage_certificates', 'manage_admins']),
     'active',
     now,
     now
   );
 }
+
+// Only one permanent root administrator seeded
 
 // Seed default demo student if empty
 const studentCount = db.prepare('SELECT COUNT(*) as count FROM students').get().count;
@@ -898,6 +872,230 @@ if (attendanceCount.count === 0) {
       );
     });
   });
+}
+
+// ==========================================
+// STUDENT PROJECTS PLATFORM TABLES (SQLite)
+// ==========================================
+db.exec(`
+  CREATE TABLE IF NOT EXISTS project_categories (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    icon TEXT DEFAULT 'Code',
+    orderIndex INTEGER DEFAULT 0,
+    createdAt TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS project_posts (
+    id TEXT PRIMARY KEY,
+    studentId TEXT NOT NULL,
+    studentName TEXT NOT NULL,
+    studentAvatar TEXT,
+    studentCourse TEXT DEFAULT 'BCA',
+    studentSemester TEXT DEFAULT 'V',
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    category TEXT DEFAULT 'Web Development',
+    demoUrl TEXT,
+    githubUrl TEXT,
+    youtubeUrl TEXT,
+    tags TEXT,
+    likesCount INTEGER DEFAULT 0,
+    commentsCount INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'active',
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS project_images (
+    id TEXT PRIMARY KEY,
+    postId TEXT NOT NULL,
+    imageUrl TEXT NOT NULL,
+    caption TEXT,
+    orderIndex INTEGER DEFAULT 0,
+    createdAt TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS project_likes (
+    id TEXT PRIMARY KEY,
+    postId TEXT NOT NULL,
+    studentId TEXT NOT NULL,
+    createdAt TEXT NOT NULL,
+    UNIQUE(postId, studentId)
+  );
+
+  CREATE TABLE IF NOT EXISTS project_comments (
+    id TEXT PRIMARY KEY,
+    postId TEXT NOT NULL,
+    parentId TEXT,
+    studentId TEXT NOT NULL,
+    studentName TEXT NOT NULL,
+    studentAvatar TEXT,
+    content TEXT NOT NULL,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS project_bookmarks (
+    id TEXT PRIMARY KEY,
+    postId TEXT NOT NULL,
+    studentId TEXT NOT NULL,
+    createdAt TEXT NOT NULL,
+    UNIQUE(postId, studentId)
+  );
+
+  CREATE TABLE IF NOT EXISTS project_reports (
+    id TEXT PRIMARY KEY,
+    postId TEXT NOT NULL,
+    reporterId TEXT NOT NULL,
+    reporterName TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    details TEXT,
+    status TEXT DEFAULT 'pending',
+    createdAt TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS project_notifications (
+    id TEXT PRIMARY KEY,
+    studentId TEXT NOT NULL,
+    actorId TEXT NOT NULL,
+    actorName TEXT NOT NULL,
+    actorAvatar TEXT,
+    postId TEXT NOT NULL,
+    type TEXT NOT NULL,
+    message TEXT NOT NULL,
+    isRead INTEGER DEFAULT 0,
+    createdAt TEXT NOT NULL
+  );
+`);
+
+// Seed project categories if empty
+const pCatCount = db.prepare('SELECT COUNT(*) as count FROM project_categories').get().count;
+if (pCatCount === 0) {
+  const now = new Date().toISOString();
+  const defaultCats = [
+    ['cat-1', 'Web Development', 'Globe', 1],
+    ['cat-2', 'Android Development', 'Smartphone', 2],
+    ['cat-3', 'Artificial Intelligence', 'Cpu', 3],
+    ['cat-4', 'Machine Learning', 'Brain', 4],
+    ['cat-5', 'Python', 'Terminal', 5],
+    ['cat-6', 'Java', 'Coffee', 6],
+    ['cat-7', 'C and C++', 'Code', 7],
+    ['cat-8', 'Cybersecurity', 'Shield', 8],
+    ['cat-9', 'Database Management', 'Database', 9],
+    ['cat-10', 'Graphic Design', 'Palette', 10],
+    ['cat-11', 'Business Projects', 'Briefcase', 11],
+    ['cat-12', 'Marketing', 'TrendingUp', 12],
+    ['cat-13', 'Entrepreneurship', 'Rocket', 13],
+    ['cat-14', 'Other', 'Folder', 14]
+  ];
+  const stmt = db.prepare('INSERT INTO project_categories (id, name, icon, orderIndex, createdAt) VALUES (?, ?, ?, ?, ?)');
+  defaultCats.forEach(c => stmt.run(c[0], c[1], c[2], c[3], now));
+}
+
+// Seed sample project posts if empty
+const pPostCount = db.prepare('SELECT COUNT(*) as count FROM project_posts').get().count;
+if (pPostCount === 0) {
+  const now = new Date().toISOString();
+  const yesterday = new Date(Date.now() - 86400000).toISOString();
+  const twoDaysAgo = new Date(Date.now() - 172800000).toISOString();
+
+  const insertPost = db.prepare(`
+    INSERT INTO project_posts (
+      id, studentId, studentName, studentAvatar, studentCourse, studentSemester,
+      title, description, category, demoUrl, githubUrl, youtubeUrl, tags,
+      likesCount, commentsCount, status, createdAt, updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const insertImg = db.prepare(`
+    INSERT INTO project_images (id, postId, imageUrl, caption, orderIndex, createdAt)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+
+  const insertCom = db.prepare(`
+    INSERT INTO project_comments (id, postId, parentId, studentId, studentName, studentAvatar, content, createdAt, updatedAt)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  // Post 1: PathAI
+  insertPost.run(
+    'post-101',
+    'student-demo-2',
+    'Aarav Sharma',
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+    'BSc IT',
+    'Semester VI',
+    'PathAI - Neural Career & Skill Gap Analyzer for Campus Placements',
+    'Excited to present **PathAI**, my final year capstone project! 🚀\n\nIt analyzes student GitHub repos and resumes, calculates skill match percentages against top recruiters (TCS, Barclays, Deloitte), and generates a personalized 30-day learning roadmap.\n\n### Key Highlights:\n- Real-time GitHub commit & repo parsing\n- KaTeX / NLP based keyword matching\n- Exportable verified Career Readiness Report\n\nTested with 40+ classmates with 94% accuracy. Check out the demo link and star the repo!',
+    'Artificial Intelligence',
+    'https://pathai-demo.podar.edu',
+    'https://github.com/aarav-podar/pathai-career-engine',
+    'https://youtube.com/watch?v=sample-pathai',
+    JSON.stringify(['React', 'Python', 'FastAPI', 'TailwindCSS', 'TensorFlow']),
+    18,
+    2,
+    'active',
+    yesterday,
+    yesterday
+  );
+
+  insertImg.run('img-101-1', 'post-101', 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1000&auto=format&fit=crop&q=80', 'Dashboard Analytics', 0, yesterday);
+  insertImg.run('img-101-2', 'post-101', 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?w=1000&auto=format&fit=crop&q=80', 'Model Inference Graph', 1, yesterday);
+
+  insertCom.run('com-101-1', 'post-101', null, 'student-demo', 'Student Demo', '', 'Amazing UI Aarav! How are you handling the token limits during resume parsing?', yesterday, yesterday);
+  insertCom.run('com-101-2', 'post-101', 'com-101-1', 'student-demo-2', 'Aarav Sharma', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80', 'Thanks! We chunk the text into 1,000 token segments and cache embeddings in Redis.', yesterday, yesterday);
+
+  // Post 2: CampusKart
+  insertPost.run(
+    'post-102',
+    'student-demo-3',
+    'Priya Patel',
+    'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=200&auto=format&fit=crop&q=80',
+    'BBA',
+    'Semester IV',
+    'CampusKart - Peer-to-Peer College Marketplace & Equipment Sharing',
+    'Sharing my latest startup project: **CampusKart**! 🛒✨\n\nA platform built specifically for Podar college students to buy, sell and borrow textbooks, calculators, lab aprons, and electronics within the college campus safely.\n\n### Features:\n- Verified college email signup\n- In-app real-time messaging\n- Handshake QR code verification before payment release\n- Category filters for all departments\n\nLooking for beta testers! Drop your feedback in the comments.',
+    'Web Development',
+    'https://campuskart.podar.edu',
+    'https://github.com/priyapatel/campuskart-p2p',
+    '',
+    JSON.stringify(['Next.js', 'Node.js', 'MongoDB', 'Socket.io', 'TailwindCSS']),
+    26,
+    1,
+    'active',
+    twoDaysAgo,
+    twoDaysAgo
+  );
+
+  insertImg.run('img-102-1', 'post-102', 'https://images.unsplash.com/photo-1556742049-0a67c5574f73?w=1000&auto=format&fit=crop&q=80', 'Storefront UI', 0, twoDaysAgo);
+  insertImg.run('img-102-2', 'post-102', 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1000&auto=format&fit=crop&q=80', 'Seller Dashboard', 1, twoDaysAgo);
+
+  insertCom.run('com-102-1', 'post-102', null, 'student-demo', 'Student Demo', '', 'Super useful! Can BCA semester textbooks be listed by course syllabus codes?', twoDaysAgo, twoDaysAgo);
+
+  // Post 3: MedVault
+  insertPost.run(
+    'post-103',
+    'student-demo-4',
+    'Rohan Deshmukh',
+    'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=200&auto=format&fit=crop&q=80',
+    'MCA',
+    'Semester III',
+    'MedVault - Zero-Knowledge End-to-End Encrypted Health Records',
+    'Security first! 🛡️ **MedVault** solves student and athlete health record management with zero-knowledge architecture.\n\nAll diagnostic lab files and vaccination cards are encrypted in the browser with AES-256-GCM before reaching the server. The college infirmary can only read records when you show a one-time expiring QR authorization key.\n\nStar the project on GitHub if you are interested in web cryptography!',
+    'Cybersecurity',
+    'https://medvault-demo.podar.edu',
+    'https://github.com/rohan-desh/medvault-zk',
+    '',
+    JSON.stringify(['Cryptography', 'Python', 'React', 'Docker', 'PostgreSQL']),
+    14,
+    0,
+    'active',
+    now,
+    now
+  );
+
+  insertImg.run('img-103-1', 'post-103', 'https://images.unsplash.com/photo-1563986768609-322da13575f3?w=1000&auto=format&fit=crop&q=80', 'Security Architecture', 0, now);
 }
 
 export default db;

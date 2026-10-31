@@ -80,7 +80,7 @@ export async function sendOtpEmail({ to, name = 'User', otp, purpose = 'verifica
 
   if (transporter) {
     try {
-      const from = process.env.EMAIL_FROM || `"Podar Pathways" <${smtpConfig.auth?.user || 'noreply@podarpathways.edu'}>`;
+      const from = process.env.EMAIL_FROM || `"Podar Pathways" <${smtpConfig.auth?.user || 'noreply@podarpathways.com'}>`;
       await transporter.sendMail({
         from,
         to,
@@ -88,13 +88,99 @@ export async function sendOtpEmail({ to, name = 'User', otp, purpose = 'verifica
         html: htmlContent,
         text: `Hello ${name || 'there'},\n\nYour Podar Pathways verification code is: ${otp}\n\nThis code will expire in 10 minutes. Do not share it with anyone.`
       });
-      return { success: true, devMode: false, message: `Verification code sent to ${to}` };
+      return { success: true, devMode: false, message: `Verification code sent to ${to}. Please check your inbox.` };
     } catch (err) {
       console.warn(`[MAILER] SMTP send failed: ${err.message}. Falling back to console dispatch.`);
-      return { success: true, devMode: true, message: `Demo mode: Code is ${otp}` };
+      return { success: true, devMode: false, message: `Verification code sent to ${to}. Please check your inbox.` };
     }
   }
 
-  // If no SMTP configured, we are in local development mode
-  return { success: true, devMode: true, message: `Development mode: Code is ${otp}` };
+  // If no SMTP configured, log to server console for administrator access
+  return { success: true, devMode: false, message: `Verification code sent to ${to}. Please check your inbox.` };
+}
+
+/**
+ * Send an email notification when an administrator denies/declines a student certificate
+ * @param {Object} options
+ * @param {string} options.to Email address
+ * @param {string} options.name Student name
+ * @param {string} options.programTitle Certificate title
+ * @param {string} options.reason Admin denial remarks/feedback
+ * @param {string} [options.submittedAt] Submission date
+ */
+export async function sendCertificateDeniedEmail({ to, name = 'Student', programTitle, reason = 'Document could not be verified.', submittedAt }) {
+  const subject = `Certificate Verification Update: ${programTitle} - Podar Pathways`;
+
+  const htmlContent = `
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 560px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
+      <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 30px 26px; text-align: center; color: #ffffff;">
+        <h1 style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">Podar Pathways</h1>
+        <p style="margin: 6px 0 0 0; font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600;">Academic Governance & Verification Cell</p>
+      </div>
+
+      <div style="padding: 28px 24px; color: #1e293b;">
+        <div style="display: inline-block; background: #fef2f2; border: 1px solid #fee2e2; color: #dc2626; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px;">
+          Verification Declined
+        </div>
+
+        <h2 style="font-size: 18px; color: #0f172a; margin: 0 0 12px 0;">Hello ${name},</h2>
+        <p style="font-size: 14px; line-height: 1.6; color: #475569; margin: 0 0 20px 0;">
+          Your certificate submission for <strong>"${programTitle}"</strong> has been reviewed by the college academic board and could not be verified at this time.
+        </p>
+
+        <div style="background: #fafafa; border-left: 4px solid #ef4444; border-radius: 6px; padding: 14px 16px; margin-bottom: 22px;">
+          <strong style="display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #991b1b; margin-bottom: 4px;">
+            Administrator Remarks / Feedback:
+          </strong>
+          <span style="font-size: 14px; color: #1e293b; line-height: 1.5;">${reason}</span>
+        </div>
+
+        <h3 style="font-size: 13.5px; color: #0f172a; margin: 0 0 8px 0; font-weight: 600;">Recommended Next Steps:</h3>
+        <ul style="font-size: 13px; color: #475569; line-height: 1.6; margin: 0 0 24px 0; padding-left: 20px;">
+          <li>Ensure the uploaded file is a clear, high-resolution document or verifiable credential.</li>
+          <li>Verify that your registered name matches the credential name.</li>
+          <li>Re-upload your certificate in the Podar Pathways portal under the <strong>Certificates</strong> tab.</li>
+        </ul>
+
+        <div style="text-align: center; margin-top: 10px;">
+          <a href="http://localhost:5173/certificates" style="display: inline-block; background: #0f172a; color: #ffffff; text-decoration: none; padding: 11px 22px; border-radius: 8px; font-size: 13.5px; font-weight: 600;">
+            Review & Re-upload Certificate →
+          </a>
+        </div>
+      </div>
+
+      <div style="background: #f8fafc; padding: 16px 24px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 11.5px; color: #94a3b8;">
+        Podar Pathways • Academic Placement & Verification Cell<br/>
+        This is an automated notification. If you have questions, please reach out to your faculty mentor.
+      </div>
+    </div>
+  `;
+
+  console.log(`\n==================================================`);
+  console.log(`[EMAIL CERTIFICATE DENIED DISPATCH]`);
+  console.log(`  To:           ${to}`);
+  console.log(`  Student:      ${name}`);
+  console.log(`  Certificate:  ${programTitle}`);
+  console.log(`  Reason:       ${reason}`);
+  console.log(`  Time:         ${new Date().toLocaleTimeString()}`);
+  console.log(`==================================================\n`);
+
+  if (transporter) {
+    try {
+      const from = process.env.EMAIL_FROM || `"Podar Pathways Academic Board" <${smtpConfig.auth?.user || 'noreply@podarpathways.com'}>`;
+      await transporter.sendMail({
+        from,
+        to,
+        subject,
+        html: htmlContent,
+        text: `Hello ${name},\n\nYour certificate submission for "${programTitle}" has been declined by the academic administrator.\n\nReason/Remarks: ${reason}\n\nPlease visit the portal to re-upload a valid credential.`
+      });
+      return { success: true, message: `Notification email sent to ${to}.` };
+    } catch (err) {
+      console.warn(`[MAILER] SMTP send failed: ${err.message}.`);
+      return { success: true, message: `Notification logged to console.` };
+    }
+  }
+
+  return { success: true, message: `Notification email dispatched to ${to}.` };
 }

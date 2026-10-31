@@ -24,9 +24,38 @@ import {
   Compass,
   Layers,
   Building,
-  CheckCircle2,
-  ExternalLink
+  CornerDownLeft,
+  ArrowRight
 } from 'lucide-react';
+
+// Helper to highlight matching keyword in search results
+function HighlightMatch({ text, query }) {
+  if (!query || !text) return <>{text}</>;
+  const cleanQ = query.trim();
+  if (!cleanQ) return <>{text}</>;
+
+  try {
+    const escaped = cleanQ.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${escaped})`, 'gi');
+    const parts = String(text).split(regex);
+
+    return (
+      <>
+        {parts.map((part, i) =>
+          regex.test(part) ? (
+            <mark key={i} className="search-highlight">
+              {part}
+            </mark>
+          ) : (
+            part
+          )
+        )}
+      </>
+    );
+  } catch {
+    return <>{text}</>;
+  }
+}
 
 export function GlobalSearch({ session, state, navigate, notify }) {
   const [query, setQuery] = useState('');
@@ -42,7 +71,9 @@ export function GlobalSearch({ session, state, navigate, notify }) {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         inputRef.current?.focus();
-        setIsOpen(true);
+        if (query.trim()) {
+          setIsOpen(true);
+        }
       } else if (e.key === 'Escape') {
         setIsOpen(false);
         inputRef.current?.blur();
@@ -50,7 +81,7 @@ export function GlobalSearch({ session, state, navigate, notify }) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [query]);
 
   // Click outside listener
   useEffect(() => {
@@ -91,7 +122,7 @@ export function GlobalSearch({ session, state, navigate, notify }) {
 
   // 2. Opportunities, Internships & Contests
   const allOpportunities = [
-    { title: 'Frontend React Developer Internship', company: 'Tech Innovation Labs', tags: 'React • TypeScript • Remote • Stipend ₹25k/mo', type: 'Internship', page: 'opportunities', icon: Code },
+    { title: 'Frontend React Developer Internship', company: 'Tech Innovation Labs', tags: 'React • TypeScript • Remote • ₹25k/mo', type: 'Internship', page: 'opportunities', icon: Code },
     { title: 'Software development internship', company: 'Tech Innovation Labs', tags: 'Java • React • Remote • 3 months', type: 'Internship', page: 'opportunities', icon: Briefcase },
     { title: 'Data Science & Analytics Internship', company: 'DataWave Insights', tags: 'Python • SQL • Tableau • Hybrid Mumbai', type: 'Internship', page: 'opportunities', icon: BarChart3 },
     { title: 'AI Innovation Challenge 2026', company: 'Open Innovation Challenge', tags: 'AI • Machine Learning • Hackathon', type: 'Hackathon', page: 'opportunities', icon: Sparkles },
@@ -135,11 +166,11 @@ export function GlobalSearch({ session, state, navigate, notify }) {
 
   // 5. Courses & Learning Tracks
   const defaultCourses = [
-    { id: 'c1', title: 'Career Readiness Foundations', desc: 'Core career curriculum, goal setting & professional ethics', page: 'dashboard', category: 'Foundation', icon: BookOpen },
-    { id: 'c2', title: 'Google IT Automation with Python', desc: 'Professional Certificate: Automating real-world tasks with Python', page: 'dashboard', category: 'Professional Cert', icon: BookOpen },
-    { id: 'c3', title: 'Meta Frontend Developer Specialization', desc: 'HTML, CSS, JavaScript, React, UI design & version control', page: 'dashboard', category: 'Specialization', icon: BookOpen },
-    { id: 'c4', title: 'AWS Certified Cloud Practitioner Track', desc: 'Comprehensive guide to AWS cloud architecture and certifications', page: 'dashboard', category: 'Cloud Track', icon: BookOpen },
-    { id: 'c5', title: 'Data Structures Masterclass in Java', desc: 'Master coding patterns for top tech interviews', page: 'dashboard', category: 'Coding Track', icon: BookOpen },
+    { id: 'c1', title: 'Career Readiness Foundations', desc: 'Core career curriculum, goal setting & professional ethics', page: 'courses', category: 'Foundation', icon: BookOpen },
+    { id: 'c2', title: 'Google IT Automation with Python', desc: 'Professional Certificate: Automating real-world tasks with Python', page: 'courses', category: 'Professional Cert', icon: BookOpen },
+    { id: 'c3', title: 'Meta Frontend Developer Specialization', desc: 'HTML, CSS, JavaScript, React, UI design & version control', page: 'courses', category: 'Specialization', icon: BookOpen },
+    { id: 'c4', title: 'AWS Certified Cloud Practitioner Track', desc: 'Comprehensive guide to AWS cloud architecture and certifications', page: 'courses', category: 'Cloud Track', icon: BookOpen },
+    { id: 'c5', title: 'Data Structures Masterclass in Java', desc: 'Master coding patterns for top tech interviews', page: 'courses', category: 'Coding Track', icon: BookOpen },
   ];
 
   // Combine with dynamic courses from state
@@ -147,7 +178,7 @@ export function GlobalSearch({ session, state, navigate, notify }) {
     id: c.id,
     title: c.title,
     desc: c.description || 'Course shared by your college.',
-    page: session?.role === 'admin' ? 'courses' : 'dashboard',
+    page: 'courses',
     category: 'College Course',
     icon: BookOpen
   }));
@@ -173,47 +204,59 @@ export function GlobalSearch({ session, state, navigate, notify }) {
     icon: UserRound
   })) : [];
 
-  // Filter items based on query & active tab
-  const matchedPages = (activeTab === 'all' || activeTab === 'tools')
-    ? (q ? allPages.filter(p => p.title.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)) : allPages.slice(0, 4))
+  // Filter items based on query & active tab - strictly active when query is non-empty
+  const matchedPages = q && (activeTab === 'all' || activeTab === 'tools')
+    ? allPages.filter(p => p.title.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q) || p.category.toLowerCase().includes(q))
     : [];
 
-  const matchedOpps = (activeTab === 'all' || activeTab === 'opportunities')
-    ? (q ? allOpportunities.filter(o => o.title.toLowerCase().includes(q) || o.company.toLowerCase().includes(q) || o.tags.toLowerCase().includes(q) || o.type.toLowerCase().includes(q)) : (q === '' ? allOpportunities.slice(0, 3) : []))
+  const matchedOpps = q && (activeTab === 'all' || activeTab === 'opportunities')
+    ? allOpportunities.filter(o => o.title.toLowerCase().includes(q) || o.company.toLowerCase().includes(q) || o.tags.toLowerCase().includes(q) || o.type.toLowerCase().includes(q))
     : [];
 
-  const matchedCompanies = (activeTab === 'all' || activeTab === 'companies')
-    ? (q ? allCompanies.filter(c => c.name.toLowerCase().includes(q) || c.role.toLowerCase().includes(q) || c.location.toLowerCase().includes(q)) : (q === '' && activeTab === 'companies' ? allCompanies : []))
+  const matchedCompanies = q && (activeTab === 'all' || activeTab === 'companies')
+    ? allCompanies.filter(c => c.name.toLowerCase().includes(q) || c.role.toLowerCase().includes(q) || c.location.toLowerCase().includes(q))
     : [];
 
-  const matchedSkills = (activeTab === 'all' || activeTab === 'skills')
-    ? (q ? allSkills.filter(s => s.title.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q) || (s.badge && s.badge.toLowerCase().includes(q))) : (q === '' ? allSkills.slice(0, 3) : []))
+  const matchedSkills = q && (activeTab === 'all' || activeTab === 'skills')
+    ? allSkills.filter(s => s.title.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q) || (s.badge && s.badge.toLowerCase().includes(q)))
     : [];
 
-  const matchedCourses = (activeTab === 'all' || activeTab === 'courses')
-    ? (q ? allCourses.filter(c => c.title.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q)) : (q === '' && activeTab === 'courses' ? allCourses : []))
+  const matchedCourses = q && (activeTab === 'all' || activeTab === 'courses')
+    ? allCourses.filter(c => c.title.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q))
     : [];
 
-  const matchedActions = (activeTab === 'all' || activeTab === 'tools')
-    ? (q ? careerActions.filter(a => a.title.toLowerCase().includes(q) || a.desc.toLowerCase().includes(q)) : (q === '' ? careerActions.slice(0, 2) : []))
+  const matchedActions = q && (activeTab === 'all' || activeTab === 'tools')
+    ? careerActions.filter(a => a.title.toLowerCase().includes(q) || a.desc.toLowerCase().includes(q))
     : [];
 
-  const matchedStudents = (activeTab === 'all' || activeTab === 'students')
-    ? (q ? students.filter(s => s.title.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q)) : (q === '' && activeTab === 'students' ? students : []))
+  const matchedStudents = q && (activeTab === 'all' || activeTab === 'students')
+    ? students.filter(s => s.title.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q))
     : [];
+
+  // Organized categorized groups for professional sectioning
+  const groups = [
+    { id: 'pages', title: 'Pages & Portals', items: matchedPages, type: 'page' },
+    { id: 'opps', title: 'Opportunities & Contests', items: matchedOpps, type: 'opp' },
+    { id: 'companies', title: 'Companies & Partners', items: matchedCompanies, type: 'company' },
+    { id: 'skills', title: 'Skills & Tech Roadmap', items: matchedSkills, type: 'skill' },
+    { id: 'courses', title: 'Courses & Certifications', items: matchedCourses, type: 'course' },
+    { id: 'actions', title: 'Career Actions & Tools', items: matchedActions, type: 'action' },
+    { id: 'students', title: 'Student Directory', items: matchedStudents, type: 'student' }
+  ].filter(g => g.items.length > 0);
 
   // Flatten for keyboard navigation
-  const flatResults = [
-    ...matchedPages.map(p => ({ ...p, resultType: 'page' })),
-    ...matchedOpps.map(o => ({ ...o, resultType: 'opp' })),
-    ...matchedCompanies.map(c => ({ ...c, resultType: 'company' })),
-    ...matchedSkills.map(s => ({ ...s, resultType: 'skill' })),
-    ...matchedCourses.map(c => ({ ...c, resultType: 'course' })),
-    ...matchedActions.map(a => ({ ...a, resultType: 'action' })),
-    ...matchedStudents.map(s => ({ ...s, resultType: 'student' }))
-  ];
-
+  const flatResults = groups.flatMap(g => g.items.map(item => ({ ...item, groupType: g.type })));
   const totalCount = flatResults.length;
+
+  // Auto-scroll selected item into view smoothly
+  useEffect(() => {
+    if (isOpen && totalCount > 0) {
+      const selectedEl = containerRef.current?.querySelector('.search-item.is-selected');
+      if (selectedEl) {
+        selectedEl.scrollIntoView({ block: 'nearest' });
+      }
+    }
+  }, [selectedIndex, isOpen, totalCount]);
 
   const handleSelect = (page, itemTitle) => {
     if (page && navigate) {
@@ -243,40 +286,71 @@ export function GlobalSearch({ session, state, navigate, notify }) {
     }
   };
 
+  // Tab definitions with dynamic match counters
   const tabs = [
-    { id: 'all', label: 'All Options' },
-    { id: 'opportunities', label: 'Opportunities' },
-    { id: 'companies', label: 'Companies' },
-    { id: 'skills', label: 'Skills & Tech' },
-    { id: 'courses', label: 'Courses' },
-    { id: 'tools', label: 'Tools & Actions' },
+    { id: 'all', label: 'All', count: totalCount },
+    {
+      id: 'opportunities',
+      label: 'Opportunities',
+      count: allOpportunities.filter(o => o.title.toLowerCase().includes(q) || o.company.toLowerCase().includes(q) || o.tags.toLowerCase().includes(q)).length
+    },
+    {
+      id: 'companies',
+      label: 'Companies',
+      count: allCompanies.filter(c => c.name.toLowerCase().includes(q) || c.role.toLowerCase().includes(q)).length
+    },
+    {
+      id: 'skills',
+      label: 'Skills',
+      count: allSkills.filter(s => s.title.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q)).length
+    },
+    {
+      id: 'courses',
+      label: 'Courses',
+      count: allCourses.filter(c => c.title.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q)).length
+    },
+    {
+      id: 'tools',
+      label: 'Tools',
+      count: allPages.filter(p => p.title.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q)).length +
+             careerActions.filter(a => a.title.toLowerCase().includes(q) || a.desc.toLowerCase().includes(q)).length
+    },
   ];
 
   if (session?.role === 'admin') {
-    tabs.push({ id: 'students', label: 'Students' });
+    tabs.push({
+      id: 'students',
+      label: 'Students',
+      count: students.filter(s => s.title.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q)).length
+    });
   }
+
+  const showDropdown = isOpen && Boolean(q);
+  let runningIndex = 0;
 
   return (
     <div className="global-search-container" ref={containerRef}>
       <div 
-        className={`global-search-bar ${isOpen ? 'active' : ''}`}
+        className={`global-search-bar ${showDropdown ? 'active' : ''}`}
         onClick={() => {
-          setIsOpen(true);
           inputRef.current?.focus();
         }}
       >
-        <Search size={17} className="search-icon" />
+        <Search size={16} className="search-icon" />
         <input
           ref={inputRef}
           type="text"
           className="search-input"
           value={query}
           onChange={(e) => {
-            setQuery(e.target.value);
-            setIsOpen(true);
+            const val = e.target.value;
+            setQuery(val);
+            setIsOpen(Boolean(val.trim()));
             setSelectedIndex(0);
           }}
-          onFocus={() => setIsOpen(true)}
+          onFocus={() => {
+            if (query.trim()) setIsOpen(true);
+          }}
           onKeyDown={handleKeyDown}
           placeholder="Search opportunities, skills, companies, tools..."
           aria-label="Search opportunities, skills, companies, tools"
@@ -288,18 +362,22 @@ export function GlobalSearch({ session, state, navigate, notify }) {
             onClick={(e) => {
               e.stopPropagation();
               setQuery('');
+              setIsOpen(false);
               inputRef.current?.focus();
             }}
-            title="Clear search"
+            title="Clear search (Esc)"
           >
             <X size={14} />
           </button>
         ) : (
-          <span className="search-shortcut-badge" title="Press Ctrl+K to search">Ctrl K</span>
+          <div className="search-shortcut-badge" title="Press Ctrl+K or Cmd+K to search">
+            <span className="search-kbd">Ctrl</span>
+            <span className="search-kbd">K</span>
+          </div>
         )}
       </div>
 
-      {isOpen && (
+      {showDropdown && (
         <div className="search-dropdown-menu">
           {/* Quick Filter Category Tabs */}
           <div className="search-tabs">
@@ -314,200 +392,122 @@ export function GlobalSearch({ session, state, navigate, notify }) {
                   setSelectedIndex(0);
                 }}
               >
-                {tab.label}
+                <span>{tab.label}</span>
+                {tab.count > 0 && <span className="search-tab-count">{tab.count}</span>}
               </button>
             ))}
           </div>
 
-          {!q && activeTab === 'all' && (
-            <div className="search-dropdown-header">
-              <span>Suggested Quick Access</span>
-            </div>
-          )}
-
-          {totalCount === 0 && (
-            <div className="search-empty-state">
-              <Search size={26} className="search-empty-icon" />
-              <strong>No matches found {q ? `for "${query}"` : 'in this category'}</strong>
-              <p>Try searching for React, Google, internships, DSA, resume builder, or AWS courses.</p>
-            </div>
-          )}
-
-          {/* 1. Pages & Tools */}
-          {matchedPages.length > 0 && (
-            <div className="search-group">
-              <div className="search-group-title">{q ? 'Pages & Portals' : 'Quick Access'}</div>
-              {matchedPages.map((item) => {
-                const IconComponent = item.icon;
-                return (
-                  <div
-                    key={item.id}
-                    className="search-item"
-                    onClick={() => handleSelect(item.id, item.title)}
-                  >
-                    <div className="search-item-icon">
-                      <IconComponent size={16} />
-                    </div>
-                    <div className="search-item-info">
-                      <strong>{item.title}</strong>
-                      <span>{item.desc}</span>
-                    </div>
-                    <ChevronRight size={15} className="search-item-arrow" />
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* 2. Opportunities */}
-          {matchedOpps.length > 0 && (
-            <div className="search-group">
-              <div className="search-group-title">Opportunities &amp; Contests</div>
-              {matchedOpps.map((item, idx) => {
-                const IconComponent = item.icon;
-                return (
-                  <div
-                    key={idx}
-                    className="search-item"
-                    onClick={() => handleSelect(item.page, item.title)}
-                  >
-                    <div className="search-item-icon opp-icon">
-                      <IconComponent size={16} />
-                    </div>
-                    <div className="search-item-info">
-                      <strong>{item.title}</strong>
-                      <span>{item.company} • {item.tags}</span>
-                    </div>
-                    <span className="search-badge">{item.type}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* 3. Companies & Employers */}
-          {matchedCompanies.length > 0 && (
-            <div className="search-group">
-              <div className="search-group-title">Companies &amp; Hiring Partners</div>
-              {matchedCompanies.map((item, idx) => {
-                const IconComponent = item.icon;
-                return (
-                  <div
-                    key={idx}
-                    className="search-item"
-                    onClick={() => handleSelect(item.page, item.name)}
-                  >
-                    <div className="search-item-icon company-icon">
-                      <IconComponent size={16} />
-                    </div>
-                    <div className="search-item-info">
-                      <strong>{item.name}</strong>
-                      <span>{item.role} • {item.location}</span>
-                    </div>
-                    <ChevronRight size={15} className="search-item-arrow" />
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* 4. Skills & Learning Topics */}
-          {matchedSkills.length > 0 && (
-            <div className="search-group">
-              <div className="search-group-title">Skills &amp; Tech Roadmap</div>
-              {matchedSkills.map((item, idx) => {
-                const IconComponent = item.icon;
-                return (
-                  <div
-                    key={idx}
-                    className="search-item"
-                    onClick={() => handleSelect(item.page, item.title)}
-                  >
-                    <div className="search-item-icon skill-icon">
-                      <IconComponent size={16} />
-                    </div>
-                    <div className="search-item-info">
-                      <strong>{item.title}</strong>
-                      <span>{item.desc}</span>
-                    </div>
-                    {item.badge && <span className="search-badge skill-badge">{item.badge}</span>}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* 5. Courses */}
-          {matchedCourses.length > 0 && (
-            <div className="search-group">
-              <div className="search-group-title">Courses &amp; Certifications</div>
-              {matchedCourses.map((item) => (
-                <div
-                  key={item.id}
-                  className="search-item"
-                  onClick={() => handleSelect(item.page, item.title)}
-                >
-                  <div className="search-item-icon course-icon">
-                    <BookOpen size={16} />
-                  </div>
-                  <div className="search-item-info">
-                    <strong>{item.title}</strong>
-                    <span>{item.desc}</span>
-                  </div>
-                  <ChevronRight size={15} className="search-item-arrow" />
+          {/* Results Scroll Area */}
+          <div className="search-results-scroll">
+            {totalCount === 0 ? (
+              <div className="search-empty-state">
+                <div className="search-empty-icon-wrap">
+                  <Search size={22} />
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* 6. Career Actions */}
-          {matchedActions.length > 0 && (
-            <div className="search-group">
-              <div className="search-group-title">Actions &amp; Simulations</div>
-              {matchedActions.map((item, idx) => {
-                const IconComponent = item.icon;
-                return (
-                  <div
-                    key={idx}
-                    className="search-item"
-                    onClick={() => handleSelect(item.page, item.title)}
-                  >
-                    <div className="search-item-icon action-icon">
-                      <IconComponent size={16} />
-                    </div>
-                    <div className="search-item-info">
-                      <strong>{item.title}</strong>
-                      <span>{item.desc}</span>
-                    </div>
-                    <ChevronRight size={15} className="search-item-arrow" />
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* 7. Students (Admin view) */}
-          {matchedStudents.length > 0 && (
-            <div className="search-group">
-              <div className="search-group-title">Student Directory</div>
-              {matchedStudents.map((item) => (
-                <div
-                  key={item.id}
-                  className="search-item"
-                  onClick={() => handleSelect(item.page, item.title)}
-                >
-                  <div className="search-item-icon student-icon">
-                    <UserRound size={16} />
-                  </div>
-                  <div className="search-item-info">
-                    <strong>{item.title}</strong>
-                    <span>{item.desc}</span>
-                  </div>
-                  <ChevronRight size={15} className="search-item-arrow" />
+                <strong>No matches found for "{query.trim()}"</strong>
+                <p>Try searching by role, skill, company or system feature</p>
+                <div className="search-quick-tags">
+                  {['React', 'Internship', 'DSA', 'Google', 'Python', 'AWS', 'Resume'].map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      className="search-quick-chip"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setQuery(tag);
+                        setIsOpen(true);
+                        setSelectedIndex(0);
+                        inputRef.current?.focus();
+                      }}
+                    >
+                      {tag}
+                    </button>
+                  ))}
                 </div>
-              ))}
+              </div>
+            ) : (
+              groups.map((group) => (
+                <div key={group.id} className="search-group">
+                  <div className="search-group-header">
+                    <span className="search-group-title">{group.title}</span>
+                    <span className="search-group-count">{group.items.length}</span>
+                  </div>
+
+                  {group.items.map((item, idx) => {
+                    const currentFlatIdx = runningIndex++;
+                    const isSelected = currentFlatIdx === selectedIndex;
+                    const IconComponent = item.icon || Search;
+                    const itemTitle = item.title || item.name;
+                    const itemPage = item.page || item.id;
+                    const itemDesc = item.desc || item.tags || (item.role ? `${item.role} • ${item.location}` : '');
+                    const badgeText = item.badge || item.type || item.category;
+
+                    return (
+                      <div
+                        key={`${group.id}-${idx}`}
+                        className={`search-item ${isSelected ? 'is-selected' : ''}`}
+                        onMouseEnter={() => setSelectedIndex(currentFlatIdx)}
+                        onClick={() => handleSelect(itemPage, itemTitle)}
+                      >
+                        <div className={`search-item-icon ${group.type}-icon`}>
+                          <IconComponent size={16} />
+                        </div>
+                        <div className="search-item-info">
+                          <div className="search-item-title-row">
+                            <strong className="search-item-title">
+                              <HighlightMatch text={itemTitle} query={q} />
+                            </strong>
+                            {badgeText && (
+                              <span className={`search-badge ${group.type}-badge`}>
+                                {badgeText}
+                              </span>
+                            )}
+                          </div>
+                          {itemDesc && (
+                            <span className="search-item-desc">
+                              <HighlightMatch text={itemDesc} query={q} />
+                            </span>
+                          )}
+                        </div>
+
+                        {isSelected ? (
+                          <div className="search-item-enter-hint">
+                            <span>Open</span>
+                            <CornerDownLeft size={12} />
+                          </div>
+                        ) : (
+                          <ChevronRight size={14} className="search-item-arrow" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Linear-style Professional Footer */}
+          <div className="search-footer">
+            <div className="search-footer-shortcuts">
+              <span className="search-shortcut-item">
+                <kbd className="search-mini-kbd">↑</kbd>
+                <kbd className="search-mini-kbd">↓</kbd>
+                <span className="search-shortcut-label">Navigate</span>
+              </span>
+              <span className="search-shortcut-item">
+                <kbd className="search-mini-kbd">↵</kbd>
+                <span className="search-shortcut-label">Select</span>
+              </span>
+              <span className="search-shortcut-item">
+                <kbd className="search-mini-kbd">esc</kbd>
+                <span className="search-shortcut-label">Close</span>
+              </span>
             </div>
-          )}
+            <div className="search-footer-count">
+              <span>{totalCount} {totalCount === 1 ? 'result' : 'results'}</span>
+            </div>
+          </div>
         </div>
       )}
     </div>

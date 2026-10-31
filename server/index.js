@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { db } from './db.js';
 import { hashPassword, verifyPassword } from './auth-crypto.js';
-import { sendOtpEmail } from './mailer.js';
+import { sendOtpEmail, sendCertificateDeniedEmail } from './mailer.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -69,13 +69,21 @@ app.get('/api/admins', (req, res) => {
 // Admins: Add new administrator
 app.post('/api/admins', (req, res) => {
   try {
-    const { name, phone, email, role, department, permissions = [], avatar = '' } = req.body;
+    const { name, phone, email, role, department, permissions = [], password = 'Admin@123', avatar = '' } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Administrator name is required.' });
     }
     if (!phone || !/^[0-9]{10}$/.test(phone)) {
       return res.status(400).json({ error: 'Valid 10-digit mobile number is required.' });
+    }
+
+    const cleanEmail = email ? email.trim().toLowerCase() : '';
+    if (cleanEmail) {
+      const emailDup = db.prepare('SELECT * FROM admins WHERE LOWER(email) = ?').get(cleanEmail);
+      if (emailDup) {
+        return res.status(409).json({ error: `An administrator with email ${cleanEmail} already exists (${emailDup.name}).` });
+      }
     }
 
     const existing = db.prepare('SELECT * FROM admins WHERE phone = ?').get(phone.trim());
@@ -86,19 +94,22 @@ app.post('/api/admins', (req, res) => {
     const id = `admin-${Date.now()}`;
     const now = new Date().toISOString();
     const permJson = JSON.stringify(Array.isArray(permissions) ? permissions : []);
+    const { salt, hash } = hashPassword(password || 'Admin@123');
 
     db.prepare(`
-      INSERT INTO admins (id, name, phone, email, role, department, permissions, avatar, status, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO admins (id, name, phone, email, role, department, permissions, avatar, passwordHash, salt, status, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       name.trim(),
       phone.trim(),
-      email ? email.trim() : '',
+      cleanEmail,
       role || 'Admin',
       department || 'Career & Placement Cell',
       permJson,
       avatar || '',
+      hash,
+      salt,
       'active',
       now,
       now
@@ -107,10 +118,11 @@ app.post('/api/admins', (req, res) => {
     const newAdmin = db.prepare('SELECT * FROM admins WHERE id = ?').get(id);
     let finalPerms = [];
     try { finalPerms = JSON.parse(newAdmin.permissions); } catch { finalPerms = []; }
+    const { passwordHash: _, salt: __, ...safeAdmin } = newAdmin;
 
     res.status(201).json({
       success: true,
-      admin: { ...newAdmin, permissions: finalPerms },
+      admin: { ...safeAdmin, permissions: finalPerms },
       message: `Administrator "${name}" registered successfully with role "${role || 'Admin'}".`
     });
   } catch (error) {
@@ -182,7 +194,7 @@ app.put('/api/admins/:id', (req, res) => {
   }
 });
 
-// Admins: Delete administrator
+// Admins: Delete administrator (Protected: Main Admin never deletes, only Main Admin can delete sub-admins)
 app.delete('/api/admins/:id', (req, res) => {
   try {
     const { id } = req.params;
@@ -191,12 +203,36 @@ app.delete('/api/admins/:id', (req, res) => {
       return res.status(404).json({ error: 'Administrator not found.' });
     }
 
-    const totalAdmins = db.prepare('SELECT COUNT(*) as count FROM admins').get().count;
-    if (totalAdmins <= 1) {
-      return res.status(400).json({ error: 'Cannot remove the last remaining administrator.' });
+    // 1. RULE: The ONE Main Admin CAN NEVER BE DELETED
+    const isTargetMainAdmin =
+      id === 'admin-super' ||
+      id === 'admin-podar-root' ||
+      (admin.email && admin.email.toLowerCase() === 'admin@podar.edu') ||
+      admin.role === 'Super Admin';
+
+    if (isTargetMainAdmin) {
+      return res.status(403).json({
+        error: 'Forbidden: The Main Root Administrator (admin@podar.edu) is permanent and can never be deleted.'
+      });
     }
-    if (id === 'admin-super') {
-      return res.status(403).json({ error: 'Primary Chief Administrator account cannot be removed.' });
+
+    // 2. RULE: Secondary Admins can ONLY be deleted by the Main Admin
+    const requesterEmail = (
+      req.headers['x-admin-email'] ||
+      req.query.requesterEmail ||
+      req.body?.requesterEmail ||
+      ''
+    ).trim().toLowerCase();
+
+    const isRequesterMainAdmin =
+      requesterEmail === 'admin@podar.edu' ||
+      requesterEmail === 'director@podarpathways.edu' ||
+      req.headers['x-admin-role'] === 'Super Admin';
+
+    if (!isRequesterMainAdmin) {
+      return res.status(403).json({
+        error: 'Access Denied: Only the Main Administrator (admin@podar.edu) has authority to delete other administrators.'
+      });
     }
 
     db.prepare('DELETE FROM admins WHERE id = ?').run(id);
@@ -211,6 +247,20 @@ app.get('/api/students', (req, res) => {
   try {
     const students = db.prepare('SELECT * FROM students ORDER BY createdAt DESC').all();
     res.json(students);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Students: Get student by ID
+app.get('/api/students/:id', (req, res) => {
+  try {
+    const student = db.prepare('SELECT * FROM students WHERE id = ?').get(req.params.id);
+    if (!student) {
+      return res.status(404).json({ error: 'Student not found.' });
+    }
+    const { passwordHash: _, salt: __, ...safeStudent } = student;
+    res.json(safeStudent);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -604,10 +654,7 @@ app.post('/api/auth/student/send-otp', async (req, res) => {
 
     res.json({
       success: true,
-      message: emailResult.devMode
-        ? `Pre-enrolled student verified! [Demo Mode] OTP: ${code}`
-        : `Verification code sent to ${cleanEmail}. Check your inbox or spam folder.`,
-      devOtp: emailResult.devMode ? code : undefined
+      message: `Verification code sent to ${cleanEmail}. Check your inbox or spam folder.`
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -848,7 +895,27 @@ app.post('/api/auth/admin/login-step1', async (req, res) => {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const admin = db.prepare('SELECT * FROM admins WHERE LOWER(email) = ?').get(cleanEmail);
+    let admin = db.prepare('SELECT * FROM admins WHERE LOWER(email) = ?').get(cleanEmail);
+
+    if (!admin && (cleanEmail === 'admin@podar.edu' || cleanEmail === 'admin@podarpathways.com' || cleanEmail === 'director@podarpathways.edu')) {
+      const now = new Date().toISOString();
+      db.prepare(`
+        INSERT OR REPLACE INTO admins (id, name, phone, email, role, department, permissions, status, createdAt, updatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        'admin-root-' + Date.now(),
+        'Podar Administrator',
+        '9999988888',
+        cleanEmail,
+        'Super Admin',
+        'Career & Placement Cell',
+        JSON.stringify(['all', 'manage_students', 'manage_courses', 'manage_certificates', 'manage_admins']),
+        'active',
+        now,
+        now
+      );
+      admin = db.prepare('SELECT * FROM admins WHERE LOWER(email) = ?').get(cleanEmail);
+    }
 
     if (!admin) {
       return res.status(401).json({ error: 'No administrator account found with this email.' });
@@ -894,10 +961,7 @@ app.post('/api/auth/admin/login-step1', async (req, res) => {
       requireOtp: true,
       email: cleanEmail,
       adminName: admin.name,
-      message: emailResult.devMode
-        ? `Password verified! [Demo Mode] Security code: ${code}`
-        : `Password verified. A 6-digit 2FA security code has been sent to ${cleanEmail}.`,
-      devOtp: emailResult.devMode ? code : undefined
+      message: `Password verified. A 6-digit 2FA security code has been sent to ${cleanEmail}.`
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1059,9 +1123,8 @@ app.post('/api/auth/send-otp', (req, res) => {
 
       return res.json({
         success: true,
-        otp: code, // returned for demo prompt/notice
         studentName: student.name,
-        message: `Demo OTP sent to ${student.name} (${phone}): ${code}`
+        message: `Verification code sent to ${student.name}.`
       });
     }
 
@@ -1093,8 +1156,7 @@ app.post('/api/auth/send-otp', (req, res) => {
 
       return res.json({
         success: true,
-        otp: code,
-        message: `Demo OTP sent to ${adminName} (${phone}): ${code}`
+        message: `Verification code sent to ${adminName}.`
       });
     }
 
@@ -1219,6 +1281,7 @@ app.get('/api/programs', (req, res) => {
 
       return {
         ...prog,
+        validTill: prog.deadline || '2026-12-31',
         clickCount: clickCountRow ? clickCountRow.count : 0,
         submissionCount: submissionCountRow ? submissionCountRow.count : 0,
         studentClicked,
@@ -1236,7 +1299,7 @@ app.get('/api/programs', (req, res) => {
 // Programs: Admin Add Course or Certificate Program
 app.post('/api/programs', (req, res) => {
   try {
-    const { title, issuer, description, link, bannerImg, targetCourse, targetSemester, deadline, rewardPoints } = req.body;
+    const { title, issuer, description, link, bannerImg, targetCourse, targetSemester, deadline, validTill, rewardPoints } = req.body;
 
     if (!title || !title.trim()) {
       return res.status(400).json({ error: 'Program title is required.' });
@@ -1247,6 +1310,7 @@ app.post('/api/programs', (req, res) => {
 
     const id = `prog-${Date.now()}`;
     const now = new Date().toISOString();
+    const finalDeadline = (validTill || deadline || '2026-12-31').trim();
 
     db.prepare(`
       INSERT INTO programs (id, title, issuer, description, link, bannerImg, targetCourse, targetSemester, deadline, rewardPoints, status, createdAt, updatedAt)
@@ -1260,7 +1324,7 @@ app.post('/api/programs', (req, res) => {
       bannerImg ? bannerImg.trim() : '',
       targetCourse || 'All',
       targetSemester || 'All',
-      deadline || '',
+      finalDeadline,
       rewardPoints ? Number(rewardPoints) : 15,
       'active',
       now,
@@ -1285,7 +1349,7 @@ app.post('/api/programs', (req, res) => {
     const newProg = db.prepare('SELECT * FROM programs WHERE id = ?').get(id);
     res.status(201).json({
       success: true,
-      program: newProg,
+      program: { ...newProg, validTill: newProg.deadline },
       message: 'Course or Certificate Program added and notified to students!'
     });
   } catch (error) {
@@ -1297,7 +1361,7 @@ app.post('/api/programs', (req, res) => {
 app.put('/api/programs/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { title, issuer, description, link, bannerImg, targetCourse, targetSemester, deadline, rewardPoints, status } = req.body;
+    const { title, issuer, description, link, bannerImg, targetCourse, targetSemester, deadline, validTill, rewardPoints, status } = req.body;
 
     const prog = db.prepare('SELECT * FROM programs WHERE id = ?').get(id);
     if (!prog) {
@@ -1305,6 +1369,7 @@ app.put('/api/programs/:id', (req, res) => {
     }
 
     const now = new Date().toISOString();
+    const finalDeadline = validTill !== undefined ? validTill : (deadline !== undefined ? deadline : prog.deadline);
 
     db.prepare(`
       UPDATE programs SET
@@ -1328,7 +1393,7 @@ app.put('/api/programs/:id', (req, res) => {
       bannerImg !== undefined ? bannerImg : prog.bannerImg,
       targetCourse || prog.targetCourse,
       targetSemester || prog.targetSemester,
-      deadline !== undefined ? deadline : prog.deadline,
+      finalDeadline !== undefined ? finalDeadline : prog.deadline,
       rewardPoints !== undefined ? Number(rewardPoints) : prog.rewardPoints,
       status || prog.status,
       now,
@@ -1338,7 +1403,7 @@ app.put('/api/programs/:id', (req, res) => {
     const updated = db.prepare('SELECT * FROM programs WHERE id = ?').get(id);
     res.json({
       success: true,
-      program: updated,
+      program: { ...updated, validTill: updated.deadline },
       message: 'Program updated successfully!'
     });
   } catch (error) {
@@ -1595,7 +1660,7 @@ app.put('/api/certificates/:id/verify', (req, res) => {
         now
       );
     } else if (status === 'rejected') {
-      // Notify student of rejection
+      // Notify student of rejection via portal notification
       db.prepare(`
         INSERT INTO notifications (id, studentId, title, message, type, programId, read, createdAt)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -1609,6 +1674,31 @@ app.put('/api/certificates/:id/verify', (req, res) => {
         0,
         now
       );
+
+      // Lookup student contact to dispatch official denial email
+      try {
+        const student = db.prepare('SELECT * FROM students WHERE id = ? OR phone = ? OR email = ?').get(
+          cert.studentId || '',
+          cert.studentPhone || '',
+          cert.studentEmail || ''
+        );
+        const targetEmail = cert.studentEmail || student?.email;
+        const targetName = cert.studentName || student?.name || 'Student';
+
+        if (targetEmail) {
+          sendCertificateDeniedEmail({
+            to: targetEmail,
+            name: targetName,
+            programTitle: cert.programTitle,
+            reason: adminRemarks ? adminRemarks.trim() : 'Document could not be verified. Please re-upload a clear copy.',
+            submittedAt: cert.submittedAt
+          }).catch(mailErr => {
+            console.warn('[Mailer] Certificate denial email failed:', mailErr.message);
+          });
+        }
+      } catch (err) {
+        console.warn('[Mailer] Error finding student for denial email:', err.message);
+      }
     }
 
     const updatedCert = db.prepare('SELECT * FROM certificates WHERE id = ?').get(id);
@@ -1617,6 +1707,36 @@ app.put('/api/certificates/:id/verify', (req, res) => {
       certificate: updatedCert,
       message: status === 'verified' ? 'Certificate verified and approved successfully!' : 'Certificate marked as rejected.'
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Certificates: Admin Delete Submission
+app.delete('/api/certificates/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const cert = db.prepare('SELECT * FROM certificates WHERE id = ?').get(id);
+    if (!cert) {
+      return res.status(404).json({ error: 'Certificate record not found.' });
+    }
+
+    db.prepare('DELETE FROM certificates WHERE id = ?').run(id);
+
+    // If verified, decrement student certificate count
+    if (cert.status === 'verified') {
+      const student = db.prepare('SELECT * FROM students WHERE id = ?').get(cert.studentId);
+      if (student) {
+        const newCerts = Math.max(0, (student.certificates || 1) - 1);
+        db.prepare('UPDATE students SET certificates = ?, updatedAt = ? WHERE id = ?').run(
+          newCerts,
+          new Date().toISOString(),
+          student.id
+        );
+      }
+    }
+
+    res.json({ success: true, message: 'Certificate deleted successfully.' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -2824,6 +2944,777 @@ app.get('/api/attendance/summary/overview', (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// ==========================================
+// STUDENT PROJECTS PLATFORM API
+// ==========================================
+
+// Helper: Enrich a post object with images, tags, isLiked, isBookmarked
+function enrichProjectPost(post, currentStudentId = null) {
+  if (!post) return null;
+  const images = db.prepare('SELECT id, imageUrl, caption, orderIndex FROM project_images WHERE postId = ? ORDER BY orderIndex ASC').all(post.id);
+
+  let tags = [];
+  try {
+    tags = post.tags ? JSON.parse(post.tags) : [];
+  } catch (e) {
+    tags = post.tags ? post.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+  }
+
+  let isLiked = false;
+  let isBookmarked = false;
+
+  if (currentStudentId) {
+    const likeRow = db.prepare('SELECT id FROM project_likes WHERE postId = ? AND studentId = ?').get(post.id, currentStudentId);
+    isLiked = !!likeRow;
+
+    const bmRow = db.prepare('SELECT id FROM project_bookmarks WHERE postId = ? AND studentId = ?').get(post.id, currentStudentId);
+    isBookmarked = !!bmRow;
+  }
+
+  return {
+    ...post,
+    images: images || [],
+    tags: tags || [],
+    isLiked,
+    isBookmarked
+  };
+}
+
+// 1. Projects: Feed & Search with Pagination
+app.get('/api/projects', (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      category,
+      search,
+      tag,
+      studentId,
+      bookmarkedBy,
+      sort = 'latest',
+      currentStudentId
+    } = req.query;
+
+    const offset = (Math.max(1, Number(page)) - 1) * Number(limit);
+    let whereClauses = ["status != 'hidden'"];
+    let params = [];
+
+    if (category && category !== 'All' && category !== 'all') {
+      whereClauses.push('category = ?');
+      params.push(category);
+    }
+
+    if (studentId) {
+      whereClauses.push('studentId = ?');
+      params.push(studentId);
+    }
+
+    if (search && search.trim()) {
+      whereClauses.push('(title LIKE ? OR description LIKE ? OR studentName LIKE ? OR tags LIKE ?)');
+      const q = `%${search.trim()}%`;
+      params.push(q, q, q, q);
+    }
+
+    if (tag && tag.trim()) {
+      whereClauses.push('tags LIKE ?');
+      params.push(`%${tag.trim()}%`);
+    }
+
+    if (bookmarkedBy) {
+      whereClauses.push('id IN (SELECT postId FROM project_bookmarks WHERE studentId = ?)');
+      params.push(bookmarkedBy);
+    }
+
+    let orderBy = 'createdAt DESC';
+    if (sort === 'most_liked') {
+      orderBy = 'likesCount DESC, createdAt DESC';
+    } else if (sort === 'trending') {
+      orderBy = '(likesCount * 2 + commentsCount * 3) DESC, createdAt DESC';
+    }
+
+    const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+    const countRow = db.prepare(`SELECT COUNT(*) as total FROM project_posts ${whereSql}`).get(...params);
+    const total = countRow ? countRow.total : 0;
+
+    const query = `
+      SELECT * FROM project_posts
+      ${whereSql}
+      ORDER BY ${orderBy}
+      LIMIT ? OFFSET ?
+    `;
+
+    const rawPosts = db.prepare(query).all(...params, Number(limit), offset);
+    const posts = rawPosts.map(p => enrichProjectPost(p, currentStudentId));
+
+    // Also fetch categories & trending tags
+    const categories = db.prepare('SELECT * FROM project_categories ORDER BY orderIndex ASC').all();
+
+    res.json({
+      success: true,
+      posts,
+      total,
+      page: Number(page),
+      totalPages: Math.ceil(total / Number(limit)),
+      categories
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 2. Projects: Get Single Project Details
+app.get('/api/projects/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { currentStudentId } = req.query;
+
+    const rawPost = db.prepare('SELECT * FROM project_posts WHERE id = ?').get(id);
+    if (!rawPost) {
+      return res.status(404).json({ error: 'Project post not found.' });
+    }
+
+    const post = enrichProjectPost(rawPost, currentStudentId);
+
+    // Get comments with nested replies
+    const rawComments = db.prepare('SELECT * FROM project_comments WHERE postId = ? ORDER BY createdAt ASC').all(id);
+    const commentMap = {};
+    const rootComments = [];
+
+    rawComments.forEach(c => {
+      commentMap[c.id] = { ...c, replies: [] };
+    });
+
+    rawComments.forEach(c => {
+      if (c.parentId && commentMap[c.parentId]) {
+        commentMap[c.parentId].replies.push(commentMap[c.id]);
+      } else {
+        rootComments.push(commentMap[c.id]);
+      }
+    });
+
+    res.json({
+      success: true,
+      post: {
+        ...post,
+        comments: rootComments
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 3. Projects: Create Project Post
+app.post('/api/projects', (req, res) => {
+  try {
+    const {
+      studentId,
+      studentName,
+      studentAvatar,
+      studentCourse = 'BCA',
+      studentSemester = 'Semester V',
+      title,
+      description,
+      category = 'Web Development',
+      demoUrl = '',
+      githubUrl = '',
+      youtubeUrl = '',
+      tags = [],
+      images = []
+    } = req.body;
+
+    if (!studentId || !studentName) {
+      return res.status(400).json({ error: 'Student authentication is required to post.' });
+    }
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: 'Project title is required.' });
+    }
+    if (!description || !description.trim()) {
+      return res.status(400).json({ error: 'Project description is required.' });
+    }
+
+    const postId = `proj-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+    const now = new Date().toISOString();
+
+    const tagsJson = Array.isArray(tags) ? JSON.stringify(tags) : JSON.stringify([]);
+
+    db.prepare(`
+      INSERT INTO project_posts (
+        id, studentId, studentName, studentAvatar, studentCourse, studentSemester,
+        title, description, category, demoUrl, githubUrl, youtubeUrl, tags,
+        likesCount, commentsCount, status, createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 'active', ?, ?)
+    `).run(
+      postId,
+      studentId,
+      studentName.trim(),
+      studentAvatar || '',
+      studentCourse,
+      studentSemester,
+      title.trim(),
+      description.trim(),
+      category || 'Web Development',
+      demoUrl.trim(),
+      githubUrl.trim(),
+      youtubeUrl.trim(),
+      tagsJson,
+      now,
+      now
+    );
+
+    // Insert Images
+    if (Array.isArray(images) && images.length > 0) {
+      const insertImg = db.prepare(`
+        INSERT INTO project_images (id, postId, imageUrl, caption, orderIndex, createdAt)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      images.forEach((img, idx) => {
+        const imgUrl = typeof img === 'string' ? img : img.imageUrl || img.dataUrl || '';
+        const caption = typeof img === 'object' ? img.caption || '' : '';
+        if (imgUrl) {
+          insertImg.run(`pimg-${Date.now()}-${idx}`, postId, imgUrl, caption, idx, now);
+        }
+      });
+    }
+
+    // Increment student's projects count
+    try {
+      db.prepare('UPDATE students SET projects = COALESCE(projects, 0) + 1 WHERE id = ?').run(studentId);
+    } catch (e) {}
+
+    const createdPost = enrichProjectPost(db.prepare('SELECT * FROM project_posts WHERE id = ?').get(postId), studentId);
+
+    res.status(201).json({
+      success: true,
+      post: createdPost,
+      message: 'Project published to community feed!'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 4. Projects: Update Project Post
+app.put('/api/projects/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      studentId,
+      isAdmin,
+      title,
+      description,
+      category,
+      demoUrl,
+      githubUrl,
+      youtubeUrl,
+      tags,
+      images
+    } = req.body;
+
+    const existing = db.prepare('SELECT * FROM project_posts WHERE id = ?').get(id);
+    if (!existing) {
+      return res.status(404).json({ error: 'Project post not found.' });
+    }
+
+    if (!isAdmin && existing.studentId !== studentId) {
+      return res.status(403).json({ error: 'Unauthorized: You can only edit your own project.' });
+    }
+
+    const now = new Date().toISOString();
+    const tagsJson = tags !== undefined
+      ? (Array.isArray(tags) ? JSON.stringify(tags) : JSON.stringify([]))
+      : existing.tags;
+
+    db.prepare(`
+      UPDATE project_posts SET
+        title = ?,
+        description = ?,
+        category = ?,
+        demoUrl = ?,
+        githubUrl = ?,
+        youtubeUrl = ?,
+        tags = ?,
+        updatedAt = ?
+      WHERE id = ?
+    `).run(
+      title !== undefined && title.trim() ? title.trim() : existing.title,
+      description !== undefined && description.trim() ? description.trim() : existing.description,
+      category !== undefined ? category : existing.category,
+      demoUrl !== undefined ? demoUrl.trim() : existing.demoUrl,
+      githubUrl !== undefined ? githubUrl.trim() : existing.githubUrl,
+      youtubeUrl !== undefined ? youtubeUrl.trim() : existing.youtubeUrl,
+      tagsJson,
+      now,
+      id
+    );
+
+    // If images array provided, replace
+    if (Array.isArray(images)) {
+      db.prepare('DELETE FROM project_images WHERE postId = ?').run(id);
+      const insertImg = db.prepare(`
+        INSERT INTO project_images (id, postId, imageUrl, caption, orderIndex, createdAt)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      images.forEach((img, idx) => {
+        const imgUrl = typeof img === 'string' ? img : img.imageUrl || img.dataUrl || '';
+        const caption = typeof img === 'object' ? img.caption || '' : '';
+        if (imgUrl) {
+          insertImg.run(`pimg-${Date.now()}-${idx}`, id, imgUrl, caption, idx, now);
+        }
+      });
+    }
+
+    const updated = enrichProjectPost(db.prepare('SELECT * FROM project_posts WHERE id = ?').get(id), studentId);
+    res.json({
+      success: true,
+      post: updated,
+      message: 'Project updated successfully!'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 5. Projects: Delete Project Post
+app.delete('/api/projects/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { studentId, isAdmin } = req.query;
+
+    const existing = db.prepare('SELECT * FROM project_posts WHERE id = ?').get(id);
+    if (!existing) {
+      return res.status(404).json({ error: 'Project post not found.' });
+    }
+
+    if (!isAdmin && existing.studentId !== studentId) {
+      return res.status(403).json({ error: 'Unauthorized: You can only delete your own project.' });
+    }
+
+    db.prepare('DELETE FROM project_images WHERE postId = ?').run(id);
+    db.prepare('DELETE FROM project_likes WHERE postId = ?').run(id);
+    db.prepare('DELETE FROM project_comments WHERE postId = ?').run(id);
+    db.prepare('DELETE FROM project_bookmarks WHERE postId = ?').run(id);
+    db.prepare('DELETE FROM project_reports WHERE postId = ?').run(id);
+    db.prepare('DELETE FROM project_notifications WHERE postId = ?').run(id);
+    db.prepare('DELETE FROM project_posts WHERE id = ?').run(id);
+
+    try {
+      db.prepare('UPDATE students SET projects = MAX(0, COALESCE(projects, 1) - 1) WHERE id = ?').run(existing.studentId);
+    } catch (e) {}
+
+    res.json({
+      success: true,
+      message: 'Project post removed successfully.'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 6. Projects: Like / Unlike Toggle
+app.post('/api/projects/:id/like', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { studentId, studentName = 'Student', studentAvatar = '' } = req.body;
+
+    if (!studentId) {
+      return res.status(400).json({ error: 'Student ID is required.' });
+    }
+
+    const post = db.prepare('SELECT id, studentId, title, likesCount FROM project_posts WHERE id = ?').get(id);
+    if (!post) {
+      return res.status(404).json({ error: 'Project post not found.' });
+    }
+
+    const existingLike = db.prepare('SELECT id FROM project_likes WHERE postId = ? AND studentId = ?').get(id, studentId);
+    let isLiked = false;
+
+    if (existingLike) {
+      // Unlike
+      db.prepare('DELETE FROM project_likes WHERE postId = ? AND studentId = ?').run(id, studentId);
+      db.prepare('UPDATE project_posts SET likesCount = MAX(0, likesCount - 1) WHERE id = ?').run(id);
+      isLiked = false;
+    } else {
+      // Like
+      const likeId = `like-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+      const now = new Date().toISOString();
+      db.prepare('INSERT INTO project_likes (id, postId, studentId, createdAt) VALUES (?, ?, ?, ?)').run(likeId, id, studentId, now);
+      db.prepare('UPDATE project_posts SET likesCount = likesCount + 1 WHERE id = ?').run(id);
+      isLiked = true;
+
+      // Notification for author (if not liking own post)
+      if (post.studentId !== studentId) {
+        db.prepare(`
+          INSERT INTO project_notifications (id, studentId, actorId, actorName, actorAvatar, postId, type, message, isRead, createdAt)
+          VALUES (?, ?, ?, ?, ?, ?, 'like', ?, 0, ?)
+        `).run(
+          `pnotif-${Date.now()}`,
+          post.studentId,
+          studentId,
+          studentName,
+          studentAvatar,
+          id,
+          `${studentName} liked your project "${post.title.slice(0, 40)}"`,
+          now
+        );
+      }
+    }
+
+    const updatedPost = db.prepare('SELECT likesCount FROM project_posts WHERE id = ?').get(id);
+    res.json({
+      success: true,
+      isLiked,
+      likesCount: updatedPost ? updatedPost.likesCount : 0
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 7. Projects: Bookmark / Save Toggle
+app.post('/api/projects/:id/bookmark', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { studentId } = req.body;
+
+    if (!studentId) {
+      return res.status(400).json({ error: 'Student ID is required.' });
+    }
+
+    const existingBm = db.prepare('SELECT id FROM project_bookmarks WHERE postId = ? AND studentId = ?').get(id, studentId);
+    let isBookmarked = false;
+
+    if (existingBm) {
+      db.prepare('DELETE FROM project_bookmarks WHERE postId = ? AND studentId = ?').run(id, studentId);
+      isBookmarked = false;
+    } else {
+      const bmId = `bm-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+      db.prepare('INSERT INTO project_bookmarks (id, postId, studentId, createdAt) VALUES (?, ?, ?, ?)').run(
+        bmId,
+        id,
+        studentId,
+        new Date().toISOString()
+      );
+      isBookmarked = true;
+    }
+
+    res.json({
+      success: true,
+      isBookmarked,
+      message: isBookmarked ? 'Saved to bookmarks' : 'Removed from bookmarks'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 8. Projects: Get Comments
+app.get('/api/projects/:id/comments', (req, res) => {
+  try {
+    const { id } = req.params;
+    const rawComments = db.prepare('SELECT * FROM project_comments WHERE postId = ? ORDER BY createdAt ASC').all(id);
+
+    const commentMap = {};
+    const rootComments = [];
+
+    rawComments.forEach(c => {
+      commentMap[c.id] = { ...c, replies: [] };
+    });
+
+    rawComments.forEach(c => {
+      if (c.parentId && commentMap[c.parentId]) {
+        commentMap[c.parentId].replies.push(commentMap[c.id]);
+      } else {
+        rootComments.push(commentMap[c.id]);
+      }
+    });
+
+    res.json({
+      success: true,
+      comments: rootComments
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 9. Projects: Add Comment / Reply
+app.post('/api/projects/:id/comments', (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      studentId,
+      studentName = 'Student',
+      studentAvatar = '',
+      content,
+      parentId = null
+    } = req.body;
+
+    if (!studentId || !studentName) {
+      return res.status(400).json({ error: 'Student authentication required.' });
+    }
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: 'Comment content cannot be empty.' });
+    }
+
+    const post = db.prepare('SELECT id, studentId, title FROM project_posts WHERE id = ?').get(id);
+    if (!post) {
+      return res.status(404).json({ error: 'Project post not found.' });
+    }
+
+    const commentId = `com-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    const now = new Date().toISOString();
+
+    db.prepare(`
+      INSERT INTO project_comments (id, postId, parentId, studentId, studentName, studentAvatar, content, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(commentId, id, parentId || null, studentId, studentName.trim(), studentAvatar || '', content.trim(), now, now);
+
+    db.prepare('UPDATE project_posts SET commentsCount = commentsCount + 1 WHERE id = ?').run(id);
+
+    // Notification for author or parent commenter
+    let recipientId = post.studentId;
+    let notifType = 'comment';
+    let notifMsg = `${studentName} commented on your project "${post.title.slice(0, 40)}"`;
+
+    if (parentId) {
+      const parentCom = db.prepare('SELECT studentId FROM project_comments WHERE id = ?').get(parentId);
+      if (parentCom && parentCom.studentId !== studentId) {
+        recipientId = parentCom.studentId;
+        notifType = 'reply';
+        notifMsg = `${studentName} replied to your comment on "${post.title.slice(0, 40)}"`;
+      }
+    }
+
+    if (recipientId && recipientId !== studentId) {
+      db.prepare(`
+        INSERT INTO project_notifications (id, studentId, actorId, actorName, actorAvatar, postId, type, message, isRead, createdAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+      `).run(
+        `pnotif-${Date.now()}`,
+        recipientId,
+        studentId,
+        studentName,
+        studentAvatar,
+        id,
+        notifType,
+        notifMsg,
+        now
+      );
+    }
+
+    const createdComment = db.prepare('SELECT * FROM project_comments WHERE id = ?').get(commentId);
+    res.status(201).json({
+      success: true,
+      comment: { ...createdComment, replies: [] },
+      message: 'Comment posted!'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 10. Projects: Delete Comment
+app.delete('/api/projects/comments/:commentId', (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const { studentId, isAdmin } = req.query;
+
+    const comment = db.prepare('SELECT * FROM project_comments WHERE id = ?').get(commentId);
+    if (!comment) {
+      return res.status(404).json({ error: 'Comment not found.' });
+    }
+
+    if (!isAdmin && comment.studentId !== studentId) {
+      return res.status(403).json({ error: 'Unauthorized: You can only delete your own comments.' });
+    }
+
+    // Delete child replies too
+    const childCountRow = db.prepare('SELECT COUNT(*) as count FROM project_comments WHERE parentId = ?').get(commentId);
+    const childCount = childCountRow ? childCountRow.count : 0;
+
+    db.prepare('DELETE FROM project_comments WHERE parentId = ?').run(commentId);
+    db.prepare('DELETE FROM project_comments WHERE id = ?').run(commentId);
+
+    db.prepare('UPDATE project_posts SET commentsCount = MAX(0, commentsCount - ?) WHERE id = ?').run(1 + childCount, comment.postId);
+
+    res.json({
+      success: true,
+      message: 'Comment deleted successfully.'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 11. Projects: Report Inappropriate Post
+app.post('/api/projects/:id/report', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reporterId, reporterName = 'Student', reason = 'Inappropriate Content', details = '' } = req.body;
+
+    if (!reporterId) {
+      return res.status(400).json({ error: 'Reporter identification required.' });
+    }
+
+    const reportId = `rep-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    const now = new Date().toISOString();
+
+    db.prepare(`
+      INSERT INTO project_reports (id, postId, reporterId, reporterName, reason, details, status, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)
+    `).run(reportId, id, reporterId, reporterName, reason, details, now);
+
+    db.prepare("UPDATE project_posts SET status = 'reported' WHERE id = ?").run(id);
+
+    res.json({
+      success: true,
+      message: 'Thank you for reporting. College administrators have been notified for review.'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 12. Projects: Categories List & Admin Management
+app.get('/api/projects/categories', (req, res) => {
+  try {
+    const categories = db.prepare('SELECT * FROM project_categories ORDER BY orderIndex ASC').all();
+    res.json({ success: true, categories });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/projects/categories', (req, res) => {
+  try {
+    const { name, icon = 'Code' } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Category name is required.' });
+    }
+
+    const id = `cat-${Date.now()}`;
+    const now = new Date().toISOString();
+    const maxOrder = db.prepare('SELECT MAX(orderIndex) as maxO FROM project_categories').get().maxO || 0;
+
+    db.prepare('INSERT INTO project_categories (id, name, icon, orderIndex, createdAt) VALUES (?, ?, ?, ?, ?)').run(
+      id,
+      name.trim(),
+      icon,
+      maxOrder + 1,
+      now
+    );
+
+    const created = db.prepare('SELECT * FROM project_categories WHERE id = ?').get(id);
+    res.status(201).json({ success: true, category: created });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/projects/categories/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    db.prepare('DELETE FROM project_categories WHERE id = ?').run(id);
+    res.json({ success: true, message: 'Category removed.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 13. Projects: Student Project Notifications
+app.get('/api/projects/notifications', (req, res) => {
+  try {
+    const { studentId } = req.query;
+    if (!studentId) {
+      return res.status(400).json({ error: 'Student ID required.' });
+    }
+
+    const notifications = db.prepare('SELECT * FROM project_notifications WHERE studentId = ? ORDER BY createdAt DESC LIMIT 30').all(studentId);
+    const unreadCountRow = db.prepare('SELECT COUNT(*) as unread FROM project_notifications WHERE studentId = ? AND isRead = 0').get(studentId);
+
+    res.json({
+      success: true,
+      notifications,
+      unreadCount: unreadCountRow ? unreadCountRow.unread : 0
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/projects/notifications/read', (req, res) => {
+  try {
+    const { studentId, notificationId } = req.body;
+    if (!studentId) {
+      return res.status(400).json({ error: 'Student ID required.' });
+    }
+
+    if (notificationId) {
+      db.prepare('UPDATE project_notifications SET isRead = 1 WHERE id = ? AND studentId = ?').run(notificationId, studentId);
+    } else {
+      db.prepare('UPDATE project_notifications SET isRead = 1 WHERE studentId = ?').run(studentId);
+    }
+
+    res.json({ success: true, message: 'Notifications marked as read.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 14. Projects: Admin Reports & Statistics
+app.get('/api/projects/admin/reports', (req, res) => {
+  try {
+    const reports = db.prepare(`
+      SELECT r.*, p.title as postTitle, p.studentName as authorName, p.category as postCategory
+      FROM project_reports r
+      LEFT JOIN project_posts p ON r.postId = p.id
+      ORDER BY r.createdAt DESC
+    `).all();
+
+    res.json({ success: true, reports });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/projects/admin/reports/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    db.prepare('DELETE FROM project_reports WHERE id = ?').run(id);
+    res.json({ success: true, message: 'Report dismissed.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/projects/admin/stats', (req, res) => {
+  try {
+    const totalProjects = db.prepare('SELECT COUNT(*) as count FROM project_posts').get().count;
+    const totalLikes = db.prepare('SELECT SUM(likesCount) as total FROM project_posts').get().total || 0;
+    const totalComments = db.prepare('SELECT COUNT(*) as count FROM project_comments').get().count;
+    const reportedCount = db.prepare("SELECT COUNT(*) as count FROM project_reports WHERE status = 'pending'").get().count;
+    const creatorsCount = db.prepare('SELECT COUNT(DISTINCT studentId) as count FROM project_posts').get().count;
+
+    res.json({
+      success: true,
+      stats: {
+        totalProjects,
+        totalLikes,
+        totalComments,
+        reportedCount,
+        creatorsCount
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+
 
 const server = app.listen(PORT, () => {
   console.log(`Podar Pathways Database & API Server running on http://localhost:${PORT}`);

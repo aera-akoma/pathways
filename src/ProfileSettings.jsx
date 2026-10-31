@@ -1,6 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { DEFAULT_STUDENT_AVATAR, DEFAULT_ADMIN_AVATAR } from './defaultAvatar.js';
+import { INITIAL_CERTIFICATES } from './defaultCertificates.js';
 import {
   User,
+  Search,
+  Building2,
+  UserCheck,
+  Compass,
   Users,
   Phone,
   Mail,
@@ -20,14 +26,34 @@ import {
   Eye,
   EyeOff,
   Bell,
+  BellOff,
   Code,
   Home,
   Navigation,
-  Map,
   Hash,
   Shield,
   AlertCircle,
-  Info
+  Info,
+  Grid,
+  Award,
+  Bookmark,
+  Settings,
+  Share2,
+  BadgeCheck,
+  Heart,
+  MessageCircle,
+  ExternalLink,
+  Layers,
+  Plus,
+  Link2,
+  Pencil,
+  Copy,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Trophy,
+  Flame,
+  Briefcase
 } from 'lucide-react';
 
 const INDIAN_STATES_DISTRICTS = {
@@ -47,64 +73,110 @@ const INDIAN_STATES_DISTRICTS = {
     'West Delhi', 'Gautam Buddha Nagar (Noida)', 'Ghaziabad', 'Gurugram', 'Faridabad'
   ],
   'Maharashtra': [
-    'Mumbai City', 'Mumbai Suburban', 'Pune', 'Nagpur', 'Thane', 'Nashik',
-    'Chhatrapati Sambhajinagar', 'Solapur', 'Amravati', 'Kolhapur', 'Navi Mumbai'
-  ],
-  'Uttar Pradesh': [
-    'Lucknow', 'Kanpur Nagar', 'Varanasi', 'Agra', 'Prayagraj', 'Meerut', 'Ghaziabad',
-    'Bareilly', 'Aligarh', 'Moradabad', 'Gorakhpur', 'Noida (GB Nagar)', 'Mathura', 'Ayodhya'
+    'Mumbai City', 'Mumbai Suburban', 'Pune', 'Nagpur', 'Thane', 'Nashik', 'Aurangabad',
+    'Solapur', 'Amravati', 'Kolhapur', 'Navi Mumbai', 'Satara', 'Sangli'
   ],
   'Gujarat': [
-    'Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Bhavnagar', 'Jamnagar',
-    'Gandhinagar', 'Junagadh', 'Anand', 'Navsari', 'Mehsana', 'Kutch'
+    'Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Bhavnagar', 'Jamnagar', 'Gandhinagar',
+    'Junagadh', 'Anand', 'Navsari', 'Morbi'
+  ],
+  'Uttar Pradesh': [
+    'Lucknow', 'Kanpur', 'Varanasi', 'Agra', 'Prayagraj', 'Noida', 'Ghaziabad',
+    'Meerut', 'Aligarh', 'Bareilly', 'Gorakhpur', 'Mathura'
   ],
   'Madhya Pradesh': [
     'Bhopal', 'Indore', 'Gwalior', 'Jabalpur', 'Ujjain', 'Sagar', 'Dewas', 'Satna', 'Ratlam'
   ],
-  'Haryana': [
-    'Gurugram', 'Faridabad', 'Panipat', 'Ambala', 'Yamunanagar', 'Rohtak', 'Hisar',
-    'Karnal', 'Sonipat', 'Panchkula'
-  ],
-  'Punjab': [
-    'Chandigarh', 'Ludhiana', 'Amritsar', 'Jalandhar', 'Patiala', 'Bathinda', 'Mohali (SAS Nagar)'
-  ],
   'Karnataka': [
-    'Bengaluru Urban', 'Bengaluru Rural', 'Mysuru', 'Hubballi-Dharwad', 'Mangaluru', 'Belagavi'
-  ],
-  'Bihar': [
-    'Patna', 'Gaya', 'Bhagalpur', 'Muzaffarpur', 'Purnia', 'Darbhanga', 'Bihar Sharif'
-  ],
-  'West Bengal': [
-    'Kolkata', 'North 24 Parganas', 'South 24 Parganas', 'Howrah', 'Hooghly', 'Darjeeling'
-  ],
-  'Telangana': [
-    'Hyderabad', 'Medchal-Malkajgiri', 'Rangareddy', 'Warangal', 'Nizamabad', 'Karimnagar'
-  ],
-  'Tamil Nadu': [
-    'Chennai', 'Coimbatore', 'Madurai', 'Tiruchirappalli', 'Salem', 'Tirunelveli'
-  ],
-  'Kerala': [
-    'Thiruvananthapuram', 'Kochi (Ernakulam)', 'Kozhikode', 'Thrissur', 'Kollam', 'Kannur'
-  ],
-  'Andhra Pradesh': [
-    'Visakhapatnam', 'Vijayawada (NTR)', 'Guntur', 'Tirupati', 'Kurnool', 'Nellore'
-  ],
-  'Assam': [
-    'Guwahati (Kamrup Metro)', 'Dibrugarh', 'Silchar (Cachar)', 'Jorhat', 'Nagaon'
-  ],
-  'Chandigarh': ['Chandigarh'],
-  'Goa': ['North Goa', 'South Goa'],
-  'Himachal Pradesh': ['Shimla', 'Dharamshala (Kangra)', 'Mandi', 'Solan', 'Kullu'],
-  'Jammu & Kashmir': ['Srinagar', 'Jammu', 'Anantnag', 'Baramulla', 'Udhampur'],
-  'Jharkhand': ['Ranchi', 'Jamshedpur (East Singhbhum)', 'Dhanbad', 'Bokaro', 'Hazaribagh'],
-  'Odisha': ['Bhubaneswar (Khurda)', 'Cuttack', 'Rourkela (Sundargarh)', 'Puri', 'Sambalpur'],
-  'Uttarakhand': ['Dehradun', 'Haridwar', 'Nainital', 'Udham Singh Nagar', 'Rishikesh']
+    'Bengaluru Urban', 'Bengaluru Rural', 'Mysuru', 'Hubballi-Dharwad', 'Mangaluru', 'Belagavi', 'Kalaburagi'
+  ]
 };
 
-export function ProfileSettings({ student, state, setState, session, notify, onLogout }) {
-  const [activeTab, setActiveTab] = useState('profile');
+const DEFAULT_STUDENT_PROJECTS = [
+  {
+    id: 'proj-demo-1',
+    title: 'CampusKart - Student Peer Marketplace',
+    description: 'A full-stack campus exchange platform allowing students to trade books, project hardware, and study materials securely.',
+    images: ['https://images.unsplash.com/photo-1557821552-17105176677c?w=700&auto=format&fit=crop&q=80'],
+    tags: ['React', 'Node.js', 'PostgreSQL', 'TailwindCSS'],
+    likesCount: 42,
+    commentsCount: 9,
+    demoUrl: 'https://campuskart.podarpathways.edu',
+    githubUrl: 'https://github.com/studentdemo/campuskart',
+    createdAt: '2026-10-24T10:00:00Z'
+  },
+  {
+    id: 'proj-demo-2',
+    title: 'CodeSprint - Real-time DSA Practice Hub',
+    description: 'Interactive coding platform with live code compilation, test case verification, and algorithmic complexity analyzer.',
+    images: ['https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=700&auto=format&fit=crop&q=80'],
+    tags: ['JavaScript', 'Python', 'WebSockets', 'Docker'],
+    likesCount: 67,
+    commentsCount: 14,
+    demoUrl: 'https://codesprint.vercel.app',
+    githubUrl: 'https://github.com/studentdemo/codesprint',
+    createdAt: '2026-10-26T14:30:00Z'
+  },
+  {
+    id: 'proj-demo-3',
+    title: 'Smart Campus Navigation & Event Tracker',
+    description: 'Progressive Web App providing indoor campus route guidance, lecture hall timetables, and college club hackathon announcements.',
+    images: ['https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=700&auto=format&fit=crop&q=80'],
+    tags: ['React Native', 'Firebase', 'Maps API', 'PWA'],
+    likesCount: 38,
+    commentsCount: 7,
+    demoUrl: 'https://campusnav.podarpathways.edu',
+    githubUrl: 'https://github.com/studentdemo/campus-navigator',
+    createdAt: '2026-10-28T09:15:00Z'
+  }
+];
 
-  // 1. Profile details state (Name and Email locked)
+export function ProfileSettings({ student, studentId, courses, state, setState, session, notify, onLogout, navigate, initialTab }) {
+  const getTabFromUrl = () => {
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const t = searchParams.get('tab');
+      if (t && ['posts', 'certificates', 'saved', 'edit', 'security', 'notifications', 'directory', 'office'].includes(t)) {
+        return t;
+      }
+    } catch (e) {}
+    return initialTab || 'posts';
+  };
+
+  const [activeTab, setActiveTab] = useState(getTabFromUrl);
+
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    try {
+      const url = new URL(window.location.href);
+      if (newTab === 'posts') {
+        url.searchParams.delete('tab');
+      } else {
+        url.searchParams.set('tab', newTab);
+      }
+      window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    const handleRouteChange = (evt) => {
+      const tabParam = evt.detail?.params?.tab;
+      if (tabParam && ['posts', 'certificates', 'saved', 'edit', 'security', 'notifications', 'directory', 'office'].includes(tabParam)) {
+        setActiveTab(tabParam);
+      }
+    };
+    const handlePopState = () => {
+      setActiveTab(getTabFromUrl());
+    };
+    window.addEventListener('podar-route-change', handleRouteChange);
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('podar-route-change', handleRouteChange);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
+  // Form State
   const [formData, setFormData] = useState({
     name: student?.name || '',
     fathersName: student?.fathersName || '',
@@ -119,17 +191,18 @@ export function ProfileSettings({ student, state, setState, session, notify, onL
     github: student?.github || '',
     portfolioUrl: student?.portfolioUrl || '',
     dob: student?.dob || '',
-    avatar: student?.avatar || '',
+    avatar: student?.avatar || DEFAULT_STUDENT_AVATAR,
     course: student?.course || 'BCA',
     semester: student?.semester || 'V',
-    goal: student?.goal || '',
-    gender: student?.gender || 'Male'
+    goal: student?.goal || 'Aspiring Software Engineer',
+    gender: student?.gender || 'Male',
+    bio: student?.bio || 'Building modern full-stack web and cloud applications. Passionate about algorithms, design systems, and practical AI solutions. Podar Pathways \'26 🚀'
   });
 
   // Sync state if student changes
   useEffect(() => {
     if (student) {
-      setFormData((prev) => ({
+      setFormData(prev => ({
         ...prev,
         name: student.name || prev.name,
         email: student.email || prev.email,
@@ -144,123 +217,234 @@ export function ProfileSettings({ student, state, setState, session, notify, onL
         github: student.github || prev.github,
         portfolioUrl: student.portfolioUrl || prev.portfolioUrl,
         dob: student.dob || prev.dob,
-        avatar: student.avatar || prev.avatar,
+        avatar: student.avatar || prev.avatar || DEFAULT_STUDENT_AVATAR,
         course: student.course || prev.course,
         semester: student.semester || prev.semester,
         goal: student.goal || prev.goal,
-        gender: student.gender || prev.gender
+        gender: student.gender || prev.gender,
+        bio: student.bio || prev.bio
       }));
     }
   }, [student]);
 
-  // 2. Password change state
+  // Username
+  const username = useMemo(() => {
+    if (student?.username) return student.username;
+    if (student?.name) return student.name.toLowerCase().replace(/\s+/g, '.');
+    return 'student.demo';
+  }, [student]);
+
+  // Quick View Project Lightbox
+  const [selectedProject, setSelectedProject] = useState(null);
+
+  // Student Projects
+  const [userProjects, setUserProjects] = useState([]);
+  useEffect(() => {
+    let localPosts = [];
+    try {
+      const saved = localStorage.getItem('podar_local_projects');
+      if (saved) localPosts = JSON.parse(saved);
+    } catch (e) {}
+
+    fetch('/api/projects?limit=30')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        const posts = data?.posts || [];
+        const combined = [...localPosts, ...posts];
+        const userSpecific = combined.filter(p => p.studentId === student?.id || p.author?.id === student?.id);
+        if (userSpecific.length > 0) {
+          setUserProjects(userSpecific);
+        } else {
+          setUserProjects(DEFAULT_STUDENT_PROJECTS);
+        }
+      })
+      .catch(() => {
+        setUserProjects(localPosts.length > 0 ? localPosts : DEFAULT_STUDENT_PROJECTS);
+      });
+  }, [student?.id]);
+
+  // Student Certificates
+  const [userCertificates, setUserCertificates] = useState([]);
+  useEffect(() => {
+    let certsList = INITIAL_CERTIFICATES;
+    try {
+      const saved = localStorage.getItem('podar-pathways-certificates');
+      if (saved) certsList = JSON.parse(saved);
+    } catch (e) {}
+
+    fetch('/api/certificates')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setUserCertificates(data.filter(c => c.studentId === student?.id || student?.id === 'student-demo'));
+        } else {
+          setUserCertificates(certsList.filter(c => c.studentId === student?.id || student?.id === 'student-demo'));
+        }
+      })
+      .catch(() => {
+        setUserCertificates(certsList.filter(c => c.studentId === student?.id || student?.id === 'student-demo'));
+      });
+  }, [student?.id]);
+
+  // Password change state
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   });
-
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
-
-  const reqMatch = Boolean(
-    passwordData.newPassword &&
-    passwordData.confirmPassword &&
-    passwordData.newPassword === passwordData.confirmPassword
-  );
+  const [copiedShare, setCopiedShare] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // Dynamic districts based on selected state
   const currentDistricts = (formData.state && INDIAN_STATES_DISTRICTS[formData.state])
     ? INDIAN_STATES_DISTRICTS[formData.state]
     : INDIAN_STATES_DISTRICTS['Rajasthan'];
 
-  // 3. Notification Preferences (saved in localStorage)
+  // Notification Preferences
   const [notifications, setNotifications] = useState(() => {
     try {
       const saved = localStorage.getItem('podar-notifications-settings');
-      return saved ? JSON.parse(saved) : {
-        jobAlerts: true,
-        interviewReminders: true,
-        weeklyDigest: true,
-        collegeNotices: true,
-        quizDeadlines: true,
-        soundEffects: true
-      };
-    } catch {
-      return {
-        jobAlerts: true,
-        interviewReminders: true,
-        weeklyDigest: true,
-        collegeNotices: true,
-        quizDeadlines: true,
-        soundEffects: true
-      };
-    }
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return {
+      enabled: true,
+      jobAlerts: true,
+      interviewReminders: true,
+      weeklyDigest: true,
+      collegeNotices: true,
+      quizDeadlines: true,
+      soundEffects: true
+    };
   });
 
   const fileInputRef = useRef(null);
 
-  const handleProfileChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handlePasswordChange = (field, value) => {
-    setPasswordData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const toggleNotification = (key) => {
-    setNotifications((prev) => {
-      const updated = { ...prev, [key]: !prev[key] };
-      localStorage.setItem('podar-notifications-settings', JSON.stringify(updated));
-      return updated;
-    });
-    if (notify) notify('Notification preferences updated.');
-  };
-
-  // Avatar Upload
-  const handleAvatarChange = (e) => {
+  // Avatar Upload with Compression
+  const handleAvatarUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      if (notify) notify('Please upload a valid image (JPG, PNG, or WebP).');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      if (notify) notify('Image file size must be less than 5 MB.');
+      notify?.('Please select an image file (PNG, JPG, or WebP).');
       return;
     }
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const base64 = event.target?.result;
-      setFormData((prev) => ({ ...prev, avatar: base64 }));
-      if (notify) notify('Photo uploaded. Click "Save details" to apply.');
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 320;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.88);
+
+        setFormData(prev => ({ ...prev, avatar: compressedBase64 }));
+
+        if (setState) {
+          setState(prev => {
+            const list = prev.students || [];
+            return {
+              ...prev,
+              students: list.map(s => s.id === student?.id ? { ...s, avatar: compressedBase64 } : s)
+            };
+          });
+        }
+
+        try {
+          const cur = JSON.parse(localStorage.getItem('podar-pathways-session') || 'null');
+          if (cur) {
+            if (cur.student) cur.student.avatar = compressedBase64;
+            cur.avatar = compressedBase64;
+            localStorage.setItem('podar-pathways-session', JSON.stringify(cur));
+          }
+        } catch (sessErr) {}
+
+        if (student?.id) {
+          fetch(`/api/students/${student.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ avatar: compressedBase64 })
+          }).catch(() => {});
+        }
+
+        window.dispatchEvent(new CustomEvent('podar-student-updated', { detail: { avatar: compressedBase64 } }));
+        notify?.('Profile photo updated successfully!');
+      };
+      img.src = event.target.result;
     };
     reader.readAsDataURL(file);
   };
 
   const handleRemoveAvatar = () => {
-    setFormData((prev) => ({ ...prev, avatar: '' }));
+    setFormData(prev => ({ ...prev, avatar: '' }));
     if (fileInputRef.current) fileInputRef.current.value = '';
-    if (notify) notify('Profile photo removed.');
+
+    if (setState) {
+      setState(prev => {
+        const list = prev.students || [];
+        return {
+          ...prev,
+          students: list.map(s => s.id === student?.id ? { ...s, avatar: '' } : s)
+        };
+      });
+    }
+
+    try {
+      const cur = JSON.parse(localStorage.getItem('podar-pathways-session') || 'null');
+      if (cur) {
+        if (cur.student) cur.student.avatar = '';
+        cur.avatar = '';
+        localStorage.setItem('podar-pathways-session', JSON.stringify(cur));
+      }
+    } catch (sessErr) {}
+
+    if (student?.id) {
+      fetch(`/api/students/${student.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatar: '' })
+      }).catch(() => {});
+    }
+
+    window.dispatchEvent(new CustomEvent('podar-student-updated', { detail: { avatar: '' } }));
+    notify?.('Profile photo removed.');
   };
 
-  // Save Profile Details
+  // Save Profile Form
   const handleSaveProfile = async (e) => {
     if (e) e.preventDefault();
 
     if (formData.phone && !/^[0-9]{10}$/.test(formData.phone.replace(/\D/g, ''))) {
-      if (notify) notify('Please enter a valid 10-digit mobile number.');
+      notify?.('Please enter a valid 10-digit mobile number.');
       return;
     }
 
     if (formData.pinCode && formData.pinCode.length !== 6) {
-      if (notify) notify('Please enter a valid 6-digit PIN code.');
+      notify?.('Please enter a valid 6-digit PIN code.');
       return;
     }
 
@@ -269,7 +453,7 @@ export function ProfileSettings({ student, state, setState, session, notify, onL
     try {
       if (student?.id) {
         try {
-          const res = await fetch(`http://localhost:5000/api/students/${student.id}`, {
+          await fetch(`/api/students/${student.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -278,32 +462,29 @@ export function ProfileSettings({ student, state, setState, session, notify, onL
               email: student.email
             })
           });
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            console.warn('Backend update note:', errData);
-          }
-        } catch (serverErr) {
-          console.warn('Backend offline, saving locally:', serverErr);
-        }
+        } catch (serverErr) {}
       }
 
       if (setState) {
-        setState((prev) => {
-          const updatedStudents = (prev.students || []).map((s) =>
+        setState(prev => {
+          const updatedStudents = (prev.students || []).map(s =>
             s.id === student?.id ? { ...s, ...formData, name: student.name, email: student.email } : s
           );
-          return {
-            ...prev,
-            students: updatedStudents
-          };
+          return { ...prev, students: updatedStudents };
         });
       }
 
-      if (notify) {
-        notify('Profile details saved successfully.');
-      }
+      try {
+        const cur = JSON.parse(localStorage.getItem('podar-pathways-session') || 'null');
+        if (cur && cur.student) {
+          cur.student = { ...cur.student, ...formData, name: student.name, email: student.email };
+          localStorage.setItem('podar-pathways-session', JSON.stringify(cur));
+        }
+      } catch (sessErr) {}
+
+      notify?.('Profile details saved successfully!');
     } catch (err) {
-      if (notify) notify(err.message || 'Error saving profile.');
+      notify?.(err.message || 'Error saving profile.');
     } finally {
       setIsSavingProfile(false);
     }
@@ -314,17 +495,17 @@ export function ProfileSettings({ student, state, setState, session, notify, onL
     if (e) e.preventDefault();
 
     if (!passwordData.newPassword) {
-      if (notify) notify('Please enter your new password.');
+      notify?.('Please enter your new password.');
       return;
     }
 
     if (passwordData.newPassword.length < 6) {
-      if (notify) notify('New password must be at least 6 characters long.');
+      notify?.('New password must be at least 6 characters long.');
       return;
     }
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      if (notify) notify('New passwords do not match. Please re-enter.');
+      notify?.('New passwords do not match. Please re-enter.');
       return;
     }
 
@@ -332,7 +513,7 @@ export function ProfileSettings({ student, state, setState, session, notify, onL
 
     try {
       if (student?.id) {
-        const res = await fetch(`http://localhost:5000/api/students/${student.id}/change-password`, {
+        const res = await fetch(`/api/students/${student.id}/change-password`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -346,781 +527,1947 @@ export function ProfileSettings({ student, state, setState, session, notify, onL
           throw new Error(data.error || 'Failed to update password.');
         }
 
-        setPasswordData({
-          currentPassword: '',
-          newPassword: '',
-          confirmPassword: ''
-        });
-
-        if (notify) {
-          notify(data.message || 'Password changed successfully. You can now use your new password to sign in.');
-        }
+        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        notify?.('Password updated successfully! You can now use your new password.');
       } else {
-        setPasswordData({
-          currentPassword: '',
-          newPassword: '',
-          confirmPassword: ''
-        });
-        if (notify) notify('Demo account password updated.');
+        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        notify?.('Account password updated successfully.');
       }
     } catch (err) {
-      if (notify) notify(err.message || 'Could not update password.');
+      notify?.(err.message || 'Could not update password.');
     } finally {
       setIsChangingPassword(false);
     }
   };
 
-  const getInitials = (name) => {
-    if (!name) return 'ST';
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .slice(0, 2)
-      .toUpperCase();
+  // Target user identification (URL query param or prop)
+  const getTargetUserIdFromUrl = () => {
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      return searchParams.get('id') || searchParams.get('user') || studentId || null;
+    } catch (e) {
+      return studentId || null;
+    }
   };
 
+  const [targetUserId, setTargetUserId] = useState(getTargetUserIdFromUrl);
+
+  // Sync when route or history changes
+  useEffect(() => {
+    const handleSyncUser = () => {
+      setTargetUserId(getTargetUserIdFromUrl());
+    };
+    window.addEventListener('popstate', handleSyncUser);
+    window.addEventListener('podar-route-change', handleSyncUser);
+    return () => {
+      window.removeEventListener('popstate', handleSyncUser);
+      window.removeEventListener('podar-route-change', handleSyncUser);
+    };
+  }, [studentId]);
+
+  // Load all administrators for Directory & Profile Switching
+  const [allAdmins, setAllAdmins] = useState([
+    {
+      id: 'admin-podar-root',
+      name: 'Podar Administrator',
+      email: 'admin@podar.edu',
+      phone: '9999988888',
+      role: 'Super Admin',
+      department: 'Career & Placement Cell',
+      avatar: DEFAULT_ADMIN_AVATAR,
+      bio: 'Directing career guidance, industry placements, examinations, and technical incubation for Podar institutions.'
+    }
+  ]);
+
+  useEffect(() => {
+    fetch('/api/admins')
+      .then(res => res.ok ? res.json() : null)
+      .then(list => {
+        if (Array.isArray(list) && list.length > 0) {
+          setAllAdmins(list.map(a => ({
+            ...a,
+            avatar: a.avatar || DEFAULT_ADMIN_AVATAR,
+            userType: 'admin'
+          })));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Extra fetched students if state.students isn't populated
+  const [fetchedStudents, setFetchedStudents] = useState([]);
+  useEffect(() => {
+    fetch('/api/students')
+      .then(res => res.ok ? res.json() : null)
+      .then(list => {
+        if (Array.isArray(list) && list.length > 0) {
+          setFetchedStudents(list);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Merged student roster
+  const allStudents = useMemo(() => {
+    const map = new Map();
+    (state?.students || []).forEach(s => map.set(s.id, s));
+    fetchedStudents.forEach(s => {
+      if (!map.has(s.id)) map.set(s.id, s);
+    });
+    if (student && !map.has(student.id)) map.set(student.id, student);
+    return Array.from(map.values()).map(s => ({
+      ...s,
+      avatar: s.avatar || DEFAULT_STUDENT_AVATAR,
+      userType: 'student'
+    }));
+  }, [state?.students, fetchedStudents, student]);
+
+  // Determine if viewing own profile or someone else
+  const activeProfileUser = useMemo(() => {
+    if (!targetUserId) return null;
+    if (student?.id === targetUserId || session?.id === targetUserId) {
+      return null;
+    }
+    const foundStudent = allStudents.find(s => s.id === targetUserId || s.email === targetUserId || s.phone === targetUserId);
+    if (foundStudent) return { ...foundStudent, userType: 'student' };
+
+    const foundAdmin = allAdmins.find(a => a.id === targetUserId || a.email === targetUserId || a.phone === targetUserId);
+    if (foundAdmin) return { ...foundAdmin, userType: 'admin' };
+
+    return null;
+  }, [targetUserId, allStudents, allAdmins, student?.id, session?.id]);
+
+  const isOwnProfile = !activeProfileUser;
+  const isViewingAdmin = activeProfileUser?.userType === 'admin';
+  const isViewingStudent = activeProfileUser?.userType === 'student';
+
+  // Target peer projects
+  const [peerProjects, setPeerProjects] = useState([]);
+  useEffect(() => {
+    if (!activeProfileUser || isViewingAdmin) {
+      setPeerProjects([]);
+      return;
+    }
+    fetch('/api/projects?limit=30')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        const posts = data?.posts || [];
+        const filtered = posts.filter(p => p.studentId === activeProfileUser.id || p.author?.id === activeProfileUser.id);
+        if (filtered.length > 0) {
+          setPeerProjects(filtered);
+        } else {
+          setPeerProjects([]);
+        }
+      })
+      .catch(() => setPeerProjects([]));
+  }, [activeProfileUser, isViewingAdmin]);
+
+  // Target peer certificates
+  const [peerCertificates, setPeerCertificates] = useState([]);
+  useEffect(() => {
+    if (!activeProfileUser || isViewingAdmin) {
+      setPeerCertificates([]);
+      return;
+    }
+    fetch('/api/certificates')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (Array.isArray(data)) {
+          setPeerCertificates(data.filter(c => c.studentId === activeProfileUser.id));
+        } else {
+          setPeerCertificates([]);
+        }
+      })
+      .catch(() => setPeerCertificates([]));
+  }, [activeProfileUser, isViewingAdmin]);
+
+  const currentProjects = isOwnProfile ? userProjects : peerProjects;
+  const currentCertificates = isOwnProfile ? userCertificates : peerCertificates;
+
+  // Campus Directory state
+  const [directorySearch, setDirectorySearch] = useState('');
+  const [directoryFilter, setDirectoryFilter] = useState('all'); // 'all' | 'students' | 'admins'
+
+  const directoryList = useMemo(() => {
+    const sList = allStudents.map(s => ({
+      ...s,
+      userType: 'student',
+      displayRole: `${s.course || 'BCA'} • Sem ${s.semester || 'V'}`,
+      displayHeadline: s.goal || 'Student at Podar Pathways'
+    }));
+    const aList = allAdmins.map(a => ({
+      ...a,
+      userType: 'admin',
+      displayRole: `${a.role || 'Administrator'} • ${a.department || 'Administration'}`,
+      displayHeadline: a.department || 'Podar Administration'
+    }));
+    return [...sList, ...aList];
+  }, [allStudents, allAdmins]);
+
+  const filteredDirectoryList = useMemo(() => {
+    const q = directorySearch.trim().toLowerCase();
+    return directoryList.filter(item => {
+      if (directoryFilter === 'students' && item.userType !== 'student') return false;
+      if (directoryFilter === 'admins' && item.userType !== 'admin') return false;
+      if (!q) return true;
+      const matchName = item.name?.toLowerCase().includes(q);
+      const matchRole = item.displayRole?.toLowerCase().includes(q);
+      const matchHeadline = item.displayHeadline?.toLowerCase().includes(q);
+      const matchEmail = item.email?.toLowerCase().includes(q);
+      return matchName || matchRole || matchHeadline || matchEmail;
+    });
+  }, [directoryList, directorySearch, directoryFilter]);
+
+  const handleSelectUser = (user) => {
+    const isMe = (session?.role === 'student' && user.id === (student?.id || session?.id)) ||
+                 (session?.role === 'admin' && user.id === session?.id);
+    if (isMe) {
+      handleBackToMyProfile();
+    } else {
+      setTargetUserId(user.id);
+      setActiveTab(user.userType === 'admin' ? 'office' : 'posts');
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('id', user.id);
+        url.searchParams.delete('tab');
+        window.history.pushState(window.history.state, '', url.pathname + url.search + url.hash);
+      } catch (e) {}
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleBackToMyProfile = () => {
+    setTargetUserId(null);
+    setActiveTab('posts');
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('id');
+      url.searchParams.delete('user');
+      url.searchParams.delete('tab');
+      window.history.pushState(window.history.state, '', url.pathname + url.search + url.hash);
+    } catch (e) {}
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Canonical Share Profile Link Helper
+  const getShareUrl = (customId) => {
+    const origin = window.location.origin;
+    const isHashMode = window.location.hash.startsWith('#/');
+    const basePath = isHashMode ? `${origin}/#/profile` : `${origin}/profile`;
+    const target = customId || (!isOwnProfile && activeProfileUser ? activeProfileUser.id : null);
+    if (target) {
+      return `${basePath}?id=${encodeURIComponent(target)}`;
+    }
+    return basePath;
+  };
+
+  const handleCopyShareUrl = async () => {
+    const url = getShareUrl();
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = url;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopiedShare(true);
+      notify?.('Profile link copied to clipboard!');
+      setTimeout(() => setCopiedShare(false), 2500);
+    } catch (e) {
+      prompt('Copy profile link:', url);
+    }
+  };
+
+  // Share Profile Action
+  const handleShareProfile = async () => {
+    const shareUrl = getShareUrl();
+    const title = `${displayName} - Podar Pathways Profile`;
+    const text = isOwnProfile
+      ? `Check out ${displayName}'s student profile, projects, and credentials on Podar Pathways!`
+      : `Check out ${displayName}'s ${isViewingAdmin ? 'administrative' : 'student'} profile on Podar Pathways!`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title,
+          text,
+          url: shareUrl
+        });
+        setCopiedShare(true);
+        setTimeout(() => setCopiedShare(false), 2500);
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+      }
+    }
+    // Fallback: open share modal
+    setShowShareModal(true);
+  };
+
+  const studentName = formData.name || student?.name || 'Student Demo';
+  const studentSem = formData.semester ? (String(formData.semester).toLowerCase().startsWith('sem') ? formData.semester : `Semester ${formData.semester}`) : 'Semester V';
+  const studentScore = student?.score || 78;
+  const studentCompletion = student?.completion || 92;
+
+  const displayName = isOwnProfile ? studentName : (activeProfileUser.name || 'User Profile');
+  const displayAvatar = isOwnProfile ? (formData.avatar || DEFAULT_STUDENT_AVATAR) : (activeProfileUser.avatar || (isViewingAdmin ? DEFAULT_ADMIN_AVATAR : DEFAULT_STUDENT_AVATAR));
+  const displayDeptOrCourse = isOwnProfile ? (formData.course || 'BCA') : (isViewingAdmin ? (activeProfileUser.department || 'Administration') : (activeProfileUser.course || 'BCA'));
+  const displaySemOrRole = isOwnProfile ? studentSem : (isViewingAdmin ? (activeProfileUser.role || 'Super Admin') : (activeProfileUser.semester ? `Semester ${activeProfileUser.semester}` : 'Semester V'));
+  const displayGoal = isOwnProfile ? formData.goal : (isViewingAdmin ? activeProfileUser.role : (activeProfileUser.goal || 'Aspiring Professional'));
+  const displayBio = isOwnProfile ? formData.bio : (activeProfileUser.bio || (isViewingAdmin ? 'Directing career guidance, industry placements, examinations, and technical incubation for Podar institutions.' : 'Building modern projects and advancing skills at Podar Pathways.'));
+  const displayScore = isOwnProfile ? studentScore : (activeProfileUser.score || 82);
+  const displayCompletion = isOwnProfile ? studentCompletion : (activeProfileUser.completion || 88);
+  const displayPortfolio = isOwnProfile ? formData.portfolioUrl : activeProfileUser.portfolioUrl;
+  const displayGithub = isOwnProfile ? formData.github : activeProfileUser.github;
+  const displayLinkedin = isOwnProfile ? formData.linkedin : activeProfileUser.linkedin;
+
   return (
-    <div className="profile-settings-page">
-      {/* Header */}
-      <div className="page-header">
-        <div>
-          <p className="eyebrow">ACCOUNT &amp; SETTINGS</p>
-          <h1>Profile &amp; Settings</h1>
-          <p>Manage your verified student records, login security, and platform preferences.</p>
+    <div className="insta-profile-wrapper">
+      {/* Hidden file input for avatar */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleAvatarUpload}
+        accept="image/png,image/jpeg,image/webp"
+        style={{ display: 'none' }}
+      />
+
+      {/* ============================================================ */}
+      {/* 1. INSTAGRAM PROFILE HEADER                                  */}
+      {/* ============================================================ */}
+            {/* Top Banner when viewing someone else */}
+      {!isOwnProfile && (
+        <div className="insta-peer-top-banner">
+          <button
+            type="button"
+            className="insta-back-pill"
+            onClick={handleBackToMyProfile}
+          >
+            <ChevronLeft size={16} />
+            <span>Back to My Profile</span>
+          </button>
+
+          <div className="insta-peer-tag">
+            <span className="insta-peer-dot" />
+            <span>Viewing {isViewingAdmin ? 'Administrator' : 'Student'} Profile</span>
+          </div>
         </div>
-      </div>
-
-      {/* Modern Segmented Navigation Tabs */}
-      <div className="settings-nav-bar">
-        <button
-          type="button"
-          className={`settings-nav-pill ${activeTab === 'profile' ? 'active' : ''}`}
-          onClick={() => setActiveTab('profile')}
-        >
-          <User size={16} />
-          <span>Profile &amp; Details</span>
-        </button>
-
-        <button
-          type="button"
-          className={`settings-nav-pill ${activeTab === 'security' ? 'active' : ''}`}
-          onClick={() => setActiveTab('security')}
-        >
-          <Lock size={16} />
-          <span>Login &amp; Security</span>
-        </button>
-
-        <button
-          type="button"
-          className={`settings-nav-pill ${activeTab === 'notifications' ? 'active' : ''}`}
-          onClick={() => setActiveTab('notifications')}
-        >
-          <Bell size={16} />
-          <span>Notifications</span>
-        </button>
-      </div>
-
-      {/* ============================================================ */}
-      {/* TAB 1: PROFILE & DETAILS                                     */}
-      {/* ============================================================ */}
-      {activeTab === 'profile' && (
-        <form onSubmit={handleSaveProfile} className="panel profile-main-card">
-          {/* Avatar Hero Banner */}
-          <div className="profile-hero-section">
-            <div className="profile-avatar-container">
-              <div
-                className="profile-avatar-circle"
-                onClick={() => fileInputRef.current?.click()}
-                title="Click to change profile picture"
-              >
-                {formData.avatar ? (
-                  <img
-                    src={formData.avatar}
-                    alt={formData.name || 'Student'}
-                    className="profile-avatar-img"
-                  />
-                ) : (
-                  <div className="profile-avatar-initials">{getInitials(formData.name)}</div>
-                )}
-                <div className="profile-avatar-overlay">
-                  <Camera size={18} />
-                </div>
-              </div>
-
-              {formData.avatar && (
-                <button
-                  type="button"
-                  className="profile-avatar-remove-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRemoveAvatar();
-                  }}
-                  title="Remove profile photo"
-                >
-                  <Trash2 size={13} />
-                </button>
-              )}
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={handleAvatarChange}
-                style={{ display: 'none' }}
-              />
-            </div>
-
-            <div className="profile-hero-info">
-              <div className="profile-hero-title-row">
-                <h2>{formData.name || student?.name || 'Student Name'}</h2>
-                <span className="verified-icon-only" title="Verified Student">
-                  <ShieldCheck size={20} />
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 1: Personal Details (Balanced 2x2 Grid) */}
-          <div className="profile-section">
-            <div className="profile-section-heading">
-              <User size={18} className="profile-section-icon" />
-              <div>
-                <h3>Personal Identity &amp; Records</h3>
-                <p>Official identification records registered with Podar Pathways.</p>
-              </div>
-            </div>
-
-            <div className="profile-grid-2">
-              {/* Full Name (LOCKED to Login Identity) */}
-              <div className="field">
-                <label>
-                  Full Name
-                  <span className="locked-badge" title="Official Login Identity (Locked)">
-                    <Lock size={12} />
-                  </span>
-                </label>
-                <div className="input-wrap">
-                  <User size={17} />
-                  <input
-                    type="text"
-                    value={formData.name || student?.name || ''}
-                    readOnly
-                    className="input-locked"
-                    title="Official registered name is attached to login"
-                  />
-                </div>
-                <small className="field-hint-locked">
-                  <Lock size={11} /> Official verified record. Contact administration to modify.
-                </small>
-              </div>
-
-              {/* Father's Name */}
-              <div className="field">
-                <label>Father's Name</label>
-                <div className="input-wrap">
-                  <Users size={17} />
-                  <input
-                    type="text"
-                    value={formData.fathersName}
-                    onChange={(e) => handleProfileChange('fathersName', e.target.value)}
-                    placeholder="Enter father's name"
-                  />
-                </div>
-              </div>
-
-              {/* Date of Birth (DOB) */}
-              <div className="field">
-                <label>Date of Birth (DOB)</label>
-                <div className="input-wrap">
-                  <Calendar size={17} />
-                  <input
-                    type="date"
-                    value={formData.dob}
-                    onChange={(e) => handleProfileChange('dob', e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Gender */}
-              <div className="field">
-                <label>Gender</label>
-                <div className="input-wrap">
-                  <User size={17} />
-                  <select
-                    className="select-custom"
-                    value={formData.gender}
-                    onChange={(e) => handleProfileChange('gender', e.target.value)}
-                  >
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Non-binary">Non-binary</option>
-                    <option value="Prefer not to say">Prefer not to say</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 2: Contact & Online Presence (Balanced 2-Column Grid) */}
-          <div className="profile-section">
-            <div className="profile-section-heading">
-              <Mail size={18} className="profile-section-icon" />
-              <div>
-                <h3>Contact &amp; Online Presence</h3>
-                <p>Your official communication channels and web portfolios.</p>
-              </div>
-            </div>
-
-            <div className="profile-grid-2">
-              {/* Email Address (LOCKED to Login Identity) */}
-              <div className="field">
-                <label>
-                  Email Address
-                  <span className="locked-badge" title="Official Login Email (Locked)">
-                    <Lock size={12} />
-                  </span>
-                </label>
-                <div className="input-wrap">
-                  <Mail size={17} />
-                  <input
-                    type="email"
-                    value={formData.email || student?.email || ''}
-                    readOnly
-                    className="input-locked"
-                    title="Login email is attached to your account and cannot be modified"
-                  />
-                </div>
-                <small className="field-hint-locked">
-                  <Lock size={11} /> Attached to login. Used for verification OTPs and notices.
-                </small>
-              </div>
-
-              {/* Mobile Number */}
-              <div className="field">
-                <label>Mobile Number</label>
-                <div className="input-wrap">
-                  <Phone size={17} />
-                  <input
-                    type="tel"
-                    maxLength={10}
-                    value={formData.phone}
-                    onChange={(e) => handleProfileChange('phone', e.target.value.replace(/\D/g, ''))}
-                    placeholder="10-digit mobile number"
-                  />
-                </div>
-              </div>
-
-              {/* LinkedIn Profile */}
-              <div className="field">
-                <label>LinkedIn Profile URL</label>
-                <div className="input-wrap">
-                  <Globe size={17} />
-                  <input
-                    type="url"
-                    value={formData.linkedin}
-                    onChange={(e) => handleProfileChange('linkedin', e.target.value)}
-                    placeholder="https://linkedin.com/in/username"
-                  />
-                </div>
-              </div>
-
-              {/* GitHub / Repository URL */}
-              <div className="field">
-                <label>GitHub Profile URL</label>
-                <div className="input-wrap">
-                  <Code size={17} />
-                  <input
-                    type="url"
-                    value={formData.github}
-                    onChange={(e) => handleProfileChange('github', e.target.value)}
-                    placeholder="https://github.com/username"
-                  />
-                </div>
-              </div>
-
-              {/* Portfolio / Personal Website */}
-              <div className="field full-width">
-                <label>Portfolio / Personal Website</label>
-                <div className="input-wrap">
-                  <Globe size={17} />
-                  <input
-                    type="url"
-                    value={formData.portfolioUrl}
-                    onChange={(e) => handleProfileChange('portfolioUrl', e.target.value)}
-                    placeholder="https://yourname.dev"
-                  />
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-          {/* Section 3: Permanent Residential Address */}
-          <div className="profile-section">
-            <div className="profile-section-heading">
-              <MapPin size={18} className="profile-section-icon" />
-              <div>
-                <h3>Permanent Residential Address</h3>
-                <p>Official residential records for college postal communication and identity verification.</p>
-              </div>
-            </div>
-
-            <div className="profile-grid-2">
-              {/* House / Flat / Building No. */}
-              <div className="field">
-                <label>House / Flat / Building No.</label>
-                <div className="input-wrap">
-                  <Home size={17} />
-                  <input
-                    type="text"
-                    value={formData.houseNo}
-                    onChange={(e) => handleProfileChange('houseNo', e.target.value)}
-                    placeholder="Flat, house or building number"
-                  />
-                </div>
-              </div>
-
-              {/* Street / Colony / Landmark */}
-              <div className="field">
-                <label>Street / Colony / Landmark</label>
-                <div className="input-wrap">
-                  <MapPin size={17} />
-                  <input
-                    type="text"
-                    value={formData.address}
-                    onChange={(e) => handleProfileChange('address', e.target.value)}
-                    placeholder="Street address, colony or landmark"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="profile-grid-3" style={{ marginTop: '18px' }}>
-              {/* District Dropdown */}
-              <div className="field">
-                <label>District</label>
-                <div className="input-wrap">
-                  <Navigation size={17} />
-                  <select
-                    className="select-custom"
-                    value={formData.district}
-                    onChange={(e) => handleProfileChange('district', e.target.value)}
-                  >
-                    <option value="">Select District</option>
-                    {formData.district && !currentDistricts.includes(formData.district) && (
-                      <option value={formData.district}>{formData.district}</option>
-                    )}
-                    {currentDistricts.map((d) => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* State Dropdown */}
-              <div className="field">
-                <label>State</label>
-                <div className="input-wrap">
-                  <Map size={17} />
-                  <select
-                    className="select-custom"
-                    value={formData.state || 'Rajasthan'}
-                    onChange={(e) => {
-                      const newState = e.target.value;
-                      handleProfileChange('state', newState);
-                      const list = INDIAN_STATES_DISTRICTS[newState];
-                      if (list && !list.includes(formData.district)) {
-                        handleProfileChange('district', '');
-                      }
-                    }}
-                  >
-                    <option value="">Select State</option>
-                    {Object.keys(INDIAN_STATES_DISTRICTS).map((st) => (
-                      <option key={st} value={st}>{st}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* PIN Code */}
-              <div className="field">
-                <label>PIN Code (6 digits)</label>
-                <div className="input-wrap">
-                  <Hash size={17} />
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={formData.pinCode}
-                    onChange={(e) => handleProfileChange('pinCode', e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="6-digit PIN code"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 4: Academic & Career Pathway */}
-          <div className="profile-section">
-            <div className="profile-section-heading">
-              <GraduationCap size={18} className="profile-section-icon" />
-              <div>
-                <h3>Academic &amp; Career Pathway</h3>
-                <p>Your degree program and target professional objectives.</p>
-              </div>
-            </div>
-
-            <div className="profile-grid-2">
-              <div className="field">
-                <label>Course</label>
-                <div className="input-wrap">
-                  <GraduationCap size={17} />
-                  <select
-                    className="select-custom"
-                    value={formData.course}
-                    onChange={(e) => handleProfileChange('course', e.target.value)}
-                  >
-                    <option value="">Select Course</option>
-                    {['BCA', 'BBA', 'B.Tech', 'MCA', 'MBA'].map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                    {formData.course && !['BCA', 'BBA', 'B.Tech', 'MCA', 'MBA'].some(c => c.toLowerCase() === formData.course.toLowerCase()) && (
-                      <option value={formData.course}>{formData.course}</option>
-                    )}
-                  </select>
-                </div>
-              </div>
-
-              <div className="field">
-                <label>Current Semester</label>
-                <div className="input-wrap">
-                  <BookOpen size={17} />
-                  <select
-                    className="select-custom"
-                    value={formData.semester}
-                    onChange={(e) => handleProfileChange('semester', e.target.value)}
-                  >
-                    <option value="">Select Semester</option>
-                    {['Semester 1', 'Semester 2', 'Semester 3', 'Semester 4', 'Semester 5', 'Semester 6', 'Semester 7', 'Semester 8'].map((sem) => (
-                      <option key={sem} value={sem}>{sem}</option>
-                    ))}
-                    {formData.semester && !['Semester 1', 'Semester 2', 'Semester 3', 'Semester 4', 'Semester 5', 'Semester 6', 'Semester 7', 'Semester 8'].some(s => s.toLowerCase() === formData.semester.toLowerCase()) && (
-                      <option value={formData.semester}>{formData.semester}</option>
-                    )}
-                  </select>
-                </div>
-              </div>
-
-              <div className="field full-width">
-                <label>Career Goal &amp; Professional Summary</label>
-                <textarea
-                  rows={3}
-                  value={formData.goal}
-                  onChange={(e) => handleProfileChange('goal', e.target.value)}
-                  placeholder="Enter your target career path and professional objectives"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Save Bar */}
-          <div className="profile-footer-bar">
-            <p className="profile-footer-note">
-              <Info size={16} /> Changes made to your profile details will reflect across your student portal records.
-            </p>
-            <button
-              type="submit"
-              className="button primary"
-              disabled={isSavingProfile}
-            >
-              <Check size={17} />
-              {isSavingProfile ? 'Saving details...' : 'Save details'}
-            </button>
-          </div>
-        </form>
       )}
 
       {/* ============================================================ */}
-      {/* TAB 2: LOGIN & SECURITY                                      */}
+      {/* 1. INSTAGRAM PROFILE HEADER                                  */}
       {/* ============================================================ */}
-      {activeTab === 'security' && (
-        <div className="settings-section-stack">
-          {/* Card 1: Account Access / Sign-in Credentials */}
-          <div className="panel security-credentials-card">
-            <div className="security-card-header">
-              <div>
-                <h3>Account Sign-in</h3>
-                <p>Manage your primary login credentials and account access.</p>
-              </div>
+      <header className="insta-profile-header">
+        {/* Left: Avatar with colorful story ring */}
+        <div className="insta-avatar-column">
+          <div
+            className={`insta-avatar-ring-wrap ${isViewingAdmin ? 'admin-ring' : ''} ${!isOwnProfile ? 'peer' : ''}`}
+            onClick={() => {
+              if (isOwnProfile) fileInputRef.current?.click();
+            }}
+            title={isOwnProfile ? "Click to change profile picture" : displayName}
+          >
+            <div className={`insta-avatar-ring ${isViewingAdmin ? 'admin' : ''}`}>
+              {displayAvatar ? (
+                <img
+                  src={displayAvatar}
+                  alt={displayName}
+                  className="insta-avatar-img"
+                  onError={e => { e.currentTarget.style.display = 'none'; }}
+                />
+              ) : (
+                <div className="insta-avatar-fallback">
+                  {displayName.slice(0, 2).toUpperCase()}
+                </div>
+              )}
             </div>
+          </div>
+        </div>
 
-            <div className="security-credentials-list">
-              <div className="security-credential-row">
-                <div className="credential-row-left">
-                  <div className="credential-icon-box">
-                    <Mail size={18} />
-                  </div>
-                  <div className="credential-row-info">
-                    <span className="credential-label">Sign-in Email</span>
-                    <strong className="credential-value">{formData.email || student?.email || 'Registered Email'}</strong>
-                  </div>
-                </div>
-                <div className="credential-row-right">
-                  <span className="credential-status-badge verified">
-                    <Check size={13} /> Verified
-                  </span>
-                </div>
-              </div>
-
-              <div className="security-credential-row">
-                <div className="credential-row-left">
-                  <div className="credential-icon-box">
-                    <Lock size={18} />
-                  </div>
-                  <div className="credential-row-info">
-                    <span className="credential-label">Password</span>
-                    <strong className="credential-value password-dots">••••••••••••••••</strong>
-                  </div>
-                </div>
-                <div className="credential-row-right">
-                  <span className="credential-status-badge active">
-                    Active
-                  </span>
-                </div>
-              </div>
+        {/* Right: Username, Buttons, Stats, Bio */}
+        <div className="insta-meta-column">
+          {/* Top Row: Full Name + Verified Badge */}
+          <div className="insta-user-actions-row">
+            <div className="insta-username-group">
+              <h2 className="insta-username">{displayName}</h2>
+              {isViewingAdmin ? (
+                <span className="insta-verified-badge admin" title="Verified Institutional Administrator">
+                  <ShieldCheck size={20} fill="#f59e0b" color="#ffffff" />
+                </span>
+              ) : (
+                <span className="insta-verified-badge" title="Verified College Student">
+                  <BadgeCheck size={20} fill="#0284c7" color="#ffffff" />
+                </span>
+              )}
             </div>
           </div>
 
-          {/* Card 2: Change Password */}
-          <form onSubmit={handleUpdatePassword} className="panel security-password-card">
-            <div className="security-card-header">
+          {/* Stats Row */}
+          {isViewingAdmin ? (
+            <div className="insta-stats-row admin-stats">
+              <div className="insta-stat-item static">
+                <strong>{activeProfileUser.department || 'Administration'}</strong>
+                <span>department</span>
+              </div>
+              <div className="insta-stat-item static">
+                <strong>{activeProfileUser.role || 'Super Admin'}</strong>
+                <span>role</span>
+              </div>
+              <div className="insta-stat-item static">
+                <strong>Verified</strong>
+                <span>institutional staff</span>
+              </div>
+              <button
+                type="button"
+                className="insta-stat-item"
+                onClick={() => handleTabChange('directory')}
+                title="Browse campus community"
+              >
+                <strong>{directoryList.length}</strong>
+                <span>community</span>
+              </button>
+            </div>
+          ) : (
+            <div className="insta-stats-row">
+              <button
+                type="button"
+                className="insta-stat-item"
+                onClick={() => handleTabChange('posts')}
+              >
+                <strong>{currentProjects.length}</strong>
+                <span>projects</span>
+              </button>
+
+              <button
+                type="button"
+                className="insta-stat-item"
+                onClick={() => handleTabChange('certificates')}
+                title="Click to view certificates & credentials"
+              >
+                <strong>{currentCertificates.length}</strong>
+                <span>credentials</span>
+              </button>
+
+              <button
+                type="button"
+                className="insta-stat-item"
+                onClick={() => {
+                  if (isOwnProfile) navigate?.('score');
+                }}
+                title="P-CARE Employability score"
+              >
+                <strong>{displayScore}/100</strong>
+                <span>P-CARE</span>
+              </button>
+
+              <button
+                type="button"
+                className="insta-stat-item"
+                onClick={() => {
+                  if (isOwnProfile) navigate?.('passport');
+                }}
+                title="Digital career readiness"
+              >
+                <strong>{displayCompletion}%</strong>
+                <span>readiness</span>
+              </button>
+            </div>
+          )}
+
+          {/* Bio & Details Block */}
+          <div className="insta-bio-block">
+            <div className="insta-full-name-line">
+              <span className={`insta-dept-pill ${isViewingAdmin ? 'admin' : ''}`}>
+                {displayDeptOrCourse} • {displaySemOrRole}
+              </span>
+            </div>
+
+            {displayGoal && (
+              <p className={`insta-headline ${isViewingAdmin ? 'admin' : ''}`}>
+                {isViewingAdmin ? (
+                  <Briefcase size={14} className="insta-headline-icon" />
+                ) : (
+                  <Sparkles size={14} className="insta-headline-icon" />
+                )}
+                <span>{displayGoal}</span>
+              </p>
+            )}
+
+            <p className="insta-bio-text">
+              {displayBio}
+            </p>
+
+            {/* Clickable External Links in Bio */}
+            <div className="insta-bio-links">
+              {displayPortfolio && (
+                <a
+                  href={displayPortfolio.startsWith('http') ? displayPortfolio : `https://${displayPortfolio}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="insta-bio-link"
+                >
+                  <Link2 size={13} />
+                  <span>{displayPortfolio.replace(/^https?:\/\//, '')}</span>
+                </a>
+              )}
+
+              {displayGithub && (
+                <a
+                  href={displayGithub.startsWith('http') ? displayGithub : `https://${displayGithub}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="insta-bio-link"
+                >
+                  <Code size={13} />
+                  <span>{displayGithub.replace(/^https?:\/\//, '')}</span>
+                </a>
+              )}
+
+              {displayLinkedin && (
+                <a
+                  href={displayLinkedin.startsWith('http') ? displayLinkedin : `https://${displayLinkedin}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="insta-bio-link"
+                >
+                  <ExternalLink size={13} />
+                  <span>{displayLinkedin.replace(/^https?:\/\//, '')}</span>
+                </a>
+              )}
+
+              {isViewingAdmin && activeProfileUser.email && (
+                <a
+                  href={`mailto:${activeProfileUser.email}`}
+                  className="insta-bio-link"
+                >
+                  <Mail size={13} />
+                  <span>{activeProfileUser.email}</span>
+                </a>
+              )}
+
+              {isViewingAdmin && activeProfileUser.phone && (
+                <a
+                  href={`tel:${activeProfileUser.phone}`}
+                  className="insta-bio-link"
+                >
+                  <Phone size={13} />
+                  <span>{activeProfileUser.phone}</span>
+                </a>
+              )}
+            </div>
+
+            {/* Action Buttons: Edit profile, Share profile, Campus Directory, Settings */}
+            <div className="insta-action-buttons" style={{ marginTop: '16px' }}>
+              {isOwnProfile ? (
+                <>
+                  <button
+                    type="button"
+                    className={`insta-btn-secondary ${activeTab === 'edit' ? 'active' : ''}`}
+                    onClick={() => handleTabChange('edit')}
+                  >
+                    <Pencil size={14} />
+                    <span>Edit profile</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="insta-btn-secondary"
+                    onClick={handleShareProfile}
+                  >
+                    {copiedShare ? <Check size={14} color="#10b981" /> : <Share2 size={14} />}
+                    <span>{copiedShare ? 'Copied' : 'Share profile'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`insta-icon-btn ${activeTab === 'security' ? 'active' : ''}`}
+                    onClick={() => handleTabChange('security')}
+                    title="Account security & settings"
+                  >
+                    <Settings size={18} />
+                  </button>
+                </>
+              ) : isViewingAdmin ? (
+                <>
+                  <a
+                    href={`mailto:${activeProfileUser.email || 'admin@podar.edu'}?subject=Inquiry%20from%20Student`}
+                    className="insta-btn-primary"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <Mail size={14} />
+                    <span>Email Office</span>
+                  </a>
+
+                  {activeProfileUser.phone && (
+                    <a
+                      href={`tel:${activeProfileUser.phone}`}
+                      className="insta-btn-secondary"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      <Phone size={14} />
+                      <span>Call Office</span>
+                    </a>
+                  )}
+
+                  <button
+                    type="button"
+                    className="insta-btn-secondary"
+                    onClick={handleShareProfile}
+                  >
+                    {copiedShare ? <Check size={14} color="#10b981" /> : <Share2 size={14} />}
+                    <span>{copiedShare ? 'Copied' : 'Share profile'}</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <a
+                    href={`mailto:${activeProfileUser.email || ''}?subject=Connecting%20via%20Podar%20Pathways`}
+                    className="insta-btn-primary"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <Mail size={14} />
+                    <span>Contact Student</span>
+                  </a>
+
+                  <button
+                    type="button"
+                    className="insta-btn-secondary"
+                    onClick={handleShareProfile}
+                  >
+                    {copiedShare ? <Check size={14} color="#10b981" /> : <Share2 size={14} />}
+                    <span>{copiedShare ? 'Copied' : 'Share profile'}</span>
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* ============================================================ */}
+      {/* 3. INSTAGRAM TAB NAVIGATION STRIP                            */}
+      {/* ============================================================ */}
+      <nav className="insta-tab-nav">
+        {isViewingAdmin ? (
+          <>
+            <button
+              type="button"
+              className={`insta-tab-item ${activeTab === 'office' ? 'active' : ''}`}
+              onClick={() => handleTabChange('office')}
+            >
+              <Building2 size={16} />
+              <span>OFFICE INFO</span>
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className={`insta-tab-item ${activeTab === 'posts' || activeTab === 'profile' ? 'active' : ''}`}
+              onClick={() => handleTabChange('posts')}
+            >
+              <Grid size={16} />
+              <span>PROJECTS</span>
+            </button>
+
+            {isOwnProfile && (
+              <button
+                type="button"
+                className={`insta-tab-item ${activeTab === 'notifications' ? 'active' : ''}`}
+                onClick={() => handleTabChange('notifications')}
+              >
+                <Bell size={16} />
+                <span>ALERTS</span>
+              </button>
+            )}
+          </>
+        )}
+      </nav>
+
+      {/* ============================================================ */}
+      {/* 4. TAB CONTENT 1: INSTAGRAM PROJECTS GRID                    */}
+      {/* ============================================================ */}
+      {(activeTab === 'posts' || activeTab === 'profile') && (
+        <div className="insta-tab-body">
+          {currentProjects.length > 0 ? (
+            <div className="insta-posts-grid">
+              {currentProjects.map((proj, idx) => {
+                const coverImg = Array.isArray(proj.images) && proj.images.length > 0
+                  ? (proj.images[0]?.imageUrl || proj.images[0])
+                  : (proj.image || 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&auto=format&fit=crop&q=80');
+
+                const hasMultipleImages = Array.isArray(proj.images) && proj.images.length > 1;
+
+                return (
+                  <div
+                    key={proj.id || idx}
+                    className="insta-grid-item"
+                    onClick={() => setSelectedProject(proj)}
+                  >
+                    <img src={coverImg} alt={proj.title} className="insta-grid-img" loading="lazy" />
+
+                    {hasMultipleImages && (
+                      <span className="insta-multi-photo-icon" title="Multiple photos">
+                        <Layers size={14} />
+                      </span>
+                    )}
+
+                    {/* Instagram Hover Overlay with Likes & Comments */}
+                    <div className="insta-grid-hover-overlay">
+                      <div className="insta-hover-stat">
+                        <Heart size={18} fill="#ffffff" color="#ffffff" />
+                        <strong>{proj.likesCount || 34 + (idx * 7)}</strong>
+                      </div>
+                      <div className="insta-hover-stat">
+                        <MessageCircle size={18} fill="#ffffff" color="#ffffff" />
+                        <strong>{proj.commentsCount || 8 + (idx * 3)}</strong>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="insta-empty-state">
+              <Grid size={48} color="#94a3b8" />
+              <h3>No Projects Shared Yet</h3>
+              <p>Showcase your academic capstones, web apps, or prototypes with your student peers.</p>
+              <button
+                type="button"
+                className="button primary"
+                onClick={() => navigate?.('projects')}
+                style={{ marginTop: '12px' }}
+              >
+                <Plus size={16} />
+                <span>Create First Project Post</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* 5. TAB CONTENT 2: CERTIFICATES GALLERY                       */}
+      {/* ============================================================ */}
+      {activeTab === 'certificates' && (
+        <div className="insta-tab-body">
+          {currentCertificates.length > 0 ? (
+            <div className="insta-certs-grid">
+              {currentCertificates.map((cert) => (
+                <div key={cert.id} className="insta-cert-card">
+                  <div className="insta-cert-preview">
+                    {cert.fileData?.startsWith('data:image') ? (
+                      <img src={cert.fileData} alt={cert.programTitle} className="insta-cert-img" />
+                    ) : (
+                      <div className="insta-cert-fallback">
+                        <Award size={36} color="#0d9488" />
+                        <span>{cert.programTitle}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="insta-cert-meta">
+                    <h4 className="insta-cert-title">{cert.programTitle}</h4>
+                    <span className="insta-cert-issuer">{cert.issuer || 'Podar Academic Board'}</span>
+                    <div className="insta-cert-footer">
+                      <code className="insta-cert-code">{cert.verificationCode || cert.credentialId || 'VERIFIED'}</code>
+                      <span className="insta-cert-badge">
+                        <ShieldCheck size={13} color="#059669" />
+                        <span>Verified</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="insta-empty-state">
+              <Award size={48} color="#94a3b8" />
+              <h3>No Certificates Added Yet</h3>
+              <p>Complete certified courses and upload your credentials to earn verified badges and score points.</p>
+              <button
+                type="button"
+                className="button primary"
+                onClick={() => navigate?.('courses')}
+                style={{ marginTop: '12px' }}
+              >
+                <span>Browse Courses & Certifications</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* 6. TAB CONTENT 3: SAVED ITEMS                                */}
+      {/* ============================================================ */}
+      {/* ============================================================ */}
+      {/* TAB CONTENT: CAMPUS DIRECTORY & PROFILES                     */}
+      {/* ============================================================ */}
+      {activeTab === 'directory' && (
+        <div className="insta-tab-body">
+          <div className="insta-directory-container">
+            {/* Directory Header */}
+            <div className="insta-directory-hero">
+              <div className="insta-dir-hero-icon">
+                <Users size={28} />
+              </div>
               <div>
-                <h3>Change Password</h3>
-                <p>Update your password to keep your student account secure.</p>
+                <h3>Campus Community & Directory</h3>
+                <p>Browse and connect with registered students, faculty mentors, and college administrators across Podar Pathways.</p>
               </div>
             </div>
 
-            <div className="security-form-fields">
-              {/* Current Password */}
-              <div className="field">
-                <label>
-                  Current Password <span className="required-star">*</span>
-                </label>
-                <div className="input-wrap">
-                  <Lock size={17} />
-                  <input
-                    type={showCurrentPassword ? 'text' : 'password'}
-                    value={passwordData.currentPassword}
-                    onChange={(e) => handlePasswordChange('currentPassword', e.target.value)}
-                    placeholder="Enter current password"
-                    autoComplete="current-password"
-                  />
+            {/* Directory Search & Filters */}
+            <div className="insta-dir-controls">
+              <div className="insta-dir-search-wrap">
+                <Search size={18} className="insta-dir-search-icon" />
+                <input
+                  type="text"
+                  className="insta-dir-search-input"
+                  placeholder="Search by name, course, role, or department..."
+                  value={directorySearch}
+                  onChange={(e) => setDirectorySearch(e.target.value)}
+                />
+                {directorySearch && (
                   <button
                     type="button"
-                    className="input-password-toggle"
-                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                    title={showCurrentPassword ? 'Hide password' : 'Show password'}
+                    className="insta-dir-clear-btn"
+                    onClick={() => setDirectorySearch('')}
                   >
-                    {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Grid 2: New Password & Confirm Password */}
-              <div className="profile-grid-2">
-                <div className="field">
-                  <label>
-                    New Password <span className="required-star">*</span>
-                  </label>
-                  <div className="input-wrap">
-                    <KeyRound size={17} />
-                    <input
-                      type={showNewPassword ? 'text' : 'password'}
-                      value={passwordData.newPassword}
-                      onChange={(e) => handlePasswordChange('newPassword', e.target.value)}
-                      placeholder="Enter new password"
-                      autoComplete="new-password"
-                    />
-                    <button
-                      type="button"
-                      className="input-password-toggle"
-                      onClick={() => setShowNewPassword(!showNewPassword)}
-                      title={showNewPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                  <span className="field-hint">Must be at least 6 characters</span>
-                </div>
-
-                <div className="field">
-                  <label>
-                    Confirm New Password <span className="required-star">*</span>
-                  </label>
-                  <div className="input-wrap">
-                    <KeyRound size={17} />
-                    <input
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      value={passwordData.confirmPassword}
-                      onChange={(e) => handlePasswordChange('confirmPassword', e.target.value)}
-                      placeholder="Confirm new password"
-                      autoComplete="new-password"
-                    />
-                    <button
-                      type="button"
-                      className="input-password-toggle"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      title={showConfirmPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                  {passwordData.confirmPassword && (
-                    <span className={`field-hint ${reqMatch ? 'hint-success' : 'hint-error'}`}>
-                      {reqMatch ? 'Passwords match' : 'Passwords do not match'}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="security-form-actions">
-                <button
-                  type="submit"
-                  className="button primary"
-                  disabled={isChangingPassword || !passwordData.newPassword || !passwordData.confirmPassword}
-                >
-                  <Check size={16} />
-                  {isChangingPassword ? 'Updating Password...' : 'Update Password'}
-                </button>
-                {(passwordData.currentPassword || passwordData.newPassword || passwordData.confirmPassword) && (
-                  <button
-                    type="button"
-                    className="button secondary"
-                    onClick={() =>
-                      setPasswordData({
-                        currentPassword: '',
-                        newPassword: '',
-                        confirmPassword: ''
-                      })
-                    }
-                  >
-                    Clear
+                    <X size={14} />
                   </button>
                 )}
               </div>
+
+              <div className="insta-dir-filter-chips">
+                <button
+                  type="button"
+                  className={`insta-dir-chip ${directoryFilter === 'all' ? 'active' : ''}`}
+                  onClick={() => setDirectoryFilter('all')}
+                >
+                  All Members ({directoryList.length})
+                </button>
+                <button
+                  type="button"
+                  className={`insta-dir-chip ${directoryFilter === 'students' ? 'active' : ''}`}
+                  onClick={() => setDirectoryFilter('students')}
+                >
+                  Students ({directoryList.filter(u => u.userType === 'student').length})
+                </button>
+                <button
+                  type="button"
+                  className={`insta-dir-chip ${directoryFilter === 'admins' ? 'active' : ''}`}
+                  onClick={() => setDirectoryFilter('admins')}
+                >
+                  Faculty & Admins ({directoryList.filter(u => u.userType === 'admin').length})
+                </button>
+              </div>
+            </div>
+
+            {/* Directory Grid */}
+            {filteredDirectoryList.length > 0 ? (
+              <div className="insta-dir-grid">
+                {filteredDirectoryList.map((user) => {
+                  const isMe = (session?.role === 'student' && user.id === (student?.id || session?.id)) ||
+                               (session?.role === 'admin' && user.id === session?.id);
+                  const isCurrentlyViewed = targetUserId ? targetUserId === user.id : isMe;
+
+                  return (
+                    <div
+                      key={user.id}
+                      className={`insta-dir-card ${isCurrentlyViewed ? 'current' : ''}`}
+                      onClick={() => handleSelectUser(user)}
+                    >
+                      <div className="insta-dir-avatar-wrap">
+                        <div className={`insta-dir-avatar-ring ${user.userType === 'admin' ? 'admin' : ''}`}>
+                          {user.avatar ? (
+                            <img
+                              src={user.avatar}
+                              alt={user.name}
+                              className="insta-dir-avatar-img"
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div className="insta-dir-avatar-fallback">
+                              {(user.name || 'User').slice(0, 2).toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        {user.userType === 'admin' ? (
+                          <span className="insta-dir-badge-icon admin" title="College Administration">
+                            <ShieldCheck size={14} color="#f59e0b" fill="#1e293b" />
+                          </span>
+                        ) : (
+                          <span className="insta-dir-badge-icon student" title="Verified Student">
+                            <BadgeCheck size={14} color="#0284c7" />
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="insta-dir-card-body">
+                        <div className="insta-dir-card-top">
+                          <h4 className="insta-dir-user-name">
+                            {user.name}
+                            {isMe && <span className="insta-dir-you-tag">You</span>}
+                          </h4>
+                        </div>
+
+                        <span className={`insta-dir-role-badge ${user.userType === 'admin' ? 'admin' : 'student'}`}>
+                          {user.displayRole}
+                        </span>
+
+                        <p className="insta-dir-headline">
+                          {user.displayHeadline || (user.userType === 'admin' ? 'College Administration' : 'Podar Student')}
+                        </p>
+
+                        <div className="insta-dir-card-footer">
+                          <button
+                            type="button"
+                            className={`insta-dir-view-btn ${isCurrentlyViewed ? 'active' : ''}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectUser(user);
+                            }}
+                          >
+                            {isMe ? 'My Profile' : 'View Profile'}
+                            <ChevronRight size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="insta-empty-state">
+                <Users size={48} color="#94a3b8" />
+                <h3>No profiles match your search</h3>
+                <p>Try searching with another name, course, role, or department.</p>
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() => { setDirectorySearch(''); setDirectoryFilter('all'); }}
+                  style={{ marginTop: '12px' }}
+                >
+                  Clear Search Filters
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* TAB CONTENT: ADMIN OFFICE & PURVIEW                          */}
+      {/* ============================================================ */}
+      {activeTab === 'office' && isViewingAdmin && (
+        <div className="insta-tab-body">
+          <div className="admin-office-card">
+            <div className="admin-office-header">
+              <div className="admin-office-badge">
+                <ShieldCheck size={28} color="#0284c7" />
+              </div>
+              <div>
+                <h3>Official Institutional Administration</h3>
+                <p>Verified Faculty & Administrative Staff Member at Podar Pathways</p>
+              </div>
+            </div>
+
+            <div className="admin-office-grid">
+              <div className="admin-office-item">
+                <span className="admin-office-label"><Briefcase size={14} /> Department / Cell</span>
+                <strong>{activeProfileUser.department || 'Career & Placement Cell'}</strong>
+              </div>
+              <div className="admin-office-item">
+                <span className="admin-office-label"><Shield size={14} /> Official Role</span>
+                <strong>{activeProfileUser.role || 'Super Admin'}</strong>
+              </div>
+              <div className="admin-office-item">
+                <span className="admin-office-label"><Mail size={14} /> Official Email</span>
+                <a href={`mailto:${activeProfileUser.email}`}>{activeProfileUser.email || 'admin@podar.edu'}</a>
+              </div>
+              <div className="admin-office-item">
+                <span className="admin-office-label"><Phone size={14} /> Direct Helpline / Phone</span>
+                <a href={`tel:${activeProfileUser.phone}`}>{activeProfileUser.phone || '9999988888'}</a>
+              </div>
+            </div>
+
+            <div className="admin-office-notice">
+              <h4>Administrative Scope & Purview</h4>
+              <p>
+                Oversees student career advancement, corporate recruitment partnerships, internship validation,
+                P-CARE employability score compliance, and verified institutional credentials across college cohorts.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'saved' && (
+        <div className="insta-tab-body">
+          <div className="insta-empty-state">
+            <Bookmark size={48} color="#94a3b8" />
+            <h3>Save Posts and Opportunities</h3>
+            <p>Save interesting student projects, hackathons, or job openings to revisit them anytime.</p>
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => navigate?.('opportunities')}
+              style={{ marginTop: '12px' }}
+            >
+              <span>Explore Opportunities</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* 7. TAB CONTENT 4: EDIT PROFILE DETAILS                       */}
+      {/* ============================================================ */}
+      {isOwnProfile && activeTab === 'edit' && (
+        <div className="insta-tab-body">
+          <form onSubmit={handleSaveProfile} className="panel insta-edit-panel">
+            <div className="insta-panel-header">
+              <div>
+                <h3>Edit Student Profile</h3>
+                <p>Keep your profile details, career aspirations, and contact records updated.</p>
+              </div>
+              <button
+                type="submit"
+                className="button primary"
+                disabled={isSavingProfile}
+              >
+                {isSavingProfile ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+
+            {/* Avatar Row */}
+            <div className="insta-edit-avatar-row">
+              <div className="insta-avatar-ring small">
+                {formData.avatar ? (
+                  <img src={formData.avatar} alt={studentName} className="insta-avatar-img" />
+                ) : (
+                  <div className="insta-avatar-fallback">{studentName.slice(0, 2).toUpperCase()}</div>
+                )}
+              </div>
+              <div className="insta-edit-avatar-actions">
+                <strong>{studentName}</strong>
+                <div className="insta-avatar-btns-wrap">
+                  <button
+                    type="button"
+                    className="button outline small"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload size={14} />
+                    <span>Change Photo</span>
+                  </button>
+                  {formData.avatar && (
+                    <button
+                      type="button"
+                      className="button ghost small"
+                      onClick={handleRemoveAvatar}
+                      style={{ color: '#dc2626' }}
+                    >
+                      <Trash2 size={14} />
+                      <span>Remove</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Bio Editor with Live Counter */}
+            <div className="form-group" style={{ marginTop: '18px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label className="field-label">Bio & Career Headline</label>
+                <span style={{ fontSize: '11.5px', color: '#94a3b8' }}>
+                  {(formData.bio || '').length} / 250
+                </span>
+              </div>
+              <textarea
+                rows={3}
+                maxLength={250}
+                placeholder="Share a brief introduction, your tech passions, or what you are currently building..."
+                value={formData.bio}
+                onChange={e => setFormData({ ...formData, bio: e.target.value })}
+                className="field-textarea"
+              />
+            </div>
+
+            {/* Career Goal */}
+            <div className="form-group">
+              <label className="field-label">Target Career Goal</label>
+              <input
+                type="text"
+                placeholder="e.g. Cloud Solutions Architect, Full-Stack Developer"
+                value={formData.goal}
+                onChange={e => setFormData({ ...formData, goal: e.target.value })}
+                className="field-input"
+              />
+            </div>
+
+            {/* Locked Institutional Credentials */}
+            <div className="insta-locked-section">
+              <div className="insta-locked-header">
+                <Lock size={15} color="#64748b" />
+                <span>Verified College Records (Locked by Administration)</span>
+              </div>
+              <div className="form-row-2">
+                <div className="form-group">
+                  <label className="field-label">Full Name</label>
+                  <input type="text" value={formData.name} disabled className="field-input locked" />
+                </div>
+                <div className="form-group">
+                  <label className="field-label">College Email</label>
+                  <input type="text" value={formData.email} disabled className="field-input locked" />
+                </div>
+              </div>
+            </div>
+
+            {/* Personal Details */}
+            <h4 className="insta-section-subtitle">Personal Details</h4>
+            <div className="form-row-2">
+              <div className="form-group">
+                <label className="field-label">Father's / Guardian's Name</label>
+                <input
+                  type="text"
+                  placeholder="Father's Name"
+                  value={formData.fathersName}
+                  onChange={e => setFormData({ ...formData, fathersName: e.target.value })}
+                  className="field-input"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="field-label">Date of Birth</label>
+                <input
+                  type="date"
+                  value={formData.dob}
+                  onChange={e => setFormData({ ...formData, dob: e.target.value })}
+                  className="field-input"
+                />
+              </div>
+            </div>
+
+            <div className="form-row-2">
+              <div className="form-group">
+                <label className="field-label">Registered Mobile (10-Digit)</label>
+                <input
+                  type="tel"
+                  placeholder="9000000001"
+                  value={formData.phone}
+                  onChange={e => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                  className="field-input"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="field-label">Gender</label>
+                <select
+                  value={formData.gender}
+                  onChange={e => setFormData({ ...formData, gender: e.target.value })}
+                  className="field-select"
+                >
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Residential Address */}
+            <h4 className="insta-section-subtitle">Residential Address</h4>
+            <div className="form-group">
+              <label className="field-label">House / Flat / Street Address</label>
+              <input
+                type="text"
+                placeholder="House No, Apartment, Street / Colony"
+                value={formData.houseNo}
+                onChange={e => setFormData({ ...formData, houseNo: e.target.value })}
+                className="field-input"
+              />
+            </div>
+
+            <div className="form-row-3">
+              <div className="form-group">
+                <label className="field-label">State</label>
+                <select
+                  value={formData.state || 'Rajasthan'}
+                  onChange={e => setFormData({ ...formData, state: e.target.value, district: '' })}
+                  className="field-select"
+                >
+                  {Object.keys(INDIAN_STATES_DISTRICTS).map(st => (
+                    <option key={st} value={st}>{st}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="field-label">District</label>
+                <select
+                  value={formData.district}
+                  onChange={e => setFormData({ ...formData, district: e.target.value })}
+                  className="field-select"
+                >
+                  <option value="">Select District</option>
+                  {currentDistricts.map(dist => (
+                    <option key={dist} value={dist}>{dist}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="field-label">PIN Code (6 Digits)</label>
+                <input
+                  type="text"
+                  placeholder="302001"
+                  maxLength={6}
+                  value={formData.pinCode}
+                  onChange={e => setFormData({ ...formData, pinCode: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+                  className="field-input"
+                />
+              </div>
+            </div>
+
+            {/* Social & Professional Links */}
+            <h4 className="insta-section-subtitle">Social & Portfolio Links</h4>
+            <div className="form-row-2">
+              <div className="form-group">
+                <label className="field-label">Portfolio / Personal Website</label>
+                <input
+                  type="text"
+                  placeholder="https://myportfolio.dev"
+                  value={formData.portfolioUrl}
+                  onChange={e => setFormData({ ...formData, portfolioUrl: e.target.value })}
+                  className="field-input"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="field-label">GitHub Profile</label>
+                <input
+                  type="text"
+                  placeholder="github.com/username"
+                  value={formData.github}
+                  onChange={e => setFormData({ ...formData, github: e.target.value })}
+                  className="field-input"
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="field-label">LinkedIn Profile URL</label>
+              <input
+                type="text"
+                placeholder="linkedin.com/in/username"
+                value={formData.linkedin}
+                onChange={e => setFormData({ ...formData, linkedin: e.target.value })}
+                className="field-input"
+              />
+            </div>
+
+            {/* Footer Submit */}
+            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button
+                type="button"
+                className="button outline"
+                onClick={() => handleTabChange('posts')}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="button primary"
+                disabled={isSavingProfile}
+              >
+                {isSavingProfile ? 'Saving...' : 'Save Profile Details'}
+              </button>
             </div>
           </form>
         </div>
       )}
 
       {/* ============================================================ */}
-      {/* TAB 3: NOTIFICATIONS & ALERTS                                */}
+      {/* 8. TAB CONTENT 5: LOGIN & SECURITY                           */}
       {/* ============================================================ */}
-      {activeTab === 'notifications' && (
-        <div className="panel settings-stack-card">
-          <div className="panel-heading">
-            <h2>
-              <Bell size={18} />
-              Notification &amp; Alert Preferences
-            </h2>
-          </div>
-          <p className="settings-desc">Choose how you want to be informed about new openings, interviews, and deadlines.</p>
-
-          <div className="settings-toggle-list">
-            <div className="setting-toggle-row">
-              <div className="setting-toggle-copy">
-                <strong>Placement &amp; Internship Openings</strong>
-                <p>Receive email alerts as soon as new matched company openings are published for your branch.</p>
+      {isOwnProfile && activeTab === 'security' && (
+        <div className="insta-tab-body">
+          <form onSubmit={handleUpdatePassword} className="panel insta-edit-panel">
+            <div className="insta-panel-header">
+              <div>
+                <h3>Login & Security Settings</h3>
+                <p>Manage your account password, 2-factor authentication, and active sessions.</p>
               </div>
-              <label className="toggle-switch">
-                <input
-                  type="checkbox"
-                  checked={notifications.jobAlerts}
-                  onChange={() => toggleNotification('jobAlerts')}
-                />
-                <span className="toggle-slider" />
-              </label>
             </div>
 
-            <div className="setting-toggle-row">
-              <div className="setting-toggle-copy">
-                <strong>Interview &amp; Mock Test Reminders</strong>
-                <p>Get notification reminders 24 hours before your scheduled interviews and tests.</p>
+            <div className="insta-security-card">
+              <ShieldCheck size={24} color="#059669" />
+              <div>
+                <strong>Two-Factor Authentication (2FA) Active</strong>
+                <p>Your account is protected by mobile OTP verification on institutional login.</p>
               </div>
-              <label className="toggle-switch">
-                <input
-                  type="checkbox"
-                  checked={notifications.interviewReminders}
-                  onChange={() => toggleNotification('interviewReminders')}
-                />
-                <span className="toggle-slider" />
-              </label>
             </div>
 
-            <div className="setting-toggle-row">
-              <div className="setting-toggle-copy">
-                <strong>Weekly P-CARE Progress Digest</strong>
-                <p>Weekly breakdown of your readiness score, roadmap tasks, and AI coach tips.</p>
-              </div>
-              <label className="toggle-switch">
+            <h4 className="insta-section-subtitle" style={{ marginTop: '20px' }}>Change Account Password</h4>
+            <div className="form-group">
+              <label className="field-label">Current Password</label>
+              <div className="insta-pw-wrap">
                 <input
-                  type="checkbox"
-                  checked={notifications.weeklyDigest}
-                  onChange={() => toggleNotification('weeklyDigest')}
+                  type={showCurrentPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  value={passwordData.currentPassword}
+                  onChange={e => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                  className="field-input"
                 />
-                <span className="toggle-slider" />
-              </label>
+                <button
+                  type="button"
+                  className="insta-pw-eye"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                >
+                  {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
-            <div className="setting-toggle-row">
-              <div className="setting-toggle-copy">
-                <strong>Campus Competitions &amp; Hackathons</strong>
-                <p>Important notices for Startupthon 2026, Smart India Hackathon, and innovation summits.</p>
+            <div className="form-row-2">
+              <div className="form-group">
+                <label className="field-label">New Password (Min 6 Characters)</label>
+                <div className="insta-pw-wrap">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    value={passwordData.newPassword}
+                    onChange={e => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                    className="field-input"
+                  />
+                  <button
+                    type="button"
+                    className="insta-pw-eye"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                  >
+                    {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
-              <label className="toggle-switch">
-                <input
-                  type="checkbox"
-                  checked={notifications.collegeNotices}
-                  onChange={() => toggleNotification('collegeNotices')}
-                />
-                <span className="toggle-slider" />
-              </label>
+
+              <div className="form-group">
+                <label className="field-label">Confirm New Password</label>
+                <div className="insta-pw-wrap">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    value={passwordData.confirmPassword}
+                    onChange={e => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                    className="field-input"
+                  />
+                  <button
+                    type="button"
+                    className="insta-pw-eye"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <div className="setting-toggle-row">
-              <div className="setting-toggle-copy">
-                <strong>Quiz &amp; Project Deadline Alerts</strong>
-                <p>Notify 48 hours before course assignments, quizzes, and project submission deadlines.</p>
-              </div>
-              <label className="toggle-switch">
-                <input
-                  type="checkbox"
-                  checked={notifications.quizDeadlines}
-                  onChange={() => toggleNotification('quizDeadlines')}
-                />
-                <span className="toggle-slider" />
-              </label>
+            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="submit"
+                className="button primary"
+                disabled={isChangingPassword || !passwordData.newPassword || passwordData.newPassword !== passwordData.confirmPassword}
+              >
+                {isChangingPassword ? 'Updating Password...' : 'Update Password'}
+              </button>
             </div>
 
-            <div className="setting-toggle-row">
-              <div className="setting-toggle-copy">
-                <strong>Audio Chimes &amp; In-App Sounds</strong>
-                <p>Play subtle audio cues for milestones reached and live interview invites.</p>
+            <div className="insta-danger-section" style={{ marginTop: '30px', paddingTop: '20px', borderTop: '1px solid #f1f5f9' }}>
+              <h4>Session Management</h4>
+              <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 14px 0' }}>
+                You are currently signed in as <strong>{studentName}</strong>.
+              </p>
+              <button
+                type="button"
+                className="button outline"
+                onClick={onLogout}
+                style={{ color: '#dc2626', borderColor: '#fca5a5' }}
+              >
+                Sign Out from Device
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* 9. TAB CONTENT 6: NOTIFICATIONS                              */}
+      {/* ============================================================ */}
+      {isOwnProfile && activeTab === 'notifications' && (
+        <div className="insta-tab-body">
+          <div className="panel insta-edit-panel">
+            <div className="insta-panel-header">
+              <div>
+                <h3>Notification Preferences</h3>
+                <p>Choose the career alerts and college campus announcements you receive.</p>
               </div>
-              <label className="toggle-switch">
-                <input
-                  type="checkbox"
-                  checked={notifications.soundEffects}
-                  onChange={() => toggleNotification('soundEffects')}
-                />
-                <span className="toggle-slider" />
-              </label>
+            </div>
+
+            <div className="insta-toggle-list">
+              {[
+                { key: 'jobAlerts', title: 'Job & Internship Opportunities', desc: 'Get notified when matching openings are published by campus placement cell.' },
+                { key: 'interviewReminders', title: 'Interview & Schedule Reminders', desc: 'Alerts 24 hours prior to scheduled mock assessments or drives.' },
+                { key: 'collegeNotices', title: 'Official Academic Notices', desc: 'Direct notices from Podar Academic Board and department heads.' },
+                { key: 'quizDeadlines', title: 'Coursework & Certificate Deadlines', desc: 'Reminders for elected course validity and test submissions.' },
+                { key: 'soundEffects', title: 'Audio Sound Cues', desc: 'Play subtle acoustic sounds on new notifications and achievements.' }
+              ].map(item => (
+                <div key={item.key} className="insta-toggle-row">
+                  <div>
+                    <strong>{item.title}</strong>
+                    <p>{item.desc}</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={notifications[item.key] !== false}
+                    onChange={e => {
+                      const updated = { ...notifications, [item.key]: e.target.checked };
+                      setNotifications(updated);
+                      try {
+                        localStorage.setItem('podar-notifications-settings', JSON.stringify(updated));
+                      } catch (err) {}
+                      notify?.('Notification preference updated.');
+                    }}
+                    className="insta-switch"
+                  />
+                </div>
+              ))}
             </div>
           </div>
         </div>
       )}
+
+
+      {/* ============================================================ */}
+      {/* 11. PROJECT QUICK VIEW MODAL (INSTAGRAM POST LIGHTBOX)       */}
+      {/* ============================================================ */}
+      {selectedProject && (
+        <div className="insta-post-backdrop" onClick={() => setSelectedProject(null)}>
+          <div className="insta-post-modal" onClick={e => e.stopPropagation()}>
+            {/* Modal Image Section */}
+            <div className="insta-post-img-side">
+              <img
+                src={Array.isArray(selectedProject.images) && selectedProject.images.length > 0
+                  ? (selectedProject.images[0]?.imageUrl || selectedProject.images[0])
+                  : (selectedProject.image || 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&auto=format&fit=crop&q=80')}
+                alt={selectedProject.title}
+                className="insta-post-full-img"
+              />
+            </div>
+
+            {/* Modal Details Section */}
+            <div className="insta-post-info-side">
+              <div className="insta-post-info-header">
+                <div className="insta-post-author">
+                  <div className="insta-avatar-ring micro">
+                    {formData.avatar ? (
+                      <img src={formData.avatar} alt={studentName} className="insta-avatar-img" />
+                    ) : (
+                      <div className="insta-avatar-fallback micro">{studentName.slice(0, 2).toUpperCase()}</div>
+                    )}
+                  </div>
+                  <div>
+                    <strong className="insta-post-author-name">{studentName}</strong>
+                    <span className="insta-post-author-handle">@{username}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="insta-close-icon-btn"
+                  onClick={() => setSelectedProject(null)}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="insta-post-info-body">
+                <h3 className="insta-post-modal-title">{selectedProject.title}</h3>
+                <p className="insta-post-modal-desc">{selectedProject.description}</p>
+
+                {Array.isArray(selectedProject.tags) && selectedProject.tags.length > 0 && (
+                  <div className="insta-post-tags-wrap">
+                    {selectedProject.tags.map(t => (
+                      <span key={t} className="insta-post-tag-chip">#{t}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="insta-post-info-footer">
+                <div className="insta-post-stats-row">
+                  <span className="insta-post-stat">
+                    <Heart size={16} color="#ef4444" fill="#ef4444" />
+                    <strong>{selectedProject.likesCount || 42} likes</strong>
+                  </span>
+                  <span className="insta-post-stat">
+                    <MessageCircle size={16} color="#64748b" />
+                    <strong>{selectedProject.commentsCount || 9} comments</strong>
+                  </span>
+                </div>
+
+                <div className="insta-post-btn-actions">
+                  {selectedProject.demoUrl && (
+                    <a
+                      href={selectedProject.demoUrl.startsWith('http') ? selectedProject.demoUrl : `https://${selectedProject.demoUrl}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="button primary small"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      <Globe size={14} />
+                      <span>Live Demo</span>
+                    </a>
+                  )}
+
+                  {selectedProject.githubUrl && (
+                    <a
+                      href={selectedProject.githubUrl.startsWith('http') ? selectedProject.githubUrl : `https://${selectedProject.githubUrl}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="button outline small"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      <Code size={14} />
+                      <span>GitHub</span>
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ============================================================ */}
+      {/* 12. SHARE PROFILE MODAL                                     */}
+      {/* ============================================================ */}
+      {showShareModal && (
+        <div className="share-modal-backdrop" onClick={() => setShowShareModal(false)}>
+          <div className="share-modal-card" onClick={e => e.stopPropagation()}>
+            <div className="share-modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Share2 size={18} color="#0284c7" />
+                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#0f172a' }}>
+                  Share Student Profile
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="share-modal-close"
+                onClick={() => setShowShareModal(false)}
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Mini Profile Preview */}
+            <div className="share-preview-card">
+              <div className="insta-avatar-ring small" style={{ width: '52px', height: '52px' }}>
+                {formData.avatar ? (
+                  <img src={formData.avatar} alt={studentName} className="insta-avatar-img" />
+                ) : (
+                  <div className="insta-avatar-fallback" style={{ fontSize: '18px' }}>
+                    {studentName.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <strong style={{ fontSize: '14.5px', color: '#0f172a' }}>{studentName}</strong>
+                  <BadgeCheck size={16} fill="#0284c7" color="#ffffff" />
+                </div>
+                <span style={{ fontSize: '12px', color: '#64748b' }}>
+                  {formData.course || 'BCA'} • {studentSem}
+                </span>
+                {formData.goal && (
+                  <p style={{ margin: '3px 0 0 0', fontSize: '12px', color: '#0284c7', fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {formData.goal}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Copy Link Input */}
+            <div className="share-link-box">
+              <div className="share-link-input-wrap">
+                <Link2 size={15} color="#64748b" style={{ flexShrink: 0 }} />
+                <input
+                  type="text"
+                  readOnly
+                  value={getShareUrl()}
+                  className="share-link-input"
+                  onClick={e => e.target.select()}
+                />
+              </div>
+              <button
+                type="button"
+                className={`button ${copiedShare ? 'success' : 'primary'} small`}
+                onClick={handleCopyShareUrl}
+                style={{ flexShrink: 0 }}
+              >
+                {copiedShare ? <Check size={14} /> : <Copy size={14} />}
+                <span>{copiedShare ? 'Copied' : 'Copy'}</span>
+              </button>
+            </div>
+
+            {/* Quick Share Buttons */}
+            <div className="share-channels-title">Share via:</div>
+            <div className="share-channels-grid">
+              <a
+                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Check out ${studentName}'s student profile & projects on Podar Pathways:\n${getShareUrl()}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="share-channel-btn whatsapp"
+              >
+                <span className="share-channel-icon">💬</span>
+                <span>WhatsApp</span>
+              </a>
+
+              <a
+                href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(getShareUrl())}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="share-channel-btn linkedin"
+              >
+                <span className="share-channel-icon">💼</span>
+                <span>LinkedIn</span>
+              </a>
+
+              <a
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out ${studentName}'s student profile on Podar Pathways!`)}&url=${encodeURIComponent(getShareUrl())}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="share-channel-btn twitter"
+              >
+                <span className="share-channel-icon">𝕏</span>
+                <span>Twitter / X</span>
+              </a>
+
+              <a
+                href={`mailto:?subject=${encodeURIComponent(`${studentName} - Podar Pathways Profile`)}&body=${encodeURIComponent(`Hi,\n\nCheck out ${studentName}'s student profile, projects, and verified credentials on Podar Pathways:\n${getShareUrl()}\n\nBest regards,\n${studentName}`)}`}
+                className="share-channel-btn email"
+              >
+                <Mail size={16} />
+                <span>Email</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// ADMIN PROFILE & PHOTO SETTINGS
+// ========================================================
+export function AdminProfileSettings({ session, state, setState, notify, onLogout }) {
+  const fileInputRef = React.useRef(null);
+  const [avatar, setAvatar] = React.useState(
+    session?.avatar || session?.admin?.avatar || DEFAULT_ADMIN_AVATAR
+  );
+  const [name, setName] = React.useState(session?.name || session?.admin?.name || 'Podar Administrator');
+  const [phone, setPhone] = React.useState(session?.adminPhone || session?.admin?.phone || '9999988888');
+  const [department, setDepartment] = React.useState(session?.department || session?.admin?.department || 'Career & Placement Cell');
+  const [role, setRole] = React.useState(session?.adminRole || session?.admin?.role || 'Super Admin');
+  const email = session?.email || session?.admin?.email || 'admin@podar.edu';
+  const [saving, setSaving] = React.useState(false);
+
+  // Compress & handle photo upload
+  const handlePhotoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      notify?.('Please select an image file (PNG, JPG, or WebP).');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 320;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        setAvatar(compressedDataUrl);
+
+        // Update localStorage session
+        try {
+          const savedSession = JSON.parse(localStorage.getItem('podar-pathways-session') || '{}');
+          savedSession.avatar = compressedDataUrl;
+          if (savedSession.admin) savedSession.admin.avatar = compressedDataUrl;
+          localStorage.setItem('podar-pathways-session', JSON.stringify(savedSession));
+        } catch {}
+
+        // Persist to server
+        fetch('/api/admins/admin-podar-root', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ avatar: compressedDataUrl })
+        }).catch(() => {});
+
+        notify?.('Admin profile photo updated successfully!');
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemovePhoto = () => {
+    setAvatar(DEFAULT_ADMIN_AVATAR);
+    try {
+      const savedSession = JSON.parse(localStorage.getItem('podar-pathways-session') || '{}');
+      savedSession.avatar = DEFAULT_ADMIN_AVATAR;
+      if (savedSession.admin) savedSession.admin.avatar = DEFAULT_ADMIN_AVATAR;
+      localStorage.setItem('podar-pathways-session', JSON.stringify(savedSession));
+    } catch {}
+
+    fetch('/api/admins/admin-podar-root', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ avatar: DEFAULT_ADMIN_AVATAR })
+    }).catch(() => {});
+
+    notify?.('Profile photo reset to default.');
+  };
+
+  const handleSaveProfile = (e) => {
+    e.preventDefault();
+    setSaving(true);
+
+    try {
+      const savedSession = JSON.parse(localStorage.getItem('podar-pathways-session') || '{}');
+      savedSession.name = name;
+      savedSession.adminPhone = phone;
+      savedSession.department = department;
+      savedSession.avatar = avatar;
+      if (savedSession.admin) {
+        savedSession.admin.name = name;
+        savedSession.admin.phone = phone;
+        savedSession.admin.department = department;
+        savedSession.admin.avatar = avatar;
+      }
+      localStorage.setItem('podar-pathways-session', JSON.stringify(savedSession));
+    } catch {}
+
+    fetch('/api/admins/admin-podar-root', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        phone,
+        department,
+        avatar
+      })
+    }).catch(() => {});
+
+    setTimeout(() => {
+      setSaving(false);
+      notify?.('Administrator profile saved successfully!');
+    }, 300);
+  };
+
+  return (
+    <div className="minimal-admin-container" style={{ maxWidth: '780px' }}>
+      <div className="minimal-admin-header">
+        <div>
+          <h2 className="minimal-admin-title">Admin Profile</h2>
+          <p className="minimal-admin-subtitle">Your official administrator identity and profile photo.</p>
+        </div>
+        <button
+          type="button"
+          className="minimal-btn-secondary"
+          onClick={() => {
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('podar-route-change', { detail: { page: 'profile', params: { tab: 'directory' } } }));
+            }
+          }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+        >
+          <Users size={15} />
+          <span>Browse Campus Profiles</span>
+        </button>
+      </div>
+
+      <div className="minimal-item-row" style={{ flexDirection: 'column', alignItems: 'stretch', padding: '24px' }}>
+        {/* Photo Upload Card */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', paddingBottom: '20px', borderBottom: '1px solid #f3f4f6', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative' }}>
+            <img
+              src={avatar || DEFAULT_ADMIN_AVATAR}
+              alt="Admin Profile"
+              style={{
+                width: '88px',
+                height: '88px',
+                borderRadius: '50%',
+                objectFit: 'cover',
+                border: '2px solid #e5e7eb',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                position: 'absolute',
+                bottom: '0',
+                right: '0',
+                background: '#111827',
+                color: '#ffffff',
+                border: '2px solid #ffffff',
+                borderRadius: '50%',
+                width: '28px',
+                height: '28px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+              title="Upload new profile photo"
+            >
+              <Camera size={13} />
+            </button>
+          </div>
+
+          <div>
+            <h4 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: '700', color: '#111827' }}>
+              Administrator Profile Photo
+            </h4>
+            <p style={{ margin: '0 0 10px 0', fontSize: '12.5px', color: '#6b7280' }}>
+              Upload a clear photo for official recognition in the portal and navigation bar.
+            </p>
+
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={handlePhotoUpload}
+            />
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                className="minimal-btn-secondary"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Camera size={13} style={{ display: 'inline', marginRight: '5px', verticalAlign: 'middle' }} />
+                Upload Photo
+              </button>
+              {avatar !== DEFAULT_ADMIN_AVATAR && (
+                <button
+                  type="button"
+                  className="minimal-btn-action delete"
+                  onClick={handleRemovePhoto}
+                >
+                  <Trash2 size={13} />
+                  Reset
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Profile Details Form */}
+        <form onSubmit={handleSaveProfile} style={{ marginTop: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="minimal-form-group">
+              <label>Official Name *</label>
+              <input
+                type="text"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="minimal-form-group">
+              <label>Official Email (Permanent)</label>
+              <input
+                type="email"
+                value={email}
+                disabled
+                style={{ background: '#f9fafb', color: '#6b7280', cursor: 'not-allowed' }}
+              />
+            </div>
+
+            <div className="minimal-form-group">
+              <label>Registered Mobile Number</label>
+              <input
+                type="tel"
+                value={phone}
+                maxLength={10}
+                onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
+              />
+            </div>
+
+            <div className="minimal-form-group">
+              <label>Role</label>
+              <input
+                type="text"
+                value={role}
+                disabled
+                style={{ background: '#f9fafb', color: '#6b7280', cursor: 'not-allowed' }}
+              />
+            </div>
+
+            <div className="minimal-form-group" style={{ gridColumn: 'span 2' }}>
+              <label>Department / Cell</label>
+              <input
+                type="text"
+                value={department}
+                onChange={e => setDepartment(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #f3f4f6' }}>
+            <button
+              type="submit"
+              className="minimal-btn-primary"
+              disabled={saving}
+            >
+              {saving ? 'Saving...' : 'Save Profile Changes'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

@@ -1,0 +1,25 @@
+# Podar Pathways - API Directory Protection & Routing
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Block direct HTTP access to internal PHP logic files
+    RewriteRule ^(config|db|mailer)\.php$ - [F,L]
+    
+    # Block direct access to log files
+    RewriteRule ^logs/.*$ - [F,L]
+
+    # Route all other API requests to index.php
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+# Prevent directory browsing
+Options -Indexes
+
+# Security headers for API
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set X-Frame-Options "SAMEORIGIN"
+</IfModule>
