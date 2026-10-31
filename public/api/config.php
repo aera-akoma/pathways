@@ -15,7 +15,7 @@ if (!defined('PODAR_APP')) {
 // Driver: 'mysql' (standard for cPanel production) or 'sqlite' (instant local zero-config)
 $autoDriver = getenv('DB_DRIVER');
 if (!$autoDriver) {
-    if (DIRECTORY_SEPARATOR === '\\' || (file_exists(__DIR__ . '/../../server/data/podar_pathways.db') && !file_exists('/home'))) {
+    if (DIRECTORY_SEPARATOR === '\\' || (file_exists(__DIR__ . '/data/podar_pathways.db') && !file_exists('/home'))) {
         $autoDriver = 'sqlite';
     } else {
         $autoDriver = 'mysql';
@@ -31,8 +31,8 @@ define('DB_USER', getenv('DB_USER') ?: 'podar_user');
 define('DB_PASS', getenv('DB_PASS') ?: 'Podar@StrongPassword2026!');
 define('DB_CHARSET', 'utf8mb4');
 
-// SQLite fallback path:
-define('SQLITE_FILE', __DIR__ . '/../../server/data/podar_pathways.db');
+// SQLite database path:
+define('SQLITE_FILE', __DIR__ . '/data/podar_pathways.db');
 define('SQLITE_LOCAL', __DIR__ . '/data/podar_pathways.db');
 
 // Administrative secret key for phone changes:

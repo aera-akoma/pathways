@@ -51,7 +51,6 @@ class Database {
         $sqlitePaths = [
             defined('SQLITE_FILE') ? SQLITE_FILE : '',
             defined('SQLITE_LOCAL') ? SQLITE_LOCAL : '',
-            __DIR__ . '/../../server/data/podar_pathways.db',
             __DIR__ . '/data/podar_pathways.db'
         ];
 
