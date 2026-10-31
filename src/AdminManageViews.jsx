@@ -35,7 +35,8 @@ import {
   Mail,
   GraduationCap,
   ArrowRight,
-  User
+  User,
+  Image as ImageIcon
 } from 'lucide-react';
 
 // Helper: Format date for admin views
@@ -109,6 +110,97 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
   const [targetCourse, setTargetCourse] = useState('All');
   const [validTill, setValidTill] = useState('2026-12-31');
   const [description, setDescription] = useState('');
+  const [bannerImg, setBannerImg] = useState('');
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [bannerInputMode, setBannerInputMode] = useState('file'); // 'file' | 'url'
+  const fileInputRef = useRef(null);
+
+  // Sync courses dynamically from MySQL/API on mount
+  useEffect(() => {
+    fetch('/api/programs')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0 && setState) {
+          setState(prev => {
+            const map = new Map((prev?.courses || []).map(c => [c.id, c]));
+            data.forEach(p => {
+              const item = {
+                id: p.id,
+                title: p.title,
+                provider: p.issuer || p.provider || 'Podar Pathways',
+                url: p.link || p.url || '',
+                targetCourse: p.targetCourse || 'All',
+                validTill: p.validTill || p.deadline || '2026-12-31',
+                deadline: p.deadline || p.validTill || '2026-12-31',
+                description: p.description || '',
+                bannerImg: p.bannerImg || '',
+                image: p.bannerImg || '',
+                image_url: p.bannerImg || '',
+                createdAt: p.createdAt
+              };
+              map.set(p.id, { ...(map.get(p.id) || {}), ...item });
+            });
+            return { ...prev, courses: Array.from(map.values()) };
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const compressBannerImage = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let { width, height } = img;
+          const maxDim = 1200;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', 0.85);
+          resolve(compressed);
+        };
+        img.onerror = () => resolve(e.target.result);
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleBannerChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      notify?.('Please select an image file (JPEG, PNG, WebP).');
+      return;
+    }
+    try {
+      setUploadingBanner(true);
+      const dataUrl = await compressBannerImage(file);
+      setBannerImg(dataUrl);
+      notify?.('Course banner uploaded!');
+    } catch (err) {
+      notify?.('Failed to process image. Please try again.');
+    } finally {
+      setUploadingBanner(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
 
   const openAddModal = () => {
     setActiveCourse(null);
@@ -118,6 +210,8 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
     setTargetCourse('All');
     setValidTill('2026-12-31');
     setDescription('');
+    setBannerImg('');
+    setBannerInputMode('file');
     setModalMode('add');
   };
 
@@ -138,6 +232,9 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
     setValidTill(vt);
 
     setDescription(course.description || '');
+    const existingBanner = course.bannerImg || course.image || course.image_url || '';
+    setBannerImg(existingBanner);
+    setBannerInputMode(existingBanner.startsWith('data:') ? 'file' : (existingBanner ? 'url' : 'file'));
     setModalMode('edit');
   };
 
@@ -163,6 +260,9 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
         validTill: validTill || '2026-12-31',
         deadline: validTill || '2026-12-31',
         description: description.trim() || 'Curated career preparation course.',
+        bannerImg: bannerImg.trim(),
+        image: bannerImg.trim(),
+        image_url: bannerImg.trim(),
         createdAt: new Date().toISOString()
       };
 
@@ -181,7 +281,9 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
           targetCourse: newCourse.targetCourse,
           deadline: newCourse.validTill,
           validTill: newCourse.validTill,
-          description: newCourse.description
+          description: newCourse.description,
+          bannerImg: newCourse.bannerImg,
+          image: newCourse.bannerImg
         })
       }).catch(() => {});
 
@@ -195,7 +297,10 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
         targetCourse: targetCourse || 'All',
         validTill: validTill || activeCourse.validTill || '2026-12-31',
         deadline: validTill || activeCourse.deadline || activeCourse.validTill || '2026-12-31',
-        description: description.trim() || activeCourse.description
+        description: description.trim() || activeCourse.description,
+        bannerImg: bannerImg.trim(),
+        image: bannerImg.trim(),
+        image_url: bannerImg.trim()
       };
 
       setState(prev => ({
@@ -211,7 +316,9 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
           issuer: updatedCourse.provider,
           link: updatedCourse.url,
           deadline: updatedCourse.validTill,
-          validTill: updatedCourse.validTill
+          validTill: updatedCourse.validTill,
+          bannerImg: updatedCourse.bannerImg,
+          image: updatedCourse.bannerImg
         })
       }).catch(() => {});
 
@@ -271,47 +378,64 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
       {/* Minimal Items List */}
       <div className="minimal-items-list">
         {filtered.length > 0 ? (
-          filtered.map(course => (
-            <div key={course.id} className="minimal-item-row">
-              <div className="minimal-item-info">
-                <h4 className="minimal-item-title">{course.title}</h4>
-                <div className="minimal-item-meta">
-                  <span>{course.provider || 'Academic Partner'}</span>
-                  <span>•</span>
-                  <span>{course.targetCourse || 'All Programs'}</span>
-                  <span>•</span>
-                  <span className="minimal-item-validity-tag">
-                    <Calendar size={12} />
-                    Valid till: {formatAdminDate(course.validTill || course.deadline || course.valid_till || '2026-12-31')}
-                  </span>
-                  <span>•</span>
-                  <a href={course.url} target="_blank" rel="noreferrer" className="minimal-link">
-                    {course.url}
-                  </a>
+          filtered.map(course => {
+            const courseBanner = course.bannerImg || course.image || course.image_url;
+            return (
+              <div key={course.id} className="minimal-item-row">
+                <div className="minimal-item-thumb">
+                  {courseBanner ? (
+                    <img
+                      src={courseBanner}
+                      alt={course.title}
+                      onError={e => { e.currentTarget.style.display = 'none'; }}
+                    />
+                  ) : (
+                    <div className="minimal-item-thumb-fallback">
+                      <BookOpen size={20} />
+                    </div>
+                  )}
+                </div>
+
+                <div className="minimal-item-info">
+                  <h4 className="minimal-item-title">{course.title}</h4>
+                  <div className="minimal-item-meta">
+                    <span>{course.provider || 'Academic Partner'}</span>
+                    <span>•</span>
+                    <span>{course.targetCourse || 'All Programs'}</span>
+                    <span>•</span>
+                    <span className="minimal-item-validity-tag">
+                      <Calendar size={12} />
+                      Valid till: {formatAdminDate(course.validTill || course.deadline || course.valid_till || '2026-12-31')}
+                    </span>
+                    <span>•</span>
+                    <a href={course.url} target="_blank" rel="noreferrer" className="minimal-link">
+                      {course.url}
+                    </a>
+                  </div>
+                </div>
+
+                {/* ONLY Edit and Delete Buttons */}
+                <div className="minimal-item-actions">
+                  <button
+                    onClick={() => openEditModal(course)}
+                    className="minimal-btn-action edit"
+                    title="Edit Course"
+                  >
+                    <Pencil size={14} />
+                    <span>Edit</span>
+                  </button>
+                  <button
+                    onClick={() => setDeleteTarget(course)}
+                    className="minimal-btn-action delete"
+                    title="Delete Course"
+                  >
+                    <Trash2 size={14} />
+                    <span>Delete</span>
+                  </button>
                 </div>
               </div>
-
-              {/* ONLY Edit and Delete Buttons */}
-              <div className="minimal-item-actions">
-                <button
-                  onClick={() => openEditModal(course)}
-                  className="minimal-btn-action edit"
-                  title="Edit Course"
-                >
-                  <Pencil size={14} />
-                  <span>Edit</span>
-                </button>
-                <button
-                  onClick={() => setDeleteTarget(course)}
-                  className="minimal-btn-action delete"
-                  title="Delete Course"
-                >
-                  <Trash2 size={14} />
-                  <span>Delete</span>
-                </button>
-              </div>
-            </div>
-          ))
+            );
+          })
         ) : (
           <div className="minimal-empty-state">No courses found.</div>
         )}
@@ -375,6 +499,114 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
                     required
                   />
                 </div>
+
+                {/* Course Banner Image (Upload / URL) */}
+                <div className="minimal-form-group">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <label style={{ margin: 0, fontWeight: 600 }}>Course Banner Image</label>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => setBannerInputMode('file')}
+                        style={{
+                          fontSize: 11,
+                          padding: '3px 9px',
+                          borderRadius: 4,
+                          cursor: 'pointer',
+                          border: '1px solid #cbd5e1',
+                          background: bannerInputMode === 'file' ? '#0d9488' : '#f8fafc',
+                          color: bannerInputMode === 'file' ? '#fff' : '#475569',
+                          fontWeight: 500
+                        }}
+                      >
+                        Upload Image
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBannerInputMode('url')}
+                        style={{
+                          fontSize: 11,
+                          padding: '3px 9px',
+                          borderRadius: 4,
+                          cursor: 'pointer',
+                          border: '1px solid #cbd5e1',
+                          background: bannerInputMode === 'url' ? '#0d9488' : '#f8fafc',
+                          color: bannerInputMode === 'url' ? '#fff' : '#475569',
+                          fontWeight: 500
+                        }}
+                      >
+                        Image URL
+                      </button>
+                    </div>
+                  </div>
+
+                  {bannerImg ? (
+                    <div className="admin-banner-preview-box">
+                      <img
+                        src={bannerImg}
+                        alt="Course banner preview"
+                        className="admin-banner-preview-img"
+                        onError={(e) => {
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&auto=format&fit=crop&q=80';
+                        }}
+                      />
+                      <div className="admin-banner-preview-overlay">
+                        <button
+                          type="button"
+                          className="admin-banner-overlay-btn"
+                          onClick={() => fileInputRef.current?.click()}
+                          title="Change banner image"
+                        >
+                          <Upload size={13} />
+                          <span>Change</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-banner-overlay-btn danger"
+                          onClick={() => setBannerImg('')}
+                          title="Remove banner image"
+                        >
+                          <X size={13} />
+                          <span>Remove</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : bannerInputMode === 'file' ? (
+                    <div
+                      className="admin-banner-dropzone"
+                      onClick={() => fileInputRef.current?.click()}
+                      title="Click to upload banner"
+                    >
+                      <div className="admin-banner-dropzone-icon">
+                        <ImageIcon size={30} />
+                      </div>
+                      <div className="admin-banner-dropzone-title">
+                        {uploadingBanner ? 'Processing image...' : 'Click to upload course banner'}
+                      </div>
+                      <div className="admin-banner-dropzone-hint">
+                        Supports JPEG, PNG, WebP (auto-optimized for 16:9 banner)
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="admin-banner-url-input">
+                      <input
+                        type="url"
+                        placeholder="https://images.unsplash.com/... or image URL"
+                        value={bannerImg}
+                        onChange={e => setBannerImg(e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={handleBannerChange}
+                    style={{ display: 'none' }}
+                  />
+                </div>
+
                 <div className="minimal-form-group">
                   <label>Summary</label>
                   <textarea

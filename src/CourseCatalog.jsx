@@ -232,7 +232,40 @@ export function CourseCatalog({
 
   useEffect(() => {
     fetchCertificates();
+    fetchPrograms();
   }, [apiBase]);
+
+  const fetchPrograms = async () => {
+    try {
+      const res = await fetch(`${apiBase}/api/programs`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0 && setState) {
+          setState(prev => {
+            const map = new Map((prev?.courses || []).map(c => [c.id, c]));
+            data.forEach(p => {
+              const item = {
+                id: p.id,
+                title: p.title,
+                provider: p.issuer || p.provider || 'Podar Pathways',
+                url: p.link || p.url || '',
+                targetCourse: p.targetCourse || 'All',
+                validTill: p.validTill || p.deadline || '2026-12-31',
+                deadline: p.deadline || p.validTill || '2026-12-31',
+                description: p.description || '',
+                bannerImg: p.bannerImg || '',
+                image: p.bannerImg || '',
+                image_url: p.bannerImg || '',
+                createdAt: p.createdAt
+              };
+              map.set(p.id, { ...(map.get(p.id) || {}), ...item });
+            });
+            return { ...prev, courses: Array.from(map.values()) };
+          });
+        }
+      }
+    } catch (err) {}
+  };
 
   const saveCertificates = (newList) => {
     setCertificates(newList);
@@ -825,7 +858,7 @@ export function CourseCatalog({
             filteredCourses.map(course => {
               const cert = getStudentCertForCourse(course);
               const isOpening = openingCourseId === course.id;
-              const bannerImage = course.image || course.image_url || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&auto=format&fit=crop&q=80';
+              const bannerImage = course.bannerImg || course.image || course.image_url || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600&auto=format&fit=crop&q=80';
               const validity = getCourseValidityInfo(course.validTill || course.deadline || course.valid_till);
 
               return (

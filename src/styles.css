@@ -11211,6 +11211,138 @@ to {
   border-color: #cbd5e1;
 }
 
+.minimal-item-thumb {
+  width: 76px;
+  height: 50px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.minimal-item-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.minimal-item-thumb-fallback {
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Course Banner Uploader & Preview */
+.admin-banner-preview-box {
+  position: relative;
+  width: 100%;
+  height: 165px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  background: #0f172a;
+}
+
+.admin-banner-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.admin-banner-preview-overlay {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 8px;
+  z-index: 2;
+}
+
+.admin-banner-overlay-btn {
+  background: rgba(15, 23, 42, 0.85);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 5px 11px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  backdrop-filter: blur(4px);
+  transition: all 0.15s ease;
+}
+
+.admin-banner-overlay-btn:hover {
+  background: rgba(15, 23, 42, 0.98);
+  color: #38bdf8;
+  border-color: #38bdf8;
+}
+
+.admin-banner-overlay-btn.danger:hover {
+  color: #f87171;
+  border-color: #f87171;
+}
+
+.admin-banner-dropzone {
+  border: 2px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 24px 16px;
+  background: #f8fafc;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.admin-banner-dropzone:hover {
+  border-color: #0d9488;
+  background: #f0fdfa;
+}
+
+.admin-banner-dropzone-icon {
+  color: #0d9488;
+  margin-bottom: 2px;
+}
+
+.admin-banner-dropzone-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.admin-banner-dropzone-hint {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.admin-banner-url-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.admin-banner-url-input input {
+  flex: 1;
+  font-size: 13px;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+}
+
 .minimal-item-info {
   flex: 1;
   min-width: 0;

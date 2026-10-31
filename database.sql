@@ -275,7 +275,7 @@ CREATE TABLE IF NOT EXISTS `programs` (
   `issuer` VARCHAR(150) NOT NULL,
   `description` TEXT DEFAULT NULL,
   `link` VARCHAR(500) NOT NULL,
-  `bannerImg` TEXT DEFAULT NULL,
+  `bannerImg` LONGTEXT DEFAULT NULL,
   `targetCourse` VARCHAR(100) DEFAULT 'All',
   `targetSemester` VARCHAR(20) DEFAULT 'All',
   `deadline` VARCHAR(50) DEFAULT '2026-12-31',

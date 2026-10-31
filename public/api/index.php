@@ -766,6 +766,11 @@ try {
             $prog['studentClicked'] = $studentClicked;
             $prog['studentClickedAt'] = $studentClickedAt;
             $prog['studentSubmission'] = $studentSubmission;
+            $prog['image'] = $prog['bannerImg'] ?? '';
+            $prog['image_url'] = $prog['bannerImg'] ?? '';
+            $prog['provider'] = $prog['issuer'] ?? 'Podar Pathways';
+            $prog['url'] = $prog['link'] ?? '';
+            $prog['validTill'] = $prog['deadline'] ?? '2026-12-31';
             return $prog;
         }, $programs);
 
@@ -774,10 +779,10 @@ try {
 
     if (($route === '/programs' || $route === '/courses') && $method === 'POST') {
         $title          = cleanString($body['title'] ?? '');
-        $issuer         = cleanString($body['issuer'] ?? 'Podar Pathways');
+        $issuer         = cleanString($body['issuer'] ?? $body['provider'] ?? 'Podar Pathways');
         $description    = trim($body['description'] ?? '');
-        $link           = cleanString($body['link'] ?? '');
-        $bannerImg      = cleanString($body['bannerImg'] ?? '');
+        $link           = cleanString($body['link'] ?? $body['url'] ?? '');
+        $bannerImg      = trim((string)($body['bannerImg'] ?? $body['image'] ?? $body['image_url'] ?? ''));
         $targetCourse   = cleanString($body['targetCourse'] ?? 'All');
         $targetSemester = cleanString($body['targetSemester'] ?? 'All');
         $deadline       = cleanString($body['validTill'] ?? $body['deadline'] ?? '2026-12-31');
@@ -796,6 +801,13 @@ try {
         );
 
         $created = Database::fetchOne("SELECT * FROM programs WHERE id = ?", [$id]);
+        if ($created) {
+            $created['image'] = $created['bannerImg'] ?? '';
+            $created['image_url'] = $created['bannerImg'] ?? '';
+            $created['provider'] = $created['issuer'] ?? 'Podar Pathways';
+            $created['url'] = $created['link'] ?? '';
+            $created['validTill'] = $created['deadline'] ?? '2026-12-31';
+        }
         jsonResponse($created, 201);
     }
 
@@ -860,10 +872,10 @@ try {
             if (!$prog) jsonError('Program not found.', 404);
 
             $title          = cleanString($body['title'] ?? $prog['title']);
-            $issuer         = cleanString($body['issuer'] ?? $prog['issuer']);
+            $issuer         = cleanString($body['issuer'] ?? $body['provider'] ?? $prog['issuer']);
             $description    = trim($body['description'] ?? $prog['description']);
-            $link           = cleanString($body['link'] ?? $prog['link']);
-            $bannerImg      = cleanString($body['bannerImg'] ?? $prog['bannerImg']);
+            $link           = cleanString($body['link'] ?? $body['url'] ?? $prog['link']);
+            $bannerImg      = isset($body['bannerImg']) ? trim((string)$body['bannerImg']) : (isset($body['image']) ? trim((string)$body['image']) : (isset($body['image_url']) ? trim((string)$body['image_url']) : $prog['bannerImg']));
             $targetCourse   = cleanString($body['targetCourse'] ?? $prog['targetCourse']);
             $targetSemester = cleanString($body['targetSemester'] ?? $prog['targetSemester']);
             $deadline       = cleanString($body['validTill'] ?? $body['deadline'] ?? $prog['deadline']);
@@ -879,6 +891,13 @@ try {
             ", [$title, $issuer, $description, $link, $bannerImg, $targetCourse, $targetSemester, $deadline, $rewardPoints, $status, nowIso(), $progId]);
 
             $updated = Database::fetchOne("SELECT * FROM programs WHERE id = ?", [$progId]);
+            if ($updated) {
+                $updated['image'] = $updated['bannerImg'] ?? '';
+                $updated['image_url'] = $updated['bannerImg'] ?? '';
+                $updated['provider'] = $updated['issuer'] ?? 'Podar Pathways';
+                $updated['url'] = $updated['link'] ?? '';
+                $updated['validTill'] = $updated['deadline'] ?? '2026-12-31';
+            }
             jsonResponse($updated);
         }
 
