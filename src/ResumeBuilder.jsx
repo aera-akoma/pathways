@@ -801,3 +801,4 @@ ${resumeData.certifications.map(c => `* ${c.name} - ${c.issuer} (${c.year})`).jo
     </div>
   );
 }
+

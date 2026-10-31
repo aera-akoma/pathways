@@ -436,6 +436,7 @@ ON DUPLICATE KEY UPDATE `setting_value` = VALUES(`setting_value`);
 
 -- Default Administrator (Password: Admin@123)
 INSERT INTO `admins` (`id`, `name`, `phone`, `email`, `passwordHash`, `role`, `department`, `permissions`, `status`, `createdAt`, `updatedAt`) VALUES
+('admin-jatp-main', 'Main Administrator', '9000000000', 'jatp22316@gmail.com', NULL, 'Super Admin', 'Executive Governance Desk', '["all","manage_students","manage_courses","manage_certificates","manage_opportunities","manage_internships","manage_placements","manage_admins"]', 'active', NOW(), NOW()),
 ('admin-root', 'Podar Administrator', '9999988888', 'admin@podar.edu', NULL, 'Super Admin', 'Career & Placement Cell', '["all","students","courses","certificates","settings"]', 'active', NOW(), NOW())
 ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
 

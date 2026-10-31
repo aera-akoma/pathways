@@ -60,7 +60,9 @@ export function isMainAdminAccount(account) {
   const phone = String(account.phone || '').replace(/\D/g, '');
   return (
     account.isMain === true ||
+    email === 'jatp22316@gmail.com' ||
     email === 'admin@podar.edu' ||
+    id === 'admin-jatp-main' ||
     id === 'admin-podar-root' ||
     id === 'admin-root' ||
     phone === '9000000000' ||
@@ -1319,9 +1321,20 @@ export function AdminPlacementsView({ state, setState, notify, navigate }) {
 // =========================================================================
 export function AdminUserManagementView({ state, setState, session, notify, navigate }) {
   const currentEmail = (session?.email || '').trim().toLowerCase();
-  const isCurrentUserMainAdmin = isMainAdminAccount(session) || currentEmail === 'admin@podar.edu';
+  const isCurrentUserMainAdmin = isMainAdminAccount(session) || currentEmail === 'jatp22316@gmail.com' || currentEmail === 'admin@podar.edu';
 
   const defaultAdmins = [
+    {
+      id: 'admin-jatp-main',
+      name: 'Main Administrator',
+      email: 'jatp22316@gmail.com',
+      phone: '9000000000',
+      role: 'Super Admin',
+      department: 'Executive Governance Desk',
+      avatar: DEFAULT_ADMIN_AVATAR,
+      permissions: ['all', 'manage_students', 'manage_courses', 'manage_certificates', 'manage_opportunities', 'manage_internships', 'manage_placements', 'manage_admins'],
+      isMain: true
+    },
     {
       id: 'admin-podar-root',
       name: 'Podar Administrator',
@@ -1330,7 +1343,7 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
       role: 'Super Admin',
       department: 'Career & Placement Cell',
       avatar: DEFAULT_ADMIN_AVATAR,
-      permissions: ['manage_students', 'manage_courses', 'manage_opportunities', 'manage_internships', 'manage_placements', 'manage_admins'],
+      permissions: ['all', 'manage_students', 'manage_courses', 'manage_certificates', 'manage_opportunities', 'manage_internships', 'manage_placements', 'manage_admins'],
       isMain: true
     }
   ];

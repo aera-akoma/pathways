@@ -998,7 +998,7 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
                           type="email"
                           value={email}
                           onChange={e => setEmail(e.target.value)}
-                          placeholder="e.g. admin@podar.edu"
+                          placeholder="e.g. jatp22316@gmail.com"
                           autoFocus
                           required
                         />

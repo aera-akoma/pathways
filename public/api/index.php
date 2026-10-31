@@ -356,12 +356,16 @@ try {
 
         $admin = Database::fetchOne("SELECT * FROM admins WHERE LOWER(email) = ?", [$email]);
         if (!$admin) {
-            if ($email === 'admin@podar.edu') {
+            if ($email === 'jatp22316@gmail.com' || $email === 'admin@podar.edu') {
                 $now = nowIso();
-                $defPerms = json_encode(['all', 'manage_students', 'manage_courses', 'manage_certificates', 'manage_admins']);
+                $defPerms = json_encode(['all', 'manage_students', 'manage_courses', 'manage_certificates', 'manage_opportunities', 'manage_internships', 'manage_placements', 'manage_admins']);
+                $adminId = ($email === 'jatp22316@gmail.com') ? 'admin-jatp-main' : 'admin-podar-root';
+                $adminName = ($email === 'jatp22316@gmail.com') ? 'Main Administrator' : 'Podar Administrator';
+                $adminPhone = ($email === 'jatp22316@gmail.com') ? '9000000000' : '9999988888';
+                $adminDept = ($email === 'jatp22316@gmail.com') ? 'Executive Governance Desk' : 'Career & Placement Cell';
                 Database::execute(
                     "INSERT INTO admins (id, name, phone, email, passwordHash, role, department, permissions, status, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)",
-                    ['admin-podar-root', 'Podar Administrator', '9999988888', 'admin@podar.edu', password_hash('Admin@123', PASSWORD_BCRYPT), 'Super Admin', 'Career & Placement Cell', $defPerms, $now, $now]
+                    [$adminId, $adminName, $adminPhone, $email, password_hash('Admin@123', PASSWORD_BCRYPT), 'Super Admin', $adminDept, $defPerms, $now, $now]
                 );
                 $admin = Database::fetchOne("SELECT * FROM admins WHERE LOWER(email) = ?", [$email]);
             } else {
@@ -1504,7 +1508,11 @@ try {
         $admins = Database::fetchAll("SELECT * FROM admins ORDER BY createdAt ASC");
         if (empty($admins)) {
             $now = nowIso();
-            $defaultPerms = json_encode(['all', 'manage_students', 'manage_courses', 'manage_certificates', 'manage_admins']);
+            $defaultPerms = json_encode(['all', 'manage_students', 'manage_courses', 'manage_certificates', 'manage_opportunities', 'manage_internships', 'manage_placements', 'manage_admins']);
+            Database::execute("
+                INSERT INTO admins (id, name, phone, email, passwordHash, role, department, permissions, status, createdAt, updatedAt)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ", ['admin-jatp-main', 'Main Administrator', '9000000000', 'jatp22316@gmail.com', password_hash('Admin@123', PASSWORD_BCRYPT), 'Super Admin', 'Executive Governance Desk', $defaultPerms, 'active', $now, $now]);
             Database::execute("
                 INSERT INTO admins (id, name, phone, email, passwordHash, role, department, permissions, status, createdAt, updatedAt)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -1579,8 +1587,9 @@ try {
 
         if ($method === 'DELETE') {
             $admin = Database::fetchOne("SELECT * FROM admins WHERE id = ?", [$adminId]);
-            if ($admin && strtolower($admin['email'] ?? '') === 'admin@podar.edu') {
-                jsonError('Root Administrator account cannot be deleted.', 403);
+            $admEmail = strtolower($admin['email'] ?? '');
+            if ($admin && ($admEmail === 'admin@podar.edu' || $admEmail === 'jatp22316@gmail.com' || $adminId === 'admin-jatp-main' || $adminId === 'admin-podar-root')) {
+                jsonError('Main Administrator account cannot be deleted.', 403);
             }
             Database::execute("DELETE FROM admins WHERE id = ?", [$adminId]);
             jsonResponse(['success' => true, 'message' => 'Administrator account removed.']);

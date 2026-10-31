@@ -380,3 +380,4 @@ export function AICareerCoach({ student, notify, navigate }) {
     </div>
   );
 }
+
