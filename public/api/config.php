@@ -10,7 +10,42 @@ if (!defined('PODAR_APP')) {
 }
 
 // ----------------------------------------------------
-// 1. DATABASE CONFIGURATION (MySQL & SQLite)
+// AUTOMATIC .ENV CONFIGURATION LOADER
+// ----------------------------------------------------
+(function() {
+    $candidates = [
+        dirname(__DIR__, 2) . '/.env',
+        dirname(__DIR__) . '/.env',
+        __DIR__ . '/.env'
+    ];
+    foreach ($candidates as $file) {
+        if (file_exists($file) && is_readable($file)) {
+            $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if ($line === '' || str_starts_with($line, '#')) continue;
+                if (strpos($line, '=') !== false) {
+                    list($k, $v) = explode('=', $line, 2);
+                    $k = trim($k);
+                    $v = trim($v);
+                    if ((str_starts_with($v, '"') && str_ends_with($v, '"')) ||
+                        (str_starts_with($v, "'") && str_ends_with($v, "'"))) {
+                        $v = substr($v, 1, -1);
+                    }
+                    if (getenv($k) === false) {
+                        putenv("$k=$v");
+                        $_ENV[$k] = $v;
+                        $_SERVER[$k] = $v;
+                    }
+                }
+            }
+            break;
+        }
+    }
+})();
+
+// ----------------------------------------------------
+// 1. DATABASE CONFIGURATION (MySQL & SQLite - 3 SEPARATE DATABASES)
 // ----------------------------------------------------
 // Driver: 'mysql' (standard for cPanel production) or 'sqlite' (instant local zero-config)
 $autoDriver = getenv('DB_DRIVER');
@@ -30,12 +65,37 @@ define('DB_NAME', getenv('DB_NAME') ?: 'podar_pathways');
 define('DB_USER', getenv('DB_USER') ?: 'podar_user');
 define('DB_PASS', getenv('DB_PASS') ?: 'Podar@StrongPassword2026!');
 define('DB_CHARSET', 'utf8mb4');
+define('DB_CERTIFICATES_NAME', getenv('DB_CERTIFICATES_NAME') ?: DB_NAME);
+define('DB_PROJECTS_NAME', getenv('DB_PROJECTS_NAME') ?: DB_NAME);
 
-// SQLite database paths:
-define('SQLITE_FILE', __DIR__ . '/data/podar_pathways.db');
-define('SQLITE_LOCAL', __DIR__ . '/data/podar_pathways.db');
-define('SQLITE_CERTIFICATES_FILE', __DIR__ . '/data/certificates.db');
-define('SQLITE_PROJECTS_FILE', __DIR__ . '/data/projects.db');
+// Helper to resolve SQLite path from env or defaults
+$resolveSqliteDb = function($envKey, $fallbackFile) {
+    $custom = getenv($envKey);
+    if ($custom) {
+        $custom = trim($custom);
+        if (preg_match('#^([a-zA-Z]:|/)#', $custom)) {
+            return $custom;
+        }
+        $root = dirname(__DIR__, 2);
+        $candidate = $root . '/' . ltrim($custom, './\\');
+        if (file_exists($candidate) || file_exists(dirname($candidate))) {
+            return $candidate;
+        }
+        return $custom;
+    }
+    return __DIR__ . '/data/' . $fallbackFile;
+};
+
+// SQLite 3-Database Separation Paths:
+// 1. Core / Main Database (Students, Admins, Courses, OTPs, Settings)
+define('SQLITE_FILE', $resolveSqliteDb('DB_MAIN_PATH', 'podar_pathways.db'));
+define('SQLITE_LOCAL', SQLITE_FILE);
+
+// 2. Certificates Database (Student Credentials, Badges & Verifications)
+define('SQLITE_CERTIFICATES_FILE', $resolveSqliteDb('DB_CERTIFICATES_PATH', 'certificates.db'));
+
+// 3. Projects Database (Student Posts, Images, Comments, Likes, Bookmarks)
+define('SQLITE_PROJECTS_FILE', $resolveSqliteDb('DB_PROJECTS_PATH', 'projects.db'));
 
 // Administrative secret key for phone changes:
 define('ADMIN_KEY', 'PodarAdmin@2026!');
