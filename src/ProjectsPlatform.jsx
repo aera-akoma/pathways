@@ -161,8 +161,8 @@ function compressProjectImage(file) {
 // MAIN COMPONENT: STUDENT PROJECTS PLATFORM
 // =========================================================================
 export function ProjectsPlatform({ session, student, state, setState, notify, navigate }) {
-  const currentStudentId = student?.id || session?.id || 'student-demo';
-  const currentStudentName = student?.name || session?.name || 'Student Demo';
+  const currentStudentId = student?.id || session?.id || '';
+  const currentStudentName = student?.name || session?.name || 'Student';
   const currentStudentAvatar = student?.avatar || session?.avatar || '';
   const currentStudentCourse = student?.course || 'BCA';
   const currentStudentSem = student?.semester || 'Semester V';
@@ -1849,8 +1849,8 @@ function ProjectComposerModal({
     const cleanedYoutube = sanitizeUrl(youtubeUrl);
 
     const payload = {
-      studentId: currentStudent?.id || 'student-demo',
-      studentName: currentStudent?.name || 'Student Demo',
+      studentId: currentStudent?.id || '',
+      studentName: currentStudent?.name || 'Student',
       studentAvatar: currentStudent?.avatar || '',
       studentCourse: currentStudent?.course || 'BCA',
       studentSemester: currentStudent?.semester || 'Semester V',

@@ -202,8 +202,8 @@ export function CourseCatalog({
   // Under review info modal state
   const [pendingInfoCert, setPendingInfoCert] = useState(null);
 
-  const currentStudentId = student?.id || session?.id || 'student-demo';
-  const currentStudentName = student?.name || session?.name || 'Student Demo';
+  const currentStudentId = student?.id || session?.id || '';
+  const currentStudentName = student?.name || session?.name || 'Student';
 
   // Determine API base url dynamically (relative for unified PHP server)
   const apiBase = useMemo(() => {

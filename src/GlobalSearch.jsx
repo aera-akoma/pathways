@@ -38,18 +38,16 @@ const SEARCH_HISTORY_STORAGE_KEY = 'podar_youtube_search_history_v2';
 
 const DEFAULT_RECENT_SEARCHES = [
   'Meta Front-End Developer Specialization',
-  'CampusKart - Student Marketplace',
   'AWS Certified Cloud Practitioner Track',
   'AI Career Coach',
-  'P-CARE Employability Score Breakdown'
+  'P-CARE Employability Score Breakdown',
+  'Resume ATS Optimizer'
 ];
 
 const TRENDING_TOPICS = [
   { text: 'Meta Front-End Developer', tag: 'Course', page: 'courses' },
-  { text: 'CampusKart Marketplace', tag: 'Project', page: 'projects' },
   { text: 'AWS Cloud Practitioner', tag: 'Certification', page: 'courses' },
   { text: 'AI Career Coach', tag: 'Tool', page: 'coach' },
-  { text: 'PathAI Neural Analyzer', tag: 'Project', page: 'projects' },
   { text: 'TCS Campus Hiring 2026', tag: 'Placement', page: 'placements' },
   { text: 'Smart India Hackathon', tag: 'Hackathon', page: 'opportunities' },
   { text: 'Resume ATS Optimizer', tag: 'Tool', page: 'resume' }
@@ -442,7 +440,7 @@ export function GlobalSearch({ session, state, navigate, notify }) {
 
     // Smart semantic navigation fallback
     const lower = trimmed.toLowerCase();
-    if (lower.includes('project') || lower.includes('campuskart') || lower.includes('pathai') || lower.includes('medvault')) {
+    if (lower.includes('project')) {
       navigate('projects');
     } else if (lower.includes('course') || lower.includes('meta') || lower.includes('aws') || lower.includes('python') || lower.includes('google')) {
       navigate('courses');
@@ -751,7 +749,7 @@ export function GlobalSearch({ session, state, navigate, notify }) {
                   <strong>No exact matches for "{query}"</strong>
                   <p>Try searching for a course, project name, or career skill.</p>
                   <div className="yt-suggested-queries">
-                    {['React', 'AWS', 'CampusKart', 'PathAI', 'Resume', 'Interview'].map((chip) => (
+                    {['React', 'AWS', 'Python', 'Certificates', 'Resume', 'Interview'].map((chip) => (
                       <button
                         key={chip}
                         type="button"
@@ -881,7 +879,7 @@ export function GlobalSearch({ session, state, navigate, notify }) {
               </div>
               <h3 className="yt-voice-modal-title">Listening...</h3>
               <p className="yt-voice-modal-prompt">
-                Say something like <em>"Meta Front-End"</em>, <em>"CampusKart"</em>, or <em>"AI Career Coach"</em>
+                Say something like <em>"Meta Front-End"</em>, <em>"AWS Cloud"</em>, or <em>"AI Career Coach"</em>
               </p>
               <button
                 type="button"

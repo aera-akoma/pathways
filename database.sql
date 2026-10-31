@@ -439,13 +439,6 @@ INSERT INTO `admins` (`id`, `name`, `phone`, `email`, `passwordHash`, `role`, `d
 ('admin-root', 'Podar Administrator', '9999988888', 'admin@podar.edu', NULL, 'Super Admin', 'Career & Placement Cell', '["all","students","courses","certificates","settings"]', 'active', NOW(), NOW())
 ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
 
--- Pre-Enrolled Students (Ready for registration with Email OTP)
-INSERT INTO `students` (`id`, `name`, `phone`, `email`, `course`, `semester`, `goal`, `score`, `completion`, `applications`, `projects`, `certificates`, `isRegistered`, `status`, `createdAt`, `updatedAt`) VALUES
-('student-demo-1', 'Demo Student', '9000000001', 'student@podar.edu', 'BCA', 'V', 'Software Engineer', 78, 92, 6, 2, 3, 0, 'active', NOW(), NOW()),
-('student-demo-2', 'Aarav Sharma', '9876543211', 'aarav.sharma@podar.edu', 'BSc IT', 'VI', 'Full Stack Developer', 82, 88, 4, 3, 2, 0, 'active', NOW(), NOW()),
-('student-demo-3', 'Priya Patel', '9876543212', 'priya.patel@podar.edu', 'BBA', 'IV', 'Business Analyst', 74, 80, 5, 1, 1, 0, 'active', NOW(), NOW())
-ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
-
 -- Sample Programs / Recommended Courses
 INSERT INTO `programs` (`id`, `title`, `issuer`, `description`, `link`, `bannerImg`, `targetCourse`, `targetSemester`, `deadline`, `rewardPoints`, `status`, `createdAt`, `updatedAt`) VALUES
 ('prog-aws-01', 'AWS Cloud Practitioner Certification Program', 'Amazon Web Services (AWS)', 'Comprehensive foundation covering cloud compute, AWS Lambda, S3, IAM security protocols, and architecture best practices.', 'https://aws.amazon.com/certification/certified-cloud-practitioner/', 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000&auto=format&fit=crop', 'All', 'All', '2026-12-31', 25, 'active', NOW(), NOW()),

@@ -200,38 +200,13 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
 
     // 3. Student Login
     if (url.includes('/student/login')) {
-      const match = (state?.students || []).find(s => s.email?.toLowerCase() === cleanEmail) ||
-        ((cleanEmail === 'student@podar.edu' || cleanEmail === 'student.demo@example.com')
-          ? {
-              id: 'student-demo-podar',
-              name: 'Demo Student',
-              phone: '9000000001',
-              course: 'BCA',
-              semester: 'V',
-              email: cleanEmail,
-              goal: 'Software Engineer',
-              score: 78,
-              completion: 92,
-              applications: 6,
-              projects: 2,
-              certificates: 3,
-              avatar: DEFAULT_STUDENT_AVATAR
-            }
-          : {
-              id: `student-static-${Date.now()}`,
-              name: cleanEmail.split('@')[0] || 'Student',
-              phone: '9000000001',
-              course: 'BCA',
-              semester: 'V',
-              email: cleanEmail,
-              goal: 'Software Developer',
-              score: 78,
-              completion: 92,
-              applications: 6,
-              projects: 2,
-              certificates: 3,
-              avatar: DEFAULT_STUDENT_AVATAR
-            });
+      const match = (state?.students || []).find(s => s.email?.toLowerCase() === cleanEmail);
+      if (!match) {
+        return {
+          success: false,
+          error: 'No student account found with this email. Please sign up first.'
+        };
+      }
 
       return {
         success: true,
@@ -248,12 +223,13 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
 
     // 4. Student Forgot Password Reset
     if (url.includes('/forgot-password/reset')) {
-      const match = (state?.students || []).find(s => s.email?.toLowerCase() === cleanEmail) || {
-        id: 'student-demo-podar',
-        name: 'Demo Student',
-        email: cleanEmail,
-        avatar: DEFAULT_STUDENT_AVATAR
-      };
+      const match = (state?.students || []).find(s => s.email?.toLowerCase() === cleanEmail);
+      if (!match) {
+        return {
+          success: false,
+          error: 'No student account found with this email.'
+        };
+      }
       return {
         success: true,
         message: 'Password reset successfully!',

@@ -92,44 +92,7 @@ const INDIAN_STATES_DISTRICTS = {
   ]
 };
 
-const DEFAULT_STUDENT_PROJECTS = [
-  {
-    id: 'proj-demo-1',
-    title: 'CampusKart - Student Peer Marketplace',
-    description: 'A full-stack campus exchange platform allowing students to trade books, project hardware, and study materials securely.',
-    images: ['https://images.unsplash.com/photo-1557821552-17105176677c?w=700&auto=format&fit=crop&q=80'],
-    tags: ['React', 'Node.js', 'PostgreSQL', 'TailwindCSS'],
-    likesCount: 42,
-    commentsCount: 9,
-    demoUrl: 'https://campuskart.podarpathways.edu',
-    githubUrl: 'https://github.com/studentdemo/campuskart',
-    createdAt: '2026-10-24T10:00:00Z'
-  },
-  {
-    id: 'proj-demo-2',
-    title: 'CodeSprint - Real-time DSA Practice Hub',
-    description: 'Interactive coding platform with live code compilation, test case verification, and algorithmic complexity analyzer.',
-    images: ['https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=700&auto=format&fit=crop&q=80'],
-    tags: ['JavaScript', 'Python', 'WebSockets', 'Docker'],
-    likesCount: 67,
-    commentsCount: 14,
-    demoUrl: 'https://codesprint.vercel.app',
-    githubUrl: 'https://github.com/studentdemo/codesprint',
-    createdAt: '2026-10-26T14:30:00Z'
-  },
-  {
-    id: 'proj-demo-3',
-    title: 'Smart Campus Navigation & Event Tracker',
-    description: 'Progressive Web App providing indoor campus route guidance, lecture hall timetables, and college club hackathon announcements.',
-    images: ['https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=700&auto=format&fit=crop&q=80'],
-    tags: ['React Native', 'Firebase', 'Maps API', 'PWA'],
-    likesCount: 38,
-    commentsCount: 7,
-    demoUrl: 'https://campusnav.podarpathways.edu',
-    githubUrl: 'https://github.com/studentdemo/campus-navigator',
-    createdAt: '2026-10-28T09:15:00Z'
-  }
-];
+const DEFAULT_STUDENT_PROJECTS = [];
 
 export function ProfileSettings({ student, studentId, courses, state, setState, session, notify, onLogout, navigate, initialTab }) {
   const getTabFromUrl = () => {
@@ -276,13 +239,13 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
-          setUserCertificates(data.filter(c => c.studentId === student?.id || student?.id === 'student-demo'));
+          setUserCertificates(data.filter(c => c.studentId === student?.id));
         } else {
-          setUserCertificates(certsList.filter(c => c.studentId === student?.id || student?.id === 'student-demo'));
+          setUserCertificates(certsList.filter(c => c.studentId === student?.id));
         }
       })
       .catch(() => {
-        setUserCertificates(certsList.filter(c => c.studentId === student?.id || student?.id === 'student-demo'));
+        setUserCertificates(certsList.filter(c => c.studentId === student?.id));
       });
   }, [student?.id]);
 
