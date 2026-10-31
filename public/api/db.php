@@ -76,6 +76,19 @@ class Database {
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
             ]);
             self::$instance->exec('PRAGMA journal_mode = WAL;');
+
+            // Attach separate databases for Certificates and Projects
+            $dir = dirname($foundPath);
+            $certDbFile = defined('SQLITE_CERTIFICATES_FILE') ? SQLITE_CERTIFICATES_FILE : ($dir . '/certificates.db');
+            $projDbFile = defined('SQLITE_PROJECTS_FILE') ? SQLITE_PROJECTS_FILE : ($dir . '/projects.db');
+
+            if (file_exists($certDbFile)) {
+                self::$instance->exec("ATTACH DATABASE " . self::$instance->quote($certDbFile) . " AS cert_db;");
+            }
+            if (file_exists($projDbFile)) {
+                self::$instance->exec("ATTACH DATABASE " . self::$instance->quote($projDbFile) . " AS proj_db;");
+            }
+
             self::$driver = 'sqlite';
             return self::$instance;
         } catch (\Throwable $sqliteErr) {
@@ -94,6 +107,38 @@ class Database {
     public static function getDriver(): string {
         self::getConnection();
         return self::$driver;
+    }
+
+    /**
+     * Get direct PDO connection for certificates database
+     */
+    public static function getCertificatesConnection(): PDO {
+        $certDbFile = defined('SQLITE_CERTIFICATES_FILE') ? SQLITE_CERTIFICATES_FILE : (__DIR__ . '/data/certificates.db');
+        if (self::getDriver() === 'sqlite' && file_exists($certDbFile)) {
+            $pdo = new PDO('sqlite:' . $certDbFile, null, null, [
+                PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+            ]);
+            $pdo->exec('PRAGMA journal_mode = WAL;');
+            return $pdo;
+        }
+        return self::getConnection();
+    }
+
+    /**
+     * Get direct PDO connection for projects database
+     */
+    public static function getProjectsConnection(): PDO {
+        $projDbFile = defined('SQLITE_PROJECTS_FILE') ? SQLITE_PROJECTS_FILE : (__DIR__ . '/data/projects.db');
+        if (self::getDriver() === 'sqlite' && file_exists($projDbFile)) {
+            $pdo = new PDO('sqlite:' . $projDbFile, null, null, [
+                PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+            ]);
+            $pdo->exec('PRAGMA journal_mode = WAL;');
+            return $pdo;
+        }
+        return self::getConnection();
     }
 
     /**

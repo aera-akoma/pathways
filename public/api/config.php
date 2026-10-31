@@ -31,9 +31,11 @@ define('DB_USER', getenv('DB_USER') ?: 'podar_user');
 define('DB_PASS', getenv('DB_PASS') ?: 'Podar@StrongPassword2026!');
 define('DB_CHARSET', 'utf8mb4');
 
-// SQLite database path:
+// SQLite database paths:
 define('SQLITE_FILE', __DIR__ . '/data/podar_pathways.db');
 define('SQLITE_LOCAL', __DIR__ . '/data/podar_pathways.db');
+define('SQLITE_CERTIFICATES_FILE', __DIR__ . '/data/certificates.db');
+define('SQLITE_PROJECTS_FILE', __DIR__ . '/data/projects.db');
 
 // Administrative secret key for phone changes:
 define('ADMIN_KEY', 'PodarAdmin@2026!');
