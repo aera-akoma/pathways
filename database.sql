@@ -91,28 +91,17 @@ CREATE TABLE IF NOT EXISTS `email_otps` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
--- Table structure for: certificates
+-- Table structure for: certificates (Simple Schema)
 -- --------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `certificates` (
   `id` VARCHAR(64) NOT NULL,
-  `programId` VARCHAR(64) DEFAULT NULL,
   `programTitle` VARCHAR(255) NOT NULL,
-  `studentId` VARCHAR(64) NOT NULL,
   `studentName` VARCHAR(150) NOT NULL,
-  `studentPhone` VARCHAR(20) NOT NULL,
-  `credentialId` VARCHAR(100) DEFAULT NULL,
-  `issueDate` VARCHAR(50) DEFAULT NULL,
-  `fileData` MEDIUMTEXT DEFAULT NULL,
-  `fileName` VARCHAR(255) DEFAULT NULL,
-  `status` ENUM('pending', 'verified', 'rejected') DEFAULT 'pending',
-  `adminRemarks` TEXT DEFAULT NULL,
+  `certificateImg` LONGTEXT DEFAULT NULL,
   `verifiedBy` VARCHAR(150) DEFAULT NULL,
-  `verificationCode` VARCHAR(50) DEFAULT NULL,
-  `verifiedAt` DATETIME DEFAULT NULL,
-  `submittedAt` DATETIME NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `idx_certs_student` (`studentId`),
-  KEY `idx_certs_status` (`status`)
+  `status` VARCHAR(50) DEFAULT 'pending',
+  `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------

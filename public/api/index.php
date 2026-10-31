@@ -621,7 +621,21 @@ try {
 
         // Student Certificates
         if ($sub === 'certificates' && $method === 'GET') {
-            $certs = Database::fetchAll("SELECT * FROM certificates WHERE studentId = ? ORDER BY submittedAt DESC", [$studentId]);
+            $student = Database::fetchOne("SELECT name FROM students WHERE id = ?", [$studentId]);
+            $studentName = $student['name'] ?? $studentId;
+            try {
+                $pdo = Database::getCertificatesConnection();
+                $stmt = $pdo->prepare("SELECT id, programTitle, studentName, certificateImg, verifiedBy, status, createdAt FROM certificates WHERE studentName = ? ORDER BY createdAt DESC");
+                $stmt->execute([$studentName]);
+                $certs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            } catch (\Throwable $e) {
+                $certs = [];
+            }
+            $certs = array_map(function($c) {
+                $c['fileData'] = $c['certificateImg'] ?? '';
+                $c['submittedAt'] = $c['createdAt'] ?? date('c');
+                return $c;
+            }, $certs);
             jsonResponse($certs);
         }
 
@@ -714,7 +728,13 @@ try {
 
         $enriched = array_map(function($prog) use ($studentId) {
             $clickCount = (int)(Database::fetchOne("SELECT COUNT(DISTINCT studentId) as c FROM program_clicks WHERE programId = ?", [$prog['id']])['c'] ?? 0);
-            $submissionCount = (int)(Database::fetchOne("SELECT COUNT(*) as c FROM certificates WHERE programId = ?", [$prog['id']])['c'] ?? 0);
+            $submissionCount = 0;
+            try {
+                $pdo = Database::getCertificatesConnection();
+                $cStmt = $pdo->prepare("SELECT COUNT(*) as c FROM certificates WHERE programTitle = ?");
+                $cStmt->execute([$prog['title']]);
+                $submissionCount = (int)($cStmt->fetch(PDO::FETCH_ASSOC)['c'] ?? 0);
+            } catch (\Throwable $e) {}
 
             $studentClicked = false;
             $studentClickedAt = null;
@@ -726,10 +746,19 @@ try {
                     $studentClicked = true;
                     $studentClickedAt = $click['clickedAt'];
                 }
-                $cert = Database::fetchOne("SELECT * FROM certificates WHERE programId = ? AND studentId = ? ORDER BY submittedAt DESC LIMIT 1", [$prog['id'], $studentId]);
-                if ($cert) {
-                    $studentSubmission = $cert;
-                }
+                try {
+                    $st = Database::fetchOne("SELECT name FROM students WHERE id = ?", [$studentId]);
+                    if ($st) {
+                        $pdo = Database::getCertificatesConnection();
+                        $certStmt = $pdo->prepare("SELECT id, programTitle, studentName, certificateImg, verifiedBy, status, createdAt FROM certificates WHERE programTitle = ? AND studentName = ? ORDER BY createdAt DESC LIMIT 1");
+                        $certStmt->execute([$prog['title'], $st['name']]);
+                        $cert = $certStmt->fetch(PDO::FETCH_ASSOC);
+                        if ($cert) {
+                            $cert['fileData'] = $cert['certificateImg'];
+                            $studentSubmission = $cert;
+                        }
+                    }
+                } catch (\Throwable $e) {}
             }
 
             $prog['clickCount'] = $clickCount;
@@ -862,121 +891,140 @@ try {
     }
 
     // ----------------------------------------------------
-    // 6. CERTIFICATES DESK & VERIFICATION
+    // 6. CERTIFICATES DESK & VERIFICATION (Simplified Schema)
+    // Structure: id, programTitle, studentName, certificateImg, verifiedBy, status, createdAt
     // ----------------------------------------------------
     if ($route === '/certificates' && $method === 'GET') {
-        $certs = Database::fetchAll("SELECT * FROM certificates ORDER BY submittedAt DESC");
+        try {
+            $pdo = Database::getCertificatesConnection();
+            $certs = $pdo->query("SELECT id, programTitle, studentName, certificateImg, verifiedBy, status, createdAt FROM certificates ORDER BY createdAt DESC")->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            $certs = Database::fetchAll("SELECT * FROM certificates ORDER BY createdAt DESC");
+        }
+        $certs = array_map(function($c) {
+            $c['fileData'] = $c['certificateImg'] ?? '';
+            $c['submittedAt'] = $c['createdAt'] ?? date('c');
+            return $c;
+        }, $certs);
         jsonResponse($certs);
     }
 
     if ($route === '/certificates' && $method === 'POST') {
-        $id = $body['id'] ?? ('cert-' . time() . '-' . random_int(1000, 9999));
-        $now = nowIso();
+        $id             = $body['id'] ?? ('cert-' . time() . '-' . random_int(1000, 9999));
+        $programTitle   = cleanString($body['programTitle'] ?? 'Course Certificate');
+        $studentName    = cleanString($body['studentName'] ?? 'Student');
+        $certificateImg = $body['certificateImg'] ?? ($body['fileData'] ?? ($body['image'] ?? ''));
+        $status         = cleanString($body['status'] ?? 'pending');
+        $verifiedBy     = ($status === 'verified') ? cleanString($body['verifiedBy'] ?? 'Podar Academic Board') : null;
+        $now            = nowIso();
 
-        Database::execute(
-            "INSERT INTO certificates (id, programId, programTitle, studentId, studentName, studentPhone, credentialId, issueDate, fileData, fileName, status, submittedAt)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)",
-            [
-                $id,
-                $body['programId'] ?? null,
-                cleanString($body['programTitle'] ?? 'Course Certificate'),
-                cleanString($body['studentId'] ?? 'student'),
-                cleanString($body['studentName'] ?? 'Student'),
-                cleanPhone($body['studentPhone'] ?? ''),
-                cleanString($body['credentialId'] ?? ''),
-                cleanString($body['issueDate'] ?? date('Y-m-d')),
-                $body['fileData'] ?? '',
-                cleanString($body['fileName'] ?? 'certificate.jpg'),
-                $now
-            ]
-        );
+        $pdo = Database::getCertificatesConnection();
+        $stmt = $pdo->prepare("
+            INSERT INTO certificates (id, programTitle, studentName, certificateImg, verifiedBy, status, createdAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([$id, $programTitle, $studentName, $certificateImg, $verifiedBy, $status, $now]);
 
-        $inserted = Database::fetchOne("SELECT * FROM certificates WHERE id = ?", [$id]);
+        // Keep podar_pathways in sync if separate DB
+        if (Database::getDriver() === 'mysql' && defined('DB_CERTIFICATES_NAME') && DB_CERTIFICATES_NAME !== DB_NAME) {
+            try {
+                $mainPdo = Database::getConnection();
+                $mainStmt = $mainPdo->prepare("
+                    INSERT INTO certificates (id, programTitle, studentName, certificateImg, verifiedBy, status, createdAt)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE programTitle = VALUES(programTitle), studentName = VALUES(studentName), certificateImg = VALUES(certificateImg), verifiedBy = VALUES(verifiedBy), status = VALUES(status)
+                ");
+                $mainStmt->execute([$id, $programTitle, $studentName, $certificateImg, $verifiedBy, $status, $now]);
+            } catch (\Throwable $e) {}
+        }
+
+        $stmt = $pdo->prepare("SELECT id, programTitle, studentName, certificateImg, verifiedBy, status, createdAt FROM certificates WHERE id = ?");
+        $stmt->execute([$id]);
+        $inserted = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($inserted) {
+            $inserted['fileData'] = $inserted['certificateImg'];
+            $inserted['submittedAt'] = $inserted['createdAt'];
+        }
         jsonResponse($inserted, 201);
     }
 
     if (preg_match('#^/certificates/([^/]+)/verify$#', $route, $matches) && $method === 'PUT') {
-        $certId = $matches[1];
-        $status = cleanString($body['status'] ?? 'verified');
-        $adminRemarks = trim($body['adminRemarks'] ?? '');
+        $certId     = $matches[1];
+        $status     = cleanString($body['status'] ?? 'verified');
         $verifiedBy = cleanString($body['verifiedBy'] ?? 'Podar Academic Board');
-        $verificationCode = cleanString($body['verificationCode'] ?? '');
 
-        if (!in_array($status, ['verified', 'rejected'])) {
-            jsonError('Status must be verified or rejected.');
+        if (!in_array($status, ['verified', 'rejected', 'pending'])) {
+            jsonError('Status must be verified, rejected, or pending.');
         }
 
-        $cert = Database::fetchOne("SELECT * FROM certificates WHERE id = ?", [$certId]);
+        $pdo = Database::getCertificatesConnection();
+        $stmt = $pdo->prepare("SELECT * FROM certificates WHERE id = ?");
+        $stmt->execute([$certId]);
+        $cert = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$cert) jsonError('Certificate record not found.', 404);
 
-        $now = nowIso();
-        $finalCode = $verificationCode ?: ($cert['verificationCode'] ?? ('PODAR-VERIF-' . random_int(100000, 999999)));
+        $vBy = ($status === 'verified') ? ($verifiedBy ?: 'Podar Academic Board') : null;
 
-        Database::execute("
-            UPDATE certificates SET
-                status = ?,
-                adminRemarks = ?,
-                verifiedBy = ?,
-                verificationCode = ?,
-                verifiedAt = ?
-            WHERE id = ?
-        ", [
-            $status,
-            $adminRemarks ?: ($status === 'verified' ? 'Approved & verified by college administrator.' : 'Rejected'),
-            $status === 'verified' ? $verifiedBy : null,
-            $status === 'verified' ? $finalCode : null,
-            $now,
-            $certId
-        ]);
+        $updateStmt = $pdo->prepare("UPDATE certificates SET status = ?, verifiedBy = ? WHERE id = ?");
+        $updateStmt->execute([$status, $vBy, $certId]);
 
-        // When verified: award points to student profile
-        if ($status === 'verified' && ($cert['status'] ?? '') !== 'verified') {
-            $student = Database::fetchOne("SELECT * FROM students WHERE id = ?", [$cert['studentId']]);
-            if ($student) {
-                $newCerts = (int)($student['certificates'] ?? 0) + 1;
-                $newScore = min(100, (int)($student['score'] ?? 40) + 12);
-                $newCompletion = min(100, (int)($student['completion'] ?? 50) + 8);
-                Database::execute("UPDATE students SET certificates = ?, score = ?, completion = ?, updatedAt = ? WHERE id = ?", [$newCerts, $newScore, $newCompletion, $now, $student['id']]);
-            }
-
-            // In-app Notification
-            $notifId = 'notif-' . time() . '-' . random_int(100, 999);
-            Database::execute(
-                "INSERT INTO notifications (id, studentId, title, message, type, programId, isRead, createdAt) VALUES (?, ?, ?, ?, 'verification', ?, 0, ?)",
-                [$notifId, $cert['studentId'], 'Certificate Verified! 🎉', "Your certificate for \"{$cert['programTitle']}\" has been verified (+12 P-CARE score rewarded).", $cert['programId'] ?? null, $now]
-            );
-
-            // Dispatch Approval Celebration Email to Student
-            $student = Database::fetchOne("SELECT * FROM students WHERE id = ? OR phone = ?", [$cert['studentId'], $cert['studentPhone']]);
-            $targetEmail = $student['email'] ?? '';
-            $targetName  = $cert['studentName'] ?: ($student['name'] ?? 'Student');
-            if ($targetEmail) {
-                Mailer::sendCertificateApprovedEmail($targetEmail, $targetName, $cert['programTitle'], $cert['credentialId'] ?? '');
-            }
-        } elseif ($status === 'rejected') {
-            // In-app Notification
-            $notifId = 'notif-' . time() . '-' . random_int(100, 999);
-            Database::execute(
-                "INSERT INTO notifications (id, studentId, title, message, type, programId, isRead, createdAt) VALUES (?, ?, ?, ?, 'verification', ?, 0, ?)",
-                [$notifId, $cert['studentId'], 'Certificate Needs Revision', "Your certificate for \"{$cert['programTitle']}\" was not verified: " . ($adminRemarks ?: 'Please re-upload a clear credential.'), $cert['programId'] ?? null, $now]
-            );
-
-            // Dispatch Denial Email to Student
-            $student = Database::fetchOne("SELECT * FROM students WHERE id = ? OR phone = ?", [$cert['studentId'], $cert['studentPhone']]);
-            $targetEmail = $student['email'] ?? '';
-            $targetName  = $cert['studentName'] ?: ($student['name'] ?? 'Student');
-
-            if ($targetEmail) {
-                Mailer::sendCertificateDeniedEmail($targetEmail, $targetName, $cert['programTitle'], $adminRemarks ?: 'Document could not be verified against course standards. Please re-upload a clear authentic copy.');
-            }
+        // Keep podar_pathways in sync if separate DB
+        if (Database::getDriver() === 'mysql' && defined('DB_CERTIFICATES_NAME') && DB_CERTIFICATES_NAME !== DB_NAME) {
+            try {
+                $mainPdo = Database::getConnection();
+                $mUp = $mainPdo->prepare("UPDATE certificates SET status = ?, verifiedBy = ? WHERE id = ?");
+                $mUp->execute([$status, $vBy, $certId]);
+            } catch (\Throwable $e) {}
         }
 
-        $updated = Database::fetchOne("SELECT * FROM certificates WHERE id = ?", [$certId]);
+        // Award score points and notify student
+        if ($status === 'verified') {
+            try {
+                $student = Database::fetchOne("SELECT * FROM students WHERE LOWER(name) = ?", [strtolower($cert['studentName'])]);
+                if ($student) {
+                    $newCerts = (int)($student['certificates'] ?? 0) + 1;
+                    $newScore = min(100, (int)($student['score'] ?? 40) + 12);
+                    $newCompletion = min(100, (int)($student['completion'] ?? 50) + 8);
+                    Database::execute("UPDATE students SET certificates = ?, score = ?, completion = ?, updatedAt = ? WHERE id = ?", [$newCerts, $newScore, $newCompletion, nowIso(), $student['id']]);
+
+                    if (!empty($student['email'])) {
+                        Mailer::sendCertificateApprovedEmail($student['email'], $student['name'], $cert['programTitle'], $cert['id']);
+                    }
+                }
+            } catch (\Throwable $e) {}
+        } elseif ($status === 'rejected') {
+            try {
+                $student = Database::fetchOne("SELECT * FROM students WHERE LOWER(name) = ?", [strtolower($cert['studentName'])]);
+                if ($student && !empty($student['email'])) {
+                    $remarks = cleanString($body['adminRemarks'] ?? 'Document could not be verified against course standards. Please re-upload a clear authentic copy.');
+                    Mailer::sendCertificateDeniedEmail($student['email'], $student['name'], $cert['programTitle'], $remarks);
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        $stmt = $pdo->prepare("SELECT id, programTitle, studentName, certificateImg, verifiedBy, status, createdAt FROM certificates WHERE id = ?");
+        $stmt->execute([$certId]);
+        $updated = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($updated) {
+            $updated['fileData'] = $updated['certificateImg'];
+            $updated['submittedAt'] = $updated['createdAt'];
+        }
         jsonResponse($updated);
     }
 
     if (preg_match('#^/certificates/([^/]+)$#', $route, $matches) && $method === 'DELETE') {
-        Database::execute("DELETE FROM certificates WHERE id = ?", [$matches[1]]);
+        $certId = $matches[1];
+        $pdo = Database::getCertificatesConnection();
+        $stmt = $pdo->prepare("DELETE FROM certificates WHERE id = ?");
+        $stmt->execute([$certId]);
+
+        if (Database::getDriver() === 'mysql' && defined('DB_CERTIFICATES_NAME') && DB_CERTIFICATES_NAME !== DB_NAME) {
+            try {
+                $mainPdo = Database::getConnection();
+                $mainStmt = $mainPdo->prepare("DELETE FROM certificates WHERE id = ?");
+                $mainStmt->execute([$certId]);
+            } catch (\Throwable $e) {}
+        }
         jsonResponse(['success' => true, 'message' => 'Certificate deleted successfully.']);
     }
 

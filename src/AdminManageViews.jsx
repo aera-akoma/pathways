@@ -2220,8 +2220,8 @@ export function AdminCertificatesView({ state, setState, session, notify, naviga
                     onClick={() => setSelectedCert(cert)}
                     title="Click to inspect full certificate"
                   >
-                    {cert.fileData?.startsWith('data:image') ? (
-                      <img src={cert.fileData} alt={cert.programTitle} className="admin-cert-thumb-img" />
+                    {(cert.certificateImg || cert.fileData) ? (
+                      <img src={cert.certificateImg || cert.fileData} alt={cert.programTitle} className="admin-cert-thumb-img" />
                     ) : (
                       <div className="admin-cert-fallback-thumb">
                         <Award size={28} color="#0d9488" />
@@ -2406,9 +2406,9 @@ export function AdminCertificatesView({ state, setState, session, notify, naviga
             <div className="minimal-modal-body admin-cert-modal-body">
               {/* Document Canvas Area */}
               <div className="admin-cert-modal-canvas">
-                {selectedCert.fileData?.startsWith('data:image') ? (
+                {(selectedCert.certificateImg || selectedCert.fileData) ? (
                   <img
-                    src={selectedCert.fileData}
+                    src={selectedCert.certificateImg || selectedCert.fileData}
                     alt={selectedCert.programTitle}
                     className="admin-cert-modal-img"
                   />

@@ -359,23 +359,13 @@ export function CourseCatalog({
 
     const newCert = {
       id: `cert-${Date.now()}`,
-      programId: uploadForm.courseId || null,
       programTitle: uploadForm.programTitle.trim(),
-      studentId: currentStudentId,
       studentName: currentStudentName,
-      studentDepartment: student?.course ? `${student.course} • Semester ${student.semester || 'V'}` : 'BCA • Semester V',
-      course: student?.course || 'BCA',
-      studentEmail: student?.email || session?.email || '',
-      studentPhone: student?.phone || session?.phone || '',
-      credentialId: uploadForm.credentialId.trim() || `CRED-${Math.floor(100000 + Math.random() * 900000)}`,
-      issueDate: uploadForm.issueDate || new Date().toISOString().split('T')[0],
+      certificateImg: uploadForm.fileData,
       fileData: uploadForm.fileData,
-      fileName: uploadForm.fileName || 'certificate.jpg',
       status: initialStatus,
-      verificationCode: initialStatus === 'verified' ? verificationCode : null,
       verifiedBy: initialStatus === 'verified' ? 'Podar Academic Board' : null,
-      verifiedAt: initialStatus === 'verified' ? new Date().toISOString() : null,
-      submittedAt: new Date().toISOString()
+      createdAt: new Date().toISOString()
     };
 
     try {
@@ -1106,9 +1096,9 @@ export function CourseCatalog({
                 }}
               >
                 <div className="gphotos-image-wrapper" style={{ position: 'relative', aspectRatio: '16/10', background: '#0f172a' }}>
-                  {cert.fileData?.startsWith('data:image') ? (
+                  {(cert.certificateImg || cert.fileData) ? (
                     <img
-                      src={cert.fileData}
+                      src={cert.certificateImg || cert.fileData}
                       alt={`${cert.studentName} - ${cert.programTitle}`}
                       className="gphotos-img"
                       loading="lazy"
@@ -1301,9 +1291,9 @@ export function CourseCatalog({
 
           {/* Photo Canvas Container */}
           <div className="gphotos-canvas-area">
-            {activeLightboxCert.fileData?.startsWith('data:image') ? (
+            {(activeLightboxCert.certificateImg || activeLightboxCert.fileData) ? (
               <img
-                src={activeLightboxCert.fileData}
+                src={activeLightboxCert.certificateImg || activeLightboxCert.fileData}
                 alt={`${activeLightboxCert.studentName} Certificate`}
                 className="gphotos-full-img"
               />

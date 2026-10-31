@@ -113,6 +113,31 @@ class Database {
      * Get direct PDO connection for certificates database
      */
     public static function getCertificatesConnection(): PDO {
+        if (self::getDriver() === 'mysql' && defined('DB_CERTIFICATES_NAME') && DB_CERTIFICATES_NAME) {
+            static $certPdo = null;
+            if ($certPdo === null) {
+                try {
+                    $dsn = sprintf(
+                        'mysql:host=%s;port=%s;dbname=%s;charset=%s',
+                        DB_HOST,
+                        DB_PORT,
+                        DB_CERTIFICATES_NAME,
+                        DB_CHARSET
+                    );
+                    $options = [
+                        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+                        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                        PDO::ATTR_EMULATE_PREPARES   => false,
+                    ];
+                    $certPdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+                } catch (\Throwable $e) {
+                    error_log('[DB NOTICE] Failed to connect directly to DB_CERTIFICATES_NAME: ' . $e->getMessage());
+                    return self::getConnection();
+                }
+            }
+            return $certPdo;
+        }
+
         $certDbFile = defined('SQLITE_CERTIFICATES_FILE') ? SQLITE_CERTIFICATES_FILE : (__DIR__ . '/data/certificates.db');
         if (self::getDriver() === 'sqlite' && file_exists($certDbFile)) {
             $pdo = new PDO('sqlite:' . $certDbFile, null, null, [
