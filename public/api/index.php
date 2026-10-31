@@ -215,6 +215,11 @@ try {
         $updated = Database::fetchOne("SELECT * FROM students WHERE id = ?", [$student['id']]);
         unset($updated['passwordHash'], $updated['salt']);
 
+        // Dispatch Welcome Onboarding Email
+        if (!empty($updated['email'])) {
+            Mailer::sendWelcomeEmail($updated['email'], $updated['name'], $updated['course'] ?? '', $updated['semester'] ?? '');
+        }
+
         $token = 'podar-token-' . bin2hex(random_bytes(24));
         $sessionObj = [
             'token'   => $token,
@@ -936,6 +941,14 @@ try {
                 "INSERT INTO notifications (id, studentId, title, message, type, programId, isRead, createdAt) VALUES (?, ?, ?, ?, 'verification', ?, 0, ?)",
                 [$notifId, $cert['studentId'], 'Certificate Verified! 🎉', "Your certificate for \"{$cert['programTitle']}\" has been verified (+12 P-CARE score rewarded).", $cert['programId'] ?? null, $now]
             );
+
+            // Dispatch Approval Celebration Email to Student
+            $student = Database::fetchOne("SELECT * FROM students WHERE id = ? OR phone = ?", [$cert['studentId'], $cert['studentPhone']]);
+            $targetEmail = $student['email'] ?? '';
+            $targetName  = $cert['studentName'] ?: ($student['name'] ?? 'Student');
+            if ($targetEmail) {
+                Mailer::sendCertificateApprovedEmail($targetEmail, $targetName, $cert['programTitle'], $cert['credentialId'] ?? '');
+            }
         } elseif ($status === 'rejected') {
             // In-app Notification
             $notifId = 'notif-' . time() . '-' . random_int(100, 999);
