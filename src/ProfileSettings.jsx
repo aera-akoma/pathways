@@ -154,7 +154,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
     github: student?.github || '',
     portfolioUrl: student?.portfolioUrl || '',
     dob: student?.dob || '',
-    avatar: student?.avatar || DEFAULT_STUDENT_AVATAR,
+    avatar: (student?.avatar && !student.avatar.startsWith('data:image/jpeg;base64')) ? student.avatar : DEFAULT_STUDENT_AVATAR,
     course: student?.course || 'BCA',
     semester: student?.semester || 'V',
     goal: student?.goal || 'Aspiring Software Engineer',
@@ -180,7 +180,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
         github: student.github || prev.github,
         portfolioUrl: student.portfolioUrl || prev.portfolioUrl,
         dob: student.dob || prev.dob,
-        avatar: student.avatar || prev.avatar || DEFAULT_STUDENT_AVATAR,
+        avatar: (student.avatar && !student.avatar.startsWith('data:image/jpeg;base64')) ? student.avatar : ((prev.avatar && !prev.avatar.startsWith('data:image/jpeg;base64')) ? prev.avatar : DEFAULT_STUDENT_AVATAR),
         course: student.course || prev.course,
         semester: student.semester || prev.semester,
         goal: student.goal || prev.goal,
@@ -580,7 +580,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
     if (student && !map.has(student.id)) map.set(student.id, student);
     return Array.from(map.values()).map(s => ({
       ...s,
-      avatar: s.avatar || DEFAULT_STUDENT_AVATAR,
+      avatar: (s.avatar && !s.avatar.startsWith('data:image/jpeg;base64')) ? s.avatar : DEFAULT_STUDENT_AVATAR,
       userType: 'student'
     }));
   }, [state?.students, fetchedStudents, student]);
@@ -780,7 +780,9 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
   const studentCompletion = Number.isFinite(Number(student?.completion)) ? Number(student.completion) : 0;
 
   const displayName = isOwnProfile ? studentName : (activeProfileUser.name || 'User Profile');
-  const displayAvatar = isOwnProfile ? (formData.avatar || DEFAULT_STUDENT_AVATAR) : (activeProfileUser.avatar || (isViewingAdmin ? DEFAULT_ADMIN_AVATAR : DEFAULT_STUDENT_AVATAR));
+  const cleanFormAvatar = (formData.avatar && !formData.avatar.startsWith('data:image/jpeg;base64')) ? formData.avatar : DEFAULT_STUDENT_AVATAR;
+  const cleanActiveAvatar = (activeProfileUser.avatar && !activeProfileUser.avatar.startsWith('data:image/jpeg;base64')) ? activeProfileUser.avatar : (isViewingAdmin ? DEFAULT_ADMIN_AVATAR : DEFAULT_STUDENT_AVATAR);
+  const displayAvatar = isOwnProfile ? cleanFormAvatar : cleanActiveAvatar;
   const displayDeptOrCourse = isOwnProfile ? (formData.course || 'BCA') : (isViewingAdmin ? (activeProfileUser.department || 'Administration') : (activeProfileUser.course || 'BCA'));
   const displaySemOrRole = isOwnProfile ? studentSem : (isViewingAdmin ? (activeProfileUser.role || 'Super Admin') : (activeProfileUser.semester ? `Semester ${activeProfileUser.semester}` : 'Semester V'));
   const displayGoal = isOwnProfile ? formData.goal : (isViewingAdmin ? activeProfileUser.role : (activeProfileUser.goal || 'Aspiring Professional'));
