@@ -1,0 +1,10 @@
+# Podar Pathways - Search Engine Discovery & Robots Policy
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin/
+Disallow: /api/
+Disallow: /profile
+
+# Sitemap Location
+Sitemap: https://podarpathways.com/sitemap.xml
