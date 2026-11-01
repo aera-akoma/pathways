@@ -353,25 +353,6 @@ export function CourseCatalog({
     }
   };
 
-  // Demo certificate generator
-  const handleGenerateSampleCertificate = () => {
-    const generated = generateCertificateSVG({
-      studentName: currentStudentName,
-      programTitle: uploadForm.programTitle || 'Professional Certification',
-      credentialId: uploadForm.credentialId || `PODAR-${Date.now().toString().slice(-6)}`,
-      issueDate: uploadForm.issueDate || new Date().toISOString().split('T')[0],
-      verificationCode: `PODAR-VERIF-${Math.floor(100000 + Math.random() * 900000)}`
-    });
-
-    setUploadForm(prev => ({
-      ...prev,
-      fileData: generated,
-      fileName: `${(uploadForm.programTitle || 'certificate').toLowerCase().replace(/\s+/g, '-')}-verified.svg`,
-      credentialId: prev.credentialId || `PODAR-${Date.now().toString().slice(-6)}`
-    }));
-    notify?.('Certificate generated! Ready to submit.');
-  };
-
   // Submit certificate
   const handleSubmitCertificate = async (e) => {
     e.preventDefault();
@@ -380,13 +361,13 @@ export function CourseCatalog({
       return;
     }
     if (!uploadForm.fileData) {
-      notify?.('Please upload an image file or generate a certificate.');
+      notify?.('Please upload your certificate image file.');
       return;
     }
 
     setUploading(true);
 
-    // If admin is uploading, auto-verify; if student, pending (with option to demo-approve)
+    // If admin is uploading, auto-verify; if student, pending admin review
     const initialStatus = isAdmin ? 'verified' : 'pending';
     const verificationCode = `PODAR-VERIF-${Math.floor(100000 + Math.random() * 900000)}`;
 
@@ -427,7 +408,7 @@ export function CourseCatalog({
     setUploading(false);
   };
 
-  // Demo verify certificate (so users can test approving a certificate into the gallery)
+  // Admin verify certificate into the verified gallery
   const handleApprovePendingCert = (cert) => {
     const verifiedCode = `PODAR-VERIF-${Math.floor(100000 + Math.random() * 900000)}`;
     const verifiedCert = {

@@ -84,7 +84,7 @@ const CAREER_TRACKS = {
         number: '04',
         title: 'Full-Stack Portfolio Capstone & Production Deployment',
         duration: 'Weeks 17–20',
-        summary: 'Synthesize your skills into an end-to-end production web application with live demo, documentation, and automated tests.',
+        summary: 'Synthesize your skills into an end-to-end production web application with live deployment, documentation, and automated tests.',
         skills: ['Full-Stack MERN', 'Docker', 'CI/CD Pipelines', 'Cloud Deployment', 'Testing'],
         checklist: [
           'Build a feature-complete web application solving a real campus or industry problem',
@@ -200,7 +200,7 @@ const CAREER_TRACKS = {
         skills: ['FastAPI', 'Streamlit', 'Docker', 'Model Serving', 'Portfolio Presentation'],
         checklist: [
           'Containerize a trained model with Docker and serve predictions via FastAPI',
-          'Build an interactive dashboard on Streamlit for live demonstrations',
+          'Build an interactive dashboard on Streamlit for live interactive showcase',
           'Complete a capstone data science presentation highlighting business impact',
           'Apply for Data Science & Machine Learning internships'
         ],
@@ -255,19 +255,19 @@ const CAREER_TRACKS = {
       {
         id: 'mob-3',
         number: '03',
-        title: 'API Integration & Offline-First Storage',
+        title: 'API Integration & Cloud Database Architecture',
         duration: 'Weeks 9–14',
-        summary: 'Connect your mobile app to backend cloud services, local caching databases, and authentication.',
-        skills: ['REST APIs', 'SQLite / Hive', 'Offline Caching', 'OAuth2 / JWT'],
+        summary: 'Connect your mobile app to backend cloud services, relational databases, and authentication.',
+        skills: ['REST APIs', 'MySQL / Cloud DB', 'State Management', 'OAuth2 / JWT'],
         checklist: [
           'Fetch and synchronize network data with retry logic and error toasts',
-          'Implement offline-first persistent storage using SQLite or Hive',
+          'Implement secure persistent storage using MySQL or cloud databases',
           'Manage user authentication tokens with secure encrypted keystore',
           'Optimize app startup time and image memory caching'
         ],
         actionType: 'courses',
         actionLabel: 'Explore Cloud & API Courses',
-        aiPrompt: 'Explain how to design an offline-first mobile app that syncs data when reconnected.'
+        aiPrompt: 'Explain how to design scalable cloud backend integration using REST APIs and MySQL.'
       },
       {
         id: 'mob-4',
@@ -283,7 +283,7 @@ const CAREER_TRACKS = {
           'Package release APK / AAB bundles with signed keystores'
         ],
         actionType: 'projects',
-        actionLabel: 'Share App Demo on Projects Feed',
+        actionLabel: 'Share App on Projects Feed',
         aiPrompt: 'How do I handle runtime permissions cleanly on Android and iOS?'
       },
       {
@@ -295,7 +295,7 @@ const CAREER_TRACKS = {
         skills: ['Google Play Console', 'App Signing', 'Performance Profiling', 'Interviews'],
         checklist: [
           'Publish at least one working application to Google Play or GitHub releases',
-          'Record a clean video demonstration demonstrating key user flows',
+          'Record a clean video walkthrough showcasing key user flows',
           'Prepare answers for mobile architecture and lifecycle interview questions',
           'Apply to matched mobile developer internship opportunities'
         ],

@@ -1523,7 +1523,7 @@ function ProjectCard({
                 title="Open Live Website / Prototype"
               >
                 <ExternalLink size={13} />
-                <span>Live Demo</span>
+                <span>Live Project</span>
               </a>
             )}
             {post.githubUrl && (
@@ -1547,7 +1547,7 @@ function ProjectCard({
                 title="Watch Video Presentation"
               >
                 <YoutubeIcon size={13} />
-                <span>Video Demo</span>
+                <span>Video Walkthrough</span>
               </a>
             )}
           </div>
@@ -2131,7 +2131,7 @@ function ProjectComposerModal({
               <div className="soc-form-field">
                 <label>
                   <Globe size={13} />
-                  <span>Live Demo / App Website (Optional)</span>
+                  <span>Live Project Website (Optional)</span>
                 </label>
                 <input
                   type="text"
@@ -2903,7 +2903,7 @@ export function AdminProjectsManagementView({ state, setState, session, notify, 
                               rel="noreferrer"
                               style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11.5px', fontWeight: 600, color: '#0284c7', textDecoration: 'none', background: '#f0f9ff', padding: '3px 8px', borderRadius: '4px', border: '1px solid #bae6fd' }}
                             >
-                              <ExternalLink size={11} /> Live Demo ↗
+                              <ExternalLink size={11} /> Live Project ↗
                             </a>
                           )}
                           {post.githubUrl && (
@@ -3149,7 +3149,7 @@ export function AdminProjectsManagementView({ state, setState, session, notify, 
                       className="minimal-btn-secondary"
                       style={{ fontSize: '12px', padding: '5px 10px', textDecoration: 'none' }}
                     >
-                      <ExternalLink size={12} /> Live Demo ↗
+                      <ExternalLink size={12} /> Live Project ↗
                     </a>
                   )}
                   {inspectingProject.githubUrl && (

@@ -1993,7 +1993,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
                       style={{ textDecoration: 'none' }}
                     >
                       <Globe size={14} />
-                      <span>Live Demo</span>
+                      <span>Live Project</span>
                     </a>
                   )}
 
