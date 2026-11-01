@@ -1,7 +1,13 @@
 -- ========================================================
--- Podar Pathways - MySQL Database Schema
--- Target: cPanel Ultimate Hosting (MySQL / MariaDB)
+-- PODAR PATHWAYS - MySQL DATABASE IMPORT SCRIPT (phpMyAdmin)
+-- Target: cPanel Ultimate Hosting / XAMPP / phpMyAdmin
 -- Character Set: utf8mb4 / Engine: InnoDB
+-- ========================================================
+-- INSTRUCTIONS FOR phpMyAdmin:
+-- 1. In cPanel or phpMyAdmin, create your database (e.g. mpoda209_pathways or podar_pathways)
+-- 2. Click your database in the left sidebar of phpMyAdmin so it is selected
+-- 3. Click the "Import" tab at the top
+-- 4. Choose this file ("database.sql") and click "Import" (or "Go")
 -- ========================================================
 
 SET NAMES utf8mb4;

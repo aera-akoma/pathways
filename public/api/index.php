@@ -709,7 +709,14 @@ try {
 
         // DELETE Student
         if (!$sub && $method === 'DELETE') {
-            Database::execute("DELETE FROM certificates WHERE studentId = ?", [$studentId]);
+            $st = Database::fetchOne("SELECT name FROM students WHERE id = ?", [$studentId]);
+            if ($st && !empty($st['name'])) {
+                try {
+                    $certPdo = Database::getCertificatesConnection();
+                    $certStmt = $certPdo->prepare("DELETE FROM certificates WHERE studentName = ?");
+                    $certStmt->execute([$st['name']]);
+                } catch (\Throwable $e) {}
+            }
             Database::execute("DELETE FROM notifications WHERE studentId = ?", [$studentId]);
             Database::execute("DELETE FROM test_submissions WHERE studentId = ?", [$studentId]);
             Database::execute("DELETE FROM attendance WHERE studentId = ?", [$studentId]);
