@@ -154,7 +154,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
     github: student?.github || '',
     portfolioUrl: student?.portfolioUrl || '',
     dob: student?.dob || '',
-    avatar: (student?.avatar && !student.avatar.startsWith('data:image/jpeg;base64')) ? student.avatar : DEFAULT_STUDENT_AVATAR,
+    avatar: (student?.avatar && typeof student.avatar === 'string' && !student.avatar.startsWith('data:image/jpeg;base64')) ? student.avatar : DEFAULT_STUDENT_AVATAR,
     course: student?.course || 'BCA',
     semester: student?.semester || 'V',
     goal: student?.goal || 'Aspiring Software Engineer',
@@ -180,7 +180,9 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
         github: student.github || prev.github,
         portfolioUrl: student.portfolioUrl || prev.portfolioUrl,
         dob: student.dob || prev.dob,
-        avatar: (student.avatar && !student.avatar.startsWith('data:image/jpeg;base64')) ? student.avatar : ((prev.avatar && !prev.avatar.startsWith('data:image/jpeg;base64')) ? prev.avatar : DEFAULT_STUDENT_AVATAR),
+        avatar: (student?.avatar && typeof student.avatar === 'string' && !student.avatar.startsWith('data:image/jpeg;base64'))
+          ? student.avatar
+          : ((prev?.avatar && typeof prev.avatar === 'string' && !prev.avatar.startsWith('data:image/jpeg;base64')) ? prev.avatar : DEFAULT_STUDENT_AVATAR),
         course: student.course || prev.course,
         semester: student.semester || prev.semester,
         goal: student.goal || prev.goal,
@@ -580,7 +582,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
     if (student && !map.has(student.id)) map.set(student.id, student);
     return Array.from(map.values()).map(s => ({
       ...s,
-      avatar: (s.avatar && !s.avatar.startsWith('data:image/jpeg;base64')) ? s.avatar : DEFAULT_STUDENT_AVATAR,
+      avatar: (s?.avatar && typeof s.avatar === 'string' && !s.avatar.startsWith('data:image/jpeg;base64')) ? s.avatar : DEFAULT_STUDENT_AVATAR,
       userType: 'student'
     }));
   }, [state?.students, fetchedStudents, student]);
@@ -774,24 +776,24 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
     setShowShareModal(true);
   };
 
-  const studentName = formData.name || student?.name || 'Student';
-  const studentSem = formData.semester ? (String(formData.semester).toLowerCase().startsWith('sem') ? formData.semester : `Semester ${formData.semester}`) : 'Semester V';
+  const studentName = formData?.name || student?.name || 'Student';
+  const studentSem = formData?.semester ? (String(formData.semester).toLowerCase().startsWith('sem') ? formData.semester : `Semester ${formData.semester}`) : 'Semester V';
   const studentScore = Number.isFinite(Number(student?.score)) ? Number(student.score) : 0;
   const studentCompletion = Number.isFinite(Number(student?.completion)) ? Number(student.completion) : 0;
 
-  const displayName = isOwnProfile ? studentName : (activeProfileUser.name || 'User Profile');
-  const cleanFormAvatar = (formData.avatar && !formData.avatar.startsWith('data:image/jpeg;base64')) ? formData.avatar : DEFAULT_STUDENT_AVATAR;
-  const cleanActiveAvatar = (activeProfileUser.avatar && !activeProfileUser.avatar.startsWith('data:image/jpeg;base64')) ? activeProfileUser.avatar : (isViewingAdmin ? DEFAULT_ADMIN_AVATAR : DEFAULT_STUDENT_AVATAR);
-  const displayAvatar = isOwnProfile ? cleanFormAvatar : cleanActiveAvatar;
-  const displayDeptOrCourse = isOwnProfile ? (formData.course || 'BCA') : (isViewingAdmin ? (activeProfileUser.department || 'Administration') : (activeProfileUser.course || 'BCA'));
-  const displaySemOrRole = isOwnProfile ? studentSem : (isViewingAdmin ? (activeProfileUser.role || 'Super Admin') : (activeProfileUser.semester ? `Semester ${activeProfileUser.semester}` : 'Semester V'));
-  const displayGoal = isOwnProfile ? formData.goal : (isViewingAdmin ? activeProfileUser.role : (activeProfileUser.goal || 'Aspiring Professional'));
-  const displayBio = isOwnProfile ? formData.bio : (activeProfileUser.bio || (isViewingAdmin ? 'Directing career guidance, industry placements, examinations, and technical incubation for Podar institutions.' : 'Building modern projects and advancing skills at Podar Pathways.'));
-  const displayScore = isOwnProfile ? studentScore : (Number.isFinite(Number(activeProfileUser.score)) ? Number(activeProfileUser.score) : 0);
-  const displayCompletion = isOwnProfile ? studentCompletion : (Number.isFinite(Number(activeProfileUser.completion)) ? Number(activeProfileUser.completion) : 0);
-  const displayPortfolio = isOwnProfile ? formData.portfolioUrl : activeProfileUser.portfolioUrl;
-  const displayGithub = isOwnProfile ? formData.github : activeProfileUser.github;
-  const displayLinkedin = isOwnProfile ? formData.linkedin : activeProfileUser.linkedin;
+  const displayName = isOwnProfile ? studentName : (activeProfileUser?.name || 'User Profile');
+  const cleanFormAvatar = (formData?.avatar && typeof formData.avatar === 'string' && !formData.avatar.startsWith('data:image/jpeg;base64')) ? formData.avatar : DEFAULT_STUDENT_AVATAR;
+  const cleanActiveAvatar = (activeProfileUser?.avatar && typeof activeProfileUser?.avatar === 'string' && !activeProfileUser?.avatar.startsWith('data:image/jpeg;base64')) ? activeProfileUser.avatar : (isViewingAdmin ? DEFAULT_ADMIN_AVATAR : DEFAULT_STUDENT_AVATAR);
+  const displayAvatar = isOwnProfile ? cleanFormAvatar : (cleanActiveAvatar || (isViewingAdmin ? DEFAULT_ADMIN_AVATAR : DEFAULT_STUDENT_AVATAR));
+  const displayDeptOrCourse = isOwnProfile ? (formData?.course || 'BCA') : (isViewingAdmin ? (activeProfileUser?.department || 'Administration') : (activeProfileUser?.course || 'BCA'));
+  const displaySemOrRole = isOwnProfile ? studentSem : (isViewingAdmin ? (activeProfileUser?.role || 'Super Admin') : (activeProfileUser?.semester ? `Semester ${activeProfileUser?.semester}` : 'Semester V'));
+  const displayGoal = isOwnProfile ? (formData?.goal || 'Aspiring Professional') : (isViewingAdmin ? (activeProfileUser?.role || 'Super Admin') : (activeProfileUser?.goal || 'Aspiring Professional'));
+  const displayBio = isOwnProfile ? (formData?.bio || 'Building modern projects and advancing skills at Podar Pathways.') : (activeProfileUser?.bio || (isViewingAdmin ? 'Directing career guidance, industry placements, examinations, and technical incubation for Podar institutions.' : 'Building modern projects and advancing skills at Podar Pathways.'));
+  const displayScore = isOwnProfile ? studentScore : (Number.isFinite(Number(activeProfileUser?.score)) ? Number(activeProfileUser?.score) : 0);
+  const displayCompletion = isOwnProfile ? studentCompletion : (Number.isFinite(Number(activeProfileUser?.completion)) ? Number(activeProfileUser?.completion) : 0);
+  const displayPortfolio = isOwnProfile ? formData?.portfolioUrl : activeProfileUser?.portfolioUrl;
+  const displayGithub = isOwnProfile ? formData?.github : activeProfileUser?.github;
+  const displayLinkedin = isOwnProfile ? formData?.linkedin : activeProfileUser?.linkedin;
 
   return (
     <div className="insta-profile-wrapper">
@@ -878,11 +880,11 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
           {isViewingAdmin ? (
             <div className="insta-stats-row admin-stats">
               <div className="insta-stat-item static">
-                <strong>{activeProfileUser.department || 'Administration'}</strong>
+                <strong>{activeProfileUser?.department || 'Administration'}</strong>
                 <span>department</span>
               </div>
               <div className="insta-stat-item static">
-                <strong>{activeProfileUser.role || 'Super Admin'}</strong>
+                <strong>{activeProfileUser?.role || 'Super Admin'}</strong>
                 <span>role</span>
               </div>
               <div className="insta-stat-item static">
@@ -1007,23 +1009,23 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
                 </a>
               )}
 
-              {isViewingAdmin && activeProfileUser.email && (
+              {isViewingAdmin && activeProfileUser?.email && (
                 <a
-                  href={`mailto:${activeProfileUser.email}`}
+                  href={`mailto:${activeProfileUser?.email}`}
                   className="insta-bio-link"
                 >
                   <Mail size={13} />
-                  <span>{activeProfileUser.email}</span>
+                  <span>{activeProfileUser?.email}</span>
                 </a>
               )}
 
-              {isViewingAdmin && activeProfileUser.phone && (
+              {isViewingAdmin && activeProfileUser?.phone && (
                 <a
-                  href={`tel:${activeProfileUser.phone}`}
+                  href={`tel:${activeProfileUser?.phone}`}
                   className="insta-bio-link"
                 >
                   <Phone size={13} />
-                  <span>{activeProfileUser.phone}</span>
+                  <span>{activeProfileUser?.phone}</span>
                 </a>
               )}
             </div>
@@ -1062,7 +1064,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
               ) : isViewingAdmin ? (
                 <>
                   <a
-                    href={`mailto:${activeProfileUser.email || 'admin@podar.edu'}?subject=Inquiry%20from%20Student`}
+                    href={`mailto:${activeProfileUser?.email || 'admin@podar.edu'}?subject=Inquiry%20from%20Student`}
                     className="insta-btn-primary"
                     style={{ textDecoration: 'none' }}
                   >
@@ -1070,9 +1072,9 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
                     <span>Email Office</span>
                   </a>
 
-                  {activeProfileUser.phone && (
+                  {activeProfileUser?.phone && (
                     <a
-                      href={`tel:${activeProfileUser.phone}`}
+                      href={`tel:${activeProfileUser?.phone}`}
                       className="insta-btn-secondary"
                       style={{ textDecoration: 'none' }}
                     >
@@ -1093,7 +1095,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
               ) : (
                 <>
                   <a
-                    href={`mailto:${activeProfileUser.email || ''}?subject=Connecting%20via%20Podar%20Pathways`}
+                    href={`mailto:${activeProfileUser?.email || ''}?subject=Connecting%20via%20Podar%20Pathways`}
                     className="insta-btn-primary"
                     style={{ textDecoration: 'none' }}
                   >
@@ -1448,19 +1450,19 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
             <div className="admin-office-grid">
               <div className="admin-office-item">
                 <span className="admin-office-label"><Briefcase size={14} /> Department / Cell</span>
-                <strong>{activeProfileUser.department || 'Career & Placement Cell'}</strong>
+                <strong>{activeProfileUser?.department || 'Career & Placement Cell'}</strong>
               </div>
               <div className="admin-office-item">
                 <span className="admin-office-label"><Shield size={14} /> Official Role</span>
-                <strong>{activeProfileUser.role || 'Super Admin'}</strong>
+                <strong>{activeProfileUser?.role || 'Super Admin'}</strong>
               </div>
               <div className="admin-office-item">
                 <span className="admin-office-label"><Mail size={14} /> Official Email</span>
-                <a href={`mailto:${activeProfileUser.email}`}>{activeProfileUser.email || 'admin@podar.edu'}</a>
+                <a href={`mailto:${activeProfileUser?.email || 'admin@podar.edu'}`}>{activeProfileUser?.email || 'admin@podar.edu'}</a>
               </div>
               <div className="admin-office-item">
                 <span className="admin-office-label"><Phone size={14} /> Direct Helpline / Phone</span>
-                <a href={`tel:${activeProfileUser.phone}`}>{activeProfileUser.phone || '9999988888'}</a>
+                <a href={`tel:${activeProfileUser?.phone || '9999988888'}`}>{activeProfileUser?.phone || '9999988888'}</a>
               </div>
             </div>
 

@@ -3351,7 +3351,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div className="avatar small" style={{ width: '34px', height: '34px', flexShrink: 0 }}>
-                          {st.avatar && !st.avatar.startsWith('data:image/jpeg;base64') ? (
+                          {st?.avatar && typeof st.avatar === 'string' && !st.avatar.startsWith('data:image/jpeg;base64') ? (
                             <img src={st.avatar} alt={st.name} className="avatar-img" onError={e => { e.currentTarget.style.display = 'none'; }} />
                           ) : (
                             <img src={DEFAULT_STUDENT_AVATAR} alt={st.name} className="avatar-img" />

@@ -192,7 +192,7 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
           role: 'student',
           id: newStudent.id,
           token: `session-${newStudent.id}-${Date.now()}`,
-          avatar: (newStudent.avatar && !newStudent.avatar.startsWith('data:image/jpeg;base64')) ? newStudent.avatar : DEFAULT_STUDENT_AVATAR,
+          avatar: (newStudent?.avatar && typeof newStudent.avatar === 'string' && !newStudent.avatar.startsWith('data:image/jpeg;base64')) ? newStudent.avatar : DEFAULT_STUDENT_AVATAR,
           student: newStudent
         }
       };
@@ -215,7 +215,7 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
           role: 'student',
           id: match.id,
           token: `session-${match.id}-${Date.now()}`,
-          avatar: (match.avatar && !match.avatar.startsWith('data:image/jpeg;base64')) ? match.avatar : DEFAULT_STUDENT_AVATAR,
+          avatar: (match?.avatar && typeof match.avatar === 'string' && !match.avatar.startsWith('data:image/jpeg;base64')) ? match.avatar : DEFAULT_STUDENT_AVATAR,
           student: match
         }
       };
@@ -237,7 +237,7 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
           role: 'student',
           id: match.id,
           token: `session-${match.id}-${Date.now()}`,
-          avatar: (match.avatar && !match.avatar.startsWith('data:image/jpeg;base64')) ? match.avatar : DEFAULT_STUDENT_AVATAR,
+          avatar: (match?.avatar && typeof match.avatar === 'string' && !match.avatar.startsWith('data:image/jpeg;base64')) ? match.avatar : DEFAULT_STUDENT_AVATAR,
           student: match
         }
       };
