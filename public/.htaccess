@@ -1,7 +1,22 @@
 # Podar Pathways - Production SPA .htaccess
+
+# Block direct browser access to sensitive files (.env, .sql, .log, etc.)
+<FilesMatch "^\.|\.(env|sql|log|ini|sh|bak)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
+
+  # Forbid direct HTTP access to .env and database files
+  RewriteRule ^(\.env|database\.sql|.*\.log) - [F,L]
 
   # Allow direct access to existing files and directories (assets, images, etc.)
   RewriteCond %{REQUEST_FILENAME} -f [OR]

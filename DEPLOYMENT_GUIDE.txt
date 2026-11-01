@@ -7,6 +7,9 @@ PODAR PATHWAYS - phpMyAdmin & MySQL PRODUCTION DEPLOYMENT GUIDE
    - Navigate to 'public_html' (or your target domain web root).
    - Upload 'podar-pathways-production.zip' (or 'public.zip').
    - Extract the zip file directly in 'public_html'.
+   - IMPORTANT (Dotfiles / Hidden Files): By default, cPanel hides files starting with a dot (.env, .htaccess).
+     If you don't see '.env' or '.htaccess', click "Settings" in the top-right corner of cPanel File Manager,
+     check "Show Hidden Files (dotfiles)", and click "Save".
    - Ensure 'index.html', '.htaccess', '.env', 'api/', and 'assets/' are in the web root.
 
 2. IMPORT THE DATABASE IN phpMyAdmin:
@@ -44,3 +47,4 @@ PODAR PATHWAYS - phpMyAdmin & MySQL PRODUCTION DEPLOYMENT GUIDE
    - Strictly uses MySQL / phpMyAdmin. No SQLite files or fallbacks are included.
    - Zero demo entries, zero sample students. Ready for real production deployment.
 =============================================================================
+

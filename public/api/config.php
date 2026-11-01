@@ -10,13 +10,35 @@ if (!defined('PODAR_APP')) {
 }
 
 // ----------------------------------------------------
-// AUTOMATIC .ENV CONFIGURATION LOADER
+// AUTOMATIC .ENV CONFIGURATION LOADER & HELPER
 // ----------------------------------------------------
+if (!function_exists('getEnvVar')) {
+    function getEnvVar(string $key, ?string $default = null): ?string {
+        if (isset($_ENV[$key]) && $_ENV[$key] !== '') {
+            return (string)$_ENV[$key];
+        }
+        if (isset($_SERVER[$key]) && $_SERVER[$key] !== '') {
+            return (string)$_SERVER[$key];
+        }
+        $val = @getenv($key);
+        if ($val !== false && $val !== '') {
+            return (string)$val;
+        }
+        if (array_key_exists($key, $_ENV)) {
+            return (string)$_ENV[$key];
+        }
+        if (array_key_exists($key, $_SERVER)) {
+            return (string)$_SERVER[$key];
+        }
+        return $default;
+    }
+}
+
 (function() {
     $candidates = [
-        dirname(__DIR__, 2) . '/.env',
-        dirname(__DIR__) . '/.env',
-        __DIR__ . '/.env'
+        dirname(__DIR__, 2) . '/.env', // 1 level above public_html (secure cPanel home)
+        dirname(__DIR__) . '/.env',    // public_html root
+        __DIR__ . '/.env'              // public_html/api/.env
     ];
     foreach ($candidates as $file) {
         if (file_exists($file) && is_readable($file)) {
@@ -31,11 +53,14 @@ if (!defined('PODAR_APP')) {
                     if ((str_starts_with($v, '"') && str_ends_with($v, '"')) ||
                         (str_starts_with($v, "'") && str_ends_with($v, "'"))) {
                         $v = substr($v, 1, -1);
+                    } elseif (($commentPos = strpos($v, ' #')) !== false) {
+                        $v = trim(substr($v, 0, $commentPos));
                     }
-                    if (getenv($k) === false) {
-                        putenv("$k=$v");
-                        $_ENV[$k] = $v;
-                        $_SERVER[$k] = $v;
+                    
+                    $_ENV[$k] = $v;
+                    $_SERVER[$k] = $v;
+                    if (function_exists('putenv')) {
+                        @putenv("$k=$v");
                     }
                 }
             }
@@ -51,32 +76,34 @@ if (!defined('PODAR_APP')) {
 define('DB_DRIVER', 'mysql');
 
 // MySQL Credentials (cPanel phpMyAdmin):
-define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
-define('DB_PORT', getenv('DB_PORT') ?: '3306');
-define('DB_NAME', getenv('DB_NAME') ?: 'podar_pathways');
-define('DB_USER', getenv('DB_USER') ?: 'root');
-define('DB_PASS', getenv('DB_PASS') !== false ? getenv('DB_PASS') : '');
+define('DB_HOST', getEnvVar('DB_HOST', 'localhost'));
+define('DB_PORT', getEnvVar('DB_PORT', '3306'));
+define('DB_NAME', getEnvVar('DB_NAME', 'podar_pathways'));
+define('DB_USER', getEnvVar('DB_USER', 'root'));
+define('DB_PASS', getEnvVar('DB_PASS', ''));
 define('DB_CHARSET', 'utf8mb4');
-define('DB_CERTIFICATES_NAME', getenv('DB_CERTIFICATES_NAME') ?: DB_NAME);
-define('DB_PROJECTS_NAME', getenv('DB_PROJECTS_NAME') ?: DB_NAME);
+define('DB_CERTIFICATES_NAME', getEnvVar('DB_CERTIFICATES_NAME', DB_NAME));
+define('DB_PROJECTS_NAME', getEnvVar('DB_PROJECTS_NAME', DB_NAME));
 
 // Administrative secret key for phone changes:
-define('ADMIN_KEY', 'PodarAdmin@2026!');
+define('ADMIN_KEY', getEnvVar('ADMIN_KEY', 'drHPSingh'));
 
 // ----------------------------------------------------
 // 2. EMAIL OTP CONFIGURATION (noreply@podarpathways.com)
 // ----------------------------------------------------
-define('MAIL_FROM_EMAIL', 'noreply@podarpathways.com');
-define('MAIL_FROM_NAME', 'Podar Pathways');
-define('MAIL_REPLY_TO', 'noreply@podarpathways.com');
+define('MAIL_FROM_EMAIL', getEnvVar('EMAIL_FROM', getEnvVar('SMTP_USER', 'noreply@podarpathways.com')));
+define('MAIL_FROM_NAME', getEnvVar('MAIL_FROM_NAME', 'Podar Pathways'));
+define('MAIL_REPLY_TO', getEnvVar('MAIL_REPLY_TO', 'noreply@podarpathways.com'));
 
-// Set to true if you prefer authenticated SMTP instead of native PHP mail()
-define('USE_SMTP', false);
-define('SMTP_HOST', 'localhost');
-define('SMTP_PORT', 465);
-define('SMTP_SECURE', 'ssl');
-define('SMTP_USER', 'noreply@podarpathways.com');
-define('SMTP_PASS', '');
+// SMTP settings loaded directly from .env:
+$smtpPass = getEnvVar('SMTP_PASS', '');
+$useSmtpEnv = getEnvVar('USE_SMTP', null);
+define('USE_SMTP', $useSmtpEnv !== null ? filter_var($useSmtpEnv, FILTER_VALIDATE_BOOLEAN) : (!empty($smtpPass)));
+define('SMTP_HOST', getEnvVar('SMTP_HOST', 'mail.podarpathways.com'));
+define('SMTP_PORT', (int)(getEnvVar('SMTP_PORT', '465')));
+define('SMTP_SECURE', getEnvVar('SMTP_SECURE', 'ssl'));
+define('SMTP_USER', getEnvVar('SMTP_USER', 'noreply@podarpathways.com'));
+define('SMTP_PASS', $smtpPass);
 
 // ----------------------------------------------------
 // 3. SECURITY & SESSION SETTINGS
@@ -84,7 +111,7 @@ define('SMTP_PASS', '');
 define('OTP_EXPIRY_MINUTES', 10);              // OTP expires in 10 minutes
 define('OTP_MAX_ATTEMPTS', 5);                 // Max verification attempts before invalidation
 define('RATE_LIMIT_SECONDS', 30);              // Min seconds between resending OTP to same email
-define('APP_ENV', getenv('APP_ENV') ?: 'production');
+define('APP_ENV', getEnvVar('APP_ENV', 'production'));
 
 // Log file for OTP audit & emergency debugging
 define('OTP_LOG_FILE', __DIR__ . '/logs/otp_audit.log');

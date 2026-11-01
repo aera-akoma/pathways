@@ -1,9 +1,22 @@
 # Podar Pathways - API Directory Protection & Routing
+
+# Block direct browser access to sensitive files
+<FilesMatch "^\.|\.(env|sql|log|ini|sh|bak)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # Block direct HTTP access to internal PHP logic files
+    # Block direct HTTP access to internal PHP logic files & env
     RewriteRule ^(config|db|mailer)\.php$ - [F,L]
+    RewriteRule ^(\.env|.*\.log)$ - [F,L]
     
     # Block direct access to log files
     RewriteRule ^logs/.*$ - [F,L]
