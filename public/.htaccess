@@ -31,6 +31,20 @@
   RewriteRule ^ index.html [L]
 </IfModule>
 
+# Ensure correct MIME type for XML sitemap and plain text robots.txt
+AddType application/xml .xml
+AddType text/plain .txt
+
+<IfModule mod_headers.c>
+  <Files "sitemap.xml">
+    Header set Content-Type "application/xml; charset=UTF-8"
+    Header set Access-Control-Allow-Origin "*"
+  </Files>
+  <Files "robots.txt">
+    Header set Content-Type "text/plain; charset=UTF-8"
+  </Files>
+</IfModule>
+
 # Caching & MIME types
 <IfModule mod_expires.c>
   ExpiresActive On
