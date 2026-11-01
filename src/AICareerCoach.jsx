@@ -54,7 +54,7 @@ const PROMPT_SUGGESTIONS = [
 export function AICareerCoach({ student, notify, navigate }) {
   const studentName = student?.name ? student.name.split(' ')[0] : 'Student';
   const studentCourse = student?.course || 'Information Technology';
-  const studentScore = student?.score || 78;
+  const studentScore = Number.isFinite(Number(student?.score)) ? Number(student.score) : 0;
 
   const [messages, setMessages] = useState(() => {
     try {

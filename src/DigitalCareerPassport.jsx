@@ -24,7 +24,7 @@ export function DigitalCareerPassport({ student, notify, navigate }) {
   const studentName = student?.name || 'Student Name';
   const studentCourse = student?.course || 'Bachelor of Science (Information Technology)';
   const studentSem = student?.semester ? `Semester ${student.semester}` : 'Semester 5';
-  const studentScore = student?.score || 78;
+  const studentScore = Number.isFinite(Number(student?.score)) ? Number(student.score) : 0;
   const studentId = student?.id || 'PP-2026-STU';
   const certCount = student?.certificates || 0;
   const projectCount = student?.projects || 0;

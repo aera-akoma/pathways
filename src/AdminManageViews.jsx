@@ -2893,7 +2893,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
     course: 'BCA',
     semester: 'Semester V',
     goal: 'Software Engineer',
-    score: 75
+    score: 0
   });
 
   const fileInputRef = useRef(null);
@@ -3040,8 +3040,8 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
       course: newStudent.course,
       semester: newStudent.semester,
       goal: newStudent.goal.trim() || 'Software Engineer',
-      score: Number(newStudent.score) || 75,
-      completion: 35,
+      score: Number.isFinite(Number(newStudent.score)) ? Math.max(0, Number(newStudent.score)) : 0,
+      completion: 0,
       applications: 0,
       projects: 0,
       certificates: 0,
@@ -3075,7 +3075,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
         course: 'BCA',
         semester: 'Semester V',
         goal: 'Software Engineer',
-        score: 75
+        score: 0
       });
       notify?.(`Student "${finalRecord.name}" enrolled successfully in database.`);
     } catch (err) {

@@ -776,8 +776,8 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
 
   const studentName = formData.name || student?.name || 'Student';
   const studentSem = formData.semester ? (String(formData.semester).toLowerCase().startsWith('sem') ? formData.semester : `Semester ${formData.semester}`) : 'Semester V';
-  const studentScore = student?.score || 78;
-  const studentCompletion = student?.completion || 92;
+  const studentScore = Number.isFinite(Number(student?.score)) ? Number(student.score) : 0;
+  const studentCompletion = Number.isFinite(Number(student?.completion)) ? Number(student.completion) : 0;
 
   const displayName = isOwnProfile ? studentName : (activeProfileUser.name || 'User Profile');
   const displayAvatar = isOwnProfile ? (formData.avatar || DEFAULT_STUDENT_AVATAR) : (activeProfileUser.avatar || (isViewingAdmin ? DEFAULT_ADMIN_AVATAR : DEFAULT_STUDENT_AVATAR));
@@ -785,8 +785,8 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
   const displaySemOrRole = isOwnProfile ? studentSem : (isViewingAdmin ? (activeProfileUser.role || 'Super Admin') : (activeProfileUser.semester ? `Semester ${activeProfileUser.semester}` : 'Semester V'));
   const displayGoal = isOwnProfile ? formData.goal : (isViewingAdmin ? activeProfileUser.role : (activeProfileUser.goal || 'Aspiring Professional'));
   const displayBio = isOwnProfile ? formData.bio : (activeProfileUser.bio || (isViewingAdmin ? 'Directing career guidance, industry placements, examinations, and technical incubation for Podar institutions.' : 'Building modern projects and advancing skills at Podar Pathways.'));
-  const displayScore = isOwnProfile ? studentScore : (activeProfileUser.score || 82);
-  const displayCompletion = isOwnProfile ? studentCompletion : (activeProfileUser.completion || 88);
+  const displayScore = isOwnProfile ? studentScore : (Number.isFinite(Number(activeProfileUser.score)) ? Number(activeProfileUser.score) : 0);
+  const displayCompletion = isOwnProfile ? studentCompletion : (Number.isFinite(Number(activeProfileUser.completion)) ? Number(activeProfileUser.completion) : 0);
   const displayPortfolio = isOwnProfile ? formData.portfolioUrl : activeProfileUser.portfolioUrl;
   const displayGithub = isOwnProfile ? formData.github : activeProfileUser.github;
   const displayLinkedin = isOwnProfile ? formData.linkedin : activeProfileUser.linkedin;

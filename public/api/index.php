@@ -237,7 +237,7 @@ try {
 
             Database::execute(
                 "INSERT INTO students (id, name, phone, course, semester, email, passwordHash, goal, score, completion, applications, projects, certificates, addedByAdmin, isRegistered, status, createdAt, updatedAt)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 'Software Engineer', 65, 30, 0, 0, 0, 0, 1, 'active', ?, ?)",
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'Software Engineer', 0, 0, 0, 0, 0, 0, 1, 'active', ?, ?)",
                 [$studentId, $name, $phone, $course, $semester, $email, $passwordHash, $now, $now]
             );
             $student = Database::fetchOne("SELECT * FROM students WHERE id = ?", [$studentId]);
@@ -572,8 +572,8 @@ try {
         $email       = cleanEmail($rawEmail);
         $dbEmail     = !empty($email) ? $email : null;
         $goal        = cleanString($body['goal'] ?? 'Software Engineer');
-        $score       = isset($body['score']) ? (int)$body['score'] : 75;
-        $completion  = isset($body['completion']) ? (int)$body['completion'] : 30;
+        $score       = (isset($body['score']) && is_numeric($body['score'])) ? (int)$body['score'] : 0;
+        $completion  = (isset($body['completion']) && is_numeric($body['completion'])) ? (int)$body['completion'] : 0;
         $avatar      = $body['avatar'] ?? null;
 
         if (!$name || !$phone) {
@@ -656,7 +656,7 @@ try {
             $id = 'st-' . time() . '-' . random_int(1000, 9999);
             Database::execute(
                 "INSERT INTO students (id, name, fathersName, phone, course, semester, email, goal, score, completion, applications, projects, certificates, addedByAdmin, status, createdAt, updatedAt)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 75, 30, 0, 0, 0, 1, 'active', ?, ?)",
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 1, 'active', ?, ?)",
                 [$id, $name, $fathersName, $phone, $course, $semester, $dbEmail, $goal, $now, $now]
             );
 

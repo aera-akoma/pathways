@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 export function PCareScoreBreakdown({ student, navigate }) {
-  const baseScore = Number(student?.score || 78);
+  const baseScore = Number.isFinite(Number(student?.score)) ? Number(student.score) : 0;
   const studentName = student?.name ? student.name.split(' ')[0] : 'Student';
   const studentCourse = student?.course || 'Information Technology';
   const studentSem = student?.semester ? `Semester ${student.semester}` : 'Semester 5';
