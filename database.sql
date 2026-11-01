@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS `students` (
   `phone` VARCHAR(20) NOT NULL,
   `course` VARCHAR(100) NOT NULL,
   `semester` VARCHAR(20) NOT NULL,
-  `email` VARCHAR(150) NOT NULL,
+  `email` VARCHAR(150) DEFAULT NULL,
   `passwordHash` VARCHAR(255) DEFAULT NULL,
   `salt` VARCHAR(64) DEFAULT NULL,
   `linkedin` VARCHAR(255) DEFAULT NULL,

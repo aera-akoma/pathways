@@ -28,9 +28,9 @@ $route = '/' . trim($route, '/');
 // Parse request payload
 $body = getJsonInput();
 
-// Helper to generate ISO 8601 timestamps
+// Helper to generate MySQL-compatible datetime timestamps
 function nowIso(): string {
-    return date('Y-m-d\TH:i:s.000\Z');
+    return date('Y-m-d H:i:s');
 }
 
 // Helper to safely parse JSON
@@ -138,14 +138,22 @@ try {
         if (!$email) jsonError('Please enter a valid email address.');
 
         $student = Database::fetchOne("SELECT * FROM students WHERE LOWER(email) = ?", [$email]);
-        if (!$student) {
-            jsonError('Access Denied: Your email address was not found in the college database. Please contact your administrator to upload your student record.', 403);
-        }
-        if (($student['status'] ?? '') === 'suspended') {
-            jsonError('Access Denied: Your student account has been suspended by the administrator.', 403);
-        }
-        if (!empty($student['isRegistered']) && !empty($student['passwordHash'])) {
-            jsonError('An account with this email is already registered. Please sign in with your email and password, or use Forgot Password.');
+        $studentName = 'Student';
+        $studentCourse = 'BCA';
+        $studentSemester = 'Semester I';
+        $studentId = '';
+
+        if ($student) {
+            if (($student['status'] ?? '') === 'suspended') {
+                jsonError('Access Denied: Your student account has been suspended by the administrator.', 403);
+            }
+            if (!empty($student['isRegistered']) && !empty($student['passwordHash'])) {
+                jsonError('An account with this email is already registered. Please sign in with your email and password, or use Forgot Password.');
+            }
+            $studentName = $student['name'] ?? 'Student';
+            $studentCourse = $student['course'] ?? 'BCA';
+            $studentSemester = $student['semester'] ?? 'Semester I';
+            $studentId = $student['id'];
         }
 
         $recentOtp = Database::fetchOne(
@@ -164,15 +172,15 @@ try {
         Database::execute("DELETE FROM email_otps WHERE email = ? AND purpose = 'registration'", [$email]);
         Database::execute(
             "INSERT INTO email_otps (email, code, role, purpose, payload, createdAt, expiresAt, isUsed) VALUES (?, ?, 'student', 'registration', ?, ?, ?, 0)",
-            [$email, $otp, json_encode(['email' => $email, 'studentId' => $student['id']]), $now, $expiresAt]
+            [$email, $otp, json_encode(['email' => $email, 'studentId' => $studentId]), $now, $expiresAt]
         );
 
-        Mailer::sendOtp($email, $student['name'], $otp, 'registration');
+        Mailer::sendOtp($email, $studentName, $otp, 'registration');
 
         jsonResponse([
             'success' => true,
             'message' => "Verification code sent to {$email}.",
-            'student' => ['id' => $student['id'], 'name' => $student['name'], 'course' => $student['course'], 'semester' => $student['semester']]
+            'student' => ['id' => $studentId, 'name' => $studentName, 'course' => $studentCourse, 'semester' => $studentSemester]
         ]);
     }
 
@@ -202,15 +210,36 @@ try {
         Database::execute("UPDATE email_otps SET isUsed = 1 WHERE id = ?", [$otpRecord['id']]);
 
         $student = Database::fetchOne("SELECT * FROM students WHERE LOWER(email) = ?", [$email]);
-        if (!$student) jsonError('Student record not found.', 404);
-
         $passwordHash = password_hash($password, PASSWORD_BCRYPT);
         $now = nowIso();
 
-        Database::execute(
-            "UPDATE students SET passwordHash = ?, isRegistered = 1, updatedAt = ? WHERE id = ?",
-            [$passwordHash, $now, $student['id']]
-        );
+        if ($student) {
+            Database::execute(
+                "UPDATE students SET passwordHash = ?, isRegistered = 1, updatedAt = ? WHERE id = ?",
+                [$passwordHash, $now, $student['id']]
+            );
+        } else {
+            // Auto-create and store student record in database upon successful verification
+            $studentId = 'student-' . time() . '-' . random_int(100, 999);
+            $name = cleanString($body['name'] ?? '');
+            if (!$name) {
+                $prefix = explode('@', $email)[0];
+                $name = ucwords(str_replace(['.', '_', '-'], ' ', $prefix));
+            }
+            $phone = cleanPhone($body['phone'] ?? '');
+            if (empty($phone) || strlen($phone) !== 10) {
+                $phone = '9' . str_pad((string)random_int(100000000, 999999999), 9, '0', STR_PAD_LEFT);
+            }
+            $course = cleanString($body['course'] ?? 'BCA');
+            $semester = cleanString($body['semester'] ?? 'Semester I');
+
+            Database::execute(
+                "INSERT INTO students (id, name, phone, course, semester, email, passwordHash, goal, score, completion, applications, projects, certificates, addedByAdmin, isRegistered, status, createdAt, updatedAt)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'Software Engineer', 65, 30, 0, 0, 0, 0, 1, 'active', ?, ?)",
+                [$studentId, $name, $phone, $course, $semester, $email, $passwordHash, $now, $now]
+            );
+            $student = Database::fetchOne("SELECT * FROM students WHERE id = ?", [$studentId]);
+        }
 
         $updated = Database::fetchOne("SELECT * FROM students WHERE id = ?", [$student['id']]);
         unset($updated['passwordHash'], $updated['salt']);
@@ -528,25 +557,42 @@ try {
     }
 
     if ($route === '/students' && $method === 'POST') {
-        $name     = cleanString($body['name'] ?? '');
-        $phone    = cleanPhone($body['phone'] ?? '');
-        $course   = cleanString($body['course'] ?? 'BCA');
-        $semester = cleanString($body['semester'] ?? 'V');
-        $email    = cleanEmail($body['email'] ?? '');
-        $goal     = cleanString($body['goal'] ?? 'Software Engineer');
+        $id          = cleanString($body['id'] ?? '') ?: ('student-' . time() . '-' . random_int(100, 999));
+        $name        = cleanString($body['name'] ?? '');
+        $fathersName = cleanString($body['fathersName'] ?? $body['fatherName'] ?? '');
+        $phone       = cleanPhone($body['phone'] ?? '');
+        $course      = cleanString($body['course'] ?? 'BCA');
+        $semester    = cleanString($body['semester'] ?? 'V');
+        $rawEmail    = trim((string)($body['email'] ?? ''));
+        $email       = cleanEmail($rawEmail);
+        $dbEmail     = !empty($email) ? $email : null;
+        $goal        = cleanString($body['goal'] ?? 'Software Engineer');
+        $score       = isset($body['score']) ? (int)$body['score'] : 75;
+        $completion  = isset($body['completion']) ? (int)$body['completion'] : 30;
+        $avatar      = $body['avatar'] ?? null;
 
-        if (!$name || !$phone) jsonError('Student name and mobile number are required.');
+        if (!$name || !$phone) {
+            jsonError('Student name and 10-digit mobile number are required.');
+        }
 
-        $existing = Database::fetchOne("SELECT id FROM students WHERE phone = ?", [$phone]);
-        if ($existing) jsonError('A student with this phone number already exists.');
+        $existingPhone = Database::fetchOne("SELECT id, name FROM students WHERE phone = ?", [$phone]);
+        if ($existingPhone) {
+            jsonError("A student with mobile number {$phone} already exists ({$existingPhone['name']}).");
+        }
 
-        $id = 'student-' . time() . '-' . random_int(100, 999);
+        if ($dbEmail !== null) {
+            $existingEmail = Database::fetchOne("SELECT id, name FROM students WHERE LOWER(email) = ?", [$dbEmail]);
+            if ($existingEmail) {
+                jsonError("A student with email {$dbEmail} already exists ({$existingEmail['name']}).");
+            }
+        }
+
         $now = nowIso();
 
         Database::execute(
-            "INSERT INTO students (id, name, phone, course, semester, email, goal, score, completion, applications, projects, certificates, addedByAdmin, isRegistered, status, createdAt, updatedAt)
-             VALUES (?, ?, ?, ?, ?, ?, ?, 35, 28, 0, 0, 0, 1, 0, 'active', ?, ?)",
-            [$id, $name, $phone, $course, $semester, $email, $goal, $now, $now]
+            "INSERT INTO students (id, name, fathersName, phone, course, semester, email, goal, score, completion, applications, projects, certificates, avatar, addedByAdmin, isRegistered, status, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, 1, 0, 'active', ?, ?)",
+            [$id, $name, $fathersName, $phone, $course, $semester, $dbEmail, $goal, $score, $completion, $avatar, $now, $now]
         );
 
         $created = Database::fetchOne("SELECT * FROM students WHERE id = ?", [$id]);
@@ -568,13 +614,15 @@ try {
         $seenPhones = [];
 
         foreach ($rows as $row) {
-            $name = cleanString($row['student_name'] ?? $row['studentName'] ?? $row['name'] ?? '');
+            $name        = cleanString($row['student_name'] ?? $row['studentName'] ?? $row['name'] ?? '');
             $fathersName = cleanString($row['fathers_name'] ?? $row['father_name'] ?? $row['fathersName'] ?? '');
-            $phone = cleanPhone($row['mobile_no'] ?? $row['mobileNo'] ?? $row['phone'] ?? '');
-            $course = cleanString($row['course'] ?? 'BCA');
-            $semester = cleanString($row['semester'] ?? 'V');
-            $email = cleanEmail($row['email'] ?? $row['email_id'] ?? '');
-            $goal = cleanString($row['goal'] ?? 'Software Engineer');
+            $phone       = cleanPhone($row['mobile_no'] ?? $row['mobileNo'] ?? $row['phone'] ?? '');
+            $course      = cleanString($row['course'] ?? 'BCA');
+            $semester    = cleanString($row['semester'] ?? 'V');
+            $rawEmail    = trim((string)($row['email'] ?? $row['email_id'] ?? ''));
+            $email       = cleanEmail($rawEmail);
+            $dbEmail     = !empty($email) ? $email : null;
+            $goal        = cleanString($row['goal'] ?? 'Software Engineer');
 
             if (!$name || strlen($phone) !== 10) {
                 $skipped[] = ['name' => $name, 'phone' => $phone, 'reason' => 'Invalid name or 10-digit mobile'];
@@ -593,14 +641,21 @@ try {
                 continue;
             }
 
+            if ($dbEmail !== null) {
+                $existingEmail = Database::fetchOne("SELECT id FROM students WHERE LOWER(email) = ?", [$dbEmail]);
+                if ($existingEmail) {
+                    $dbEmail = null;
+                }
+            }
+
             $id = 'st-' . time() . '-' . random_int(1000, 9999);
             Database::execute(
                 "INSERT INTO students (id, name, fathersName, phone, course, semester, email, goal, score, completion, applications, projects, certificates, addedByAdmin, status, createdAt, updatedAt)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 35, 28, 0, 0, 0, 1, 'active', ?, ?)",
-                [$id, $name, $fathersName, $phone, $course, $semester, $email, $goal, $now, $now]
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 75, 30, 0, 0, 0, 1, 'active', ?, ?)",
+                [$id, $name, $fathersName, $phone, $course, $semester, $dbEmail, $goal, $now, $now]
             );
 
-            $inserted[] = ['id' => $id, 'name' => $name, 'phone' => $phone, 'course' => $course, 'semester' => $semester, 'email' => $email];
+            $inserted[] = ['id' => $id, 'name' => $name, 'phone' => $phone, 'course' => $course, 'semester' => $semester, 'email' => $dbEmail];
             $importedCount++;
         }
 
@@ -688,9 +743,16 @@ try {
             $params = [];
 
             foreach ($fields as $field) {
-                if (isset($body[$field])) {
+                if (array_key_exists($field, $body)) {
+                    $val = $body[$field];
+                    if ($field === 'email') {
+                        $val = cleanEmail($val);
+                        $val = !empty($val) ? $val : null;
+                    } elseif ($field === 'phone') {
+                        $val = cleanPhone($val);
+                    }
                     $updates[] = "{$field} = ?";
-                    $params[] = $body[$field];
+                    $params[] = $val;
                 }
             }
 

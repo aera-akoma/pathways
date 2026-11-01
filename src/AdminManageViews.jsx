@@ -2868,6 +2868,22 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
   const [editStudent, setEditStudent] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
+  // Sync live students from MySQL on component mount
+  useEffect(() => {
+    fetch('/api/students')
+      .then(res => res.ok ? res.json() : null)
+      .then(list => {
+        if (Array.isArray(list)) {
+          setState?.(prev => ({
+            ...prev,
+            students: list,
+            roster: list.map(s => ({ name: s.name, phone: s.phone }))
+          }));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Form states for Add Student
   const [newStudent, setNewStudent] = useState({
     name: '',
@@ -2970,45 +2986,30 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
       }
 
       // Send to server
-      try {
-        await fetch('/api/students/import-csv', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ students: parsedStudents })
-        });
-      } catch (err) {}
-
-      // Update local state
-      const rosterList = parsedStudents.map(s => ({ name: s.name, phone: s.phone }));
-      setState?.(prev => {
-        const existingPhones = new Set((prev.students || []).map(s => s.phone));
-        const newStudents = parsedStudents
-          .filter(s => !existingPhones.has(s.phone))
-          .map((s, idx) => ({
-            id: `student-csv-${Date.now()}-${idx}`,
-            name: s.name,
-            fathersName: s.fathersName,
-            phone: s.phone,
-            course: s.course,
-            semester: s.semester,
-            email: s.email,
-            goal: s.goal,
-            score: 75,
-            completion: 30,
-            applications: 0,
-            projects: 0,
-            certificates: 0,
-            avatar: DEFAULT_STUDENT_AVATAR
-          }));
-
-        return {
-          ...prev,
-          roster: [...(prev.roster || []), ...rosterList],
-          students: [...(prev.students || []), ...newStudents]
-        };
+      const res = await fetch('/api/students/import-csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ students: parsedStudents })
       });
+      const resData = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(resData.error || 'Server failed to import students to database.');
+      }
 
-      notify?.(`Successfully imported ${parsedStudents.length} student records from file.`);
+      // Refresh student list from database
+      const freshRes = await fetch('/api/students');
+      if (freshRes.ok) {
+        const freshList = await freshRes.json();
+        if (Array.isArray(freshList)) {
+          setState?.(prev => ({
+            ...prev,
+            students: freshList,
+            roster: freshList.map(s => ({ name: s.name, phone: s.phone }))
+          }));
+        }
+      }
+
+      notify?.(resData.message || `Successfully stored ${parsedStudents.length} student records in database.`);
     } catch (err) {
       notify?.(err.message || 'Could not parse uploaded file.');
     } finally {
@@ -3048,31 +3049,38 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
     };
 
     try {
-      await fetch('/api/students', {
+      const res = await fetch('/api/students', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(studentRecord)
       });
-    } catch (err) {}
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to save student to database.');
+      }
+      const finalRecord = data.student ? { ...studentRecord, ...data.student } : studentRecord;
 
-    setState?.(prev => ({
-      ...prev,
-      students: [studentRecord, ...(prev.students || [])],
-      roster: [{ name: studentRecord.name, phone: studentRecord.phone }, ...(prev.roster || [])]
-    }));
+      setState?.(prev => ({
+        ...prev,
+        students: [finalRecord, ...(prev.students || []).filter(s => s.id !== finalRecord.id)],
+        roster: [{ name: finalRecord.name, phone: finalRecord.phone }, ...(prev.roster || []).filter(r => r.phone !== finalRecord.phone)]
+      }));
 
-    setShowAddModal(false);
-    setNewStudent({
-      name: '',
-      fathersName: '',
-      phone: '',
-      email: '',
-      course: 'BCA',
-      semester: 'Semester V',
-      goal: 'Software Engineer',
-      score: 75
-    });
-    notify?.(`Student "${studentRecord.name}" enrolled successfully.`);
+      setShowAddModal(false);
+      setNewStudent({
+        name: '',
+        fathersName: '',
+        phone: '',
+        email: '',
+        course: 'BCA',
+        semester: 'Semester V',
+        goal: 'Software Engineer',
+        score: 75
+      });
+      notify?.(`Student "${finalRecord.name}" enrolled successfully in database.`);
+    } catch (err) {
+      notify?.(err.message || 'Error saving student to database.');
+    }
   };
 
   // 5. Update Student
@@ -3081,20 +3089,26 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
     if (!editStudent) return;
 
     try {
-      await fetch(`/api/students/${editStudent.id}`, {
+      const res = await fetch(`/api/students/${editStudent.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editStudent)
       });
-    } catch (err) {}
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to update student profile in database.');
+      }
 
-    setState?.(prev => ({
-      ...prev,
-      students: (prev.students || []).map(s => s.id === editStudent.id ? { ...s, ...editStudent } : s)
-    }));
+      setState?.(prev => ({
+        ...prev,
+        students: (prev.students || []).map(s => s.id === editStudent.id ? { ...s, ...editStudent } : s)
+      }));
 
-    setEditStudent(null);
-    notify?.(`Updated profile for ${editStudent.name}.`);
+      setEditStudent(null);
+      notify?.(`Updated profile for ${editStudent.name}.`);
+    } catch (err) {
+      notify?.(err.message || 'Error updating student in database.');
+    }
   };
 
   // 6. Delete Student
@@ -3102,17 +3116,23 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
     if (!deleteTarget) return;
 
     try {
-      await fetch(`/api/students/${deleteTarget.id}`, { method: 'DELETE' });
-    } catch (err) {}
+      const res = await fetch(`/api/students/${deleteTarget.id}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to delete student from database.');
+      }
 
-    setState?.(prev => ({
-      ...prev,
-      students: (prev.students || []).filter(s => s.id !== deleteTarget.id),
-      roster: (prev.roster || []).filter(r => r.phone !== deleteTarget.phone)
-    }));
+      setState?.(prev => ({
+        ...prev,
+        students: (prev.students || []).filter(s => s.id !== deleteTarget.id),
+        roster: (prev.roster || []).filter(r => r.phone !== deleteTarget.phone)
+      }));
 
-    setDeleteTarget(null);
-    notify?.(`Deleted student account "${deleteTarget.name}".`);
+      setDeleteTarget(null);
+      notify?.(`Deleted student account "${deleteTarget.name}".`);
+    } catch (err) {
+      notify?.(err.message || 'Error deleting student from database.');
+    }
   };
 
   // Filtering
