@@ -4,6 +4,7 @@ dist/
 .env.*
 !.env.example
 app-debug.apk
+*.db
 *.db-shm
 *.db-wal
 *.zip

@@ -1,7 +1,7 @@
 <?php
 /**
  * Podar Pathways - cPanel Production Configuration
- * Target: cPanel Ultimate Hosting with PHP & MySQL / SQLite
+ * Target: cPanel Ultimate Hosting with PHP & MySQL (phpMyAdmin)
  */
 
 // Prevent direct script access outside API
@@ -45,18 +45,10 @@ if (!defined('PODAR_APP')) {
 })();
 
 // ----------------------------------------------------
-// 1. DATABASE CONFIGURATION (MySQL & SQLite - 3 SEPARATE DATABASES)
+// 1. DATABASE CONFIGURATION (MySQL / phpMyAdmin)
 // ----------------------------------------------------
-// Driver: 'mysql' (standard for cPanel production) or 'sqlite' (instant local zero-config)
-$autoDriver = getenv('DB_DRIVER');
-if (!$autoDriver) {
-    if (DIRECTORY_SEPARATOR === '\\' || (file_exists(__DIR__ . '/data/podar_pathways.db') && !file_exists('/home'))) {
-        $autoDriver = 'sqlite';
-    } else {
-        $autoDriver = 'mysql';
-    }
-}
-define('DB_DRIVER', $autoDriver);
+// Driver: Strictly 'mysql' for phpMyAdmin database
+define('DB_DRIVER', 'mysql');
 
 // MySQL Credentials (cPanel phpMyAdmin):
 define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
@@ -67,35 +59,6 @@ define('DB_PASS', getenv('DB_PASS') !== false ? getenv('DB_PASS') : '');
 define('DB_CHARSET', 'utf8mb4');
 define('DB_CERTIFICATES_NAME', getenv('DB_CERTIFICATES_NAME') ?: DB_NAME);
 define('DB_PROJECTS_NAME', getenv('DB_PROJECTS_NAME') ?: DB_NAME);
-
-// Helper to resolve SQLite path from env or defaults
-$resolveSqliteDb = function($envKey, $fallbackFile) {
-    $custom = getenv($envKey);
-    if ($custom) {
-        $custom = trim($custom);
-        if (preg_match('#^([a-zA-Z]:|/)#', $custom)) {
-            return $custom;
-        }
-        $root = dirname(__DIR__, 2);
-        $candidate = $root . '/' . ltrim($custom, './\\');
-        if (file_exists($candidate) || file_exists(dirname($candidate))) {
-            return $candidate;
-        }
-        return $custom;
-    }
-    return __DIR__ . '/data/' . $fallbackFile;
-};
-
-// SQLite 3-Database Separation Paths:
-// 1. Core / Main Database (Students, Admins, Courses, OTPs, Settings)
-define('SQLITE_FILE', $resolveSqliteDb('DB_MAIN_PATH', 'podar_pathways.db'));
-define('SQLITE_LOCAL', SQLITE_FILE);
-
-// 2. Certificates Database (Student Credentials, Badges & Verifications)
-define('SQLITE_CERTIFICATES_FILE', $resolveSqliteDb('DB_CERTIFICATES_PATH', 'certificates.db'));
-
-// 3. Projects Database (Student Posts, Images, Comments, Likes, Bookmarks)
-define('SQLITE_PROJECTS_FILE', $resolveSqliteDb('DB_PROJECTS_PATH', 'projects.db'));
 
 // Administrative secret key for phone changes:
 define('ADMIN_KEY', 'PodarAdmin@2026!');
