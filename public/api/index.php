@@ -202,7 +202,9 @@ try {
             Database::execute("DELETE FROM email_otps WHERE id = ?", [$otpRecord['id']]);
             jsonError('This OTP has expired. Please request a new verification code.');
         }
-        if ($otpRecord['code'] !== $otp && $otp !== '123456') {
+        $isDevMode = (defined('APP_ENV') && APP_ENV !== 'production');
+        $isCodeMatch = ($otpRecord['code'] === $otp) || ($isDevMode && $otp === '123456');
+        if (!$isCodeMatch) {
             Database::execute("UPDATE email_otps SET attempts = attempts + 1 WHERE id = ?", [$otpRecord['id']]);
             jsonError('Invalid verification code. Please check your email and try again.');
         }
@@ -345,7 +347,9 @@ try {
             "SELECT * FROM email_otps WHERE email = ? AND purpose = 'reset-password' AND isUsed = 0 ORDER BY id DESC LIMIT 1",
             [$email]
         );
-        if (!$otpRecord || time() > $otpRecord['expiresAt'] || ($otpRecord['code'] !== $otp && $otp !== '123456')) {
+        $isDevMode = (defined('APP_ENV') && APP_ENV !== 'production');
+        $isCodeMatch = $otpRecord && (($otpRecord['code'] === $otp) || ($isDevMode && $otp === '123456'));
+        if (!$otpRecord || time() > $otpRecord['expiresAt'] || !$isCodeMatch) {
             jsonError('Invalid or expired password reset OTP.');
         }
 
@@ -447,7 +451,7 @@ try {
 
         jsonResponse([
             'success' => true,
-            'message' => "Password verified. A 6-digit 2FA security code has been sent to {$email} (or use 123456 in dev).",
+            'message' => "Password verified. A 6-digit 2FA security code has been sent to {$email}.",
             'admin'   => ['id' => $admin['id'], 'name' => $admin['name'], 'email' => $admin['email'], 'role' => $admin['role']]
         ]);
     }
@@ -464,11 +468,12 @@ try {
             $otpRecord = Database::fetchOne("SELECT * FROM email_otps WHERE email = ? LIMIT 1", [$email]);
         } catch (\Throwable $e) {}
 
-        $isDevBypass = ($otp === '123456');
+        $isDevMode = (defined('APP_ENV') && APP_ENV !== 'production');
+        $isDevBypass = $isDevMode && ($otp === '123456');
         $isCodeValid = $otpRecord && ($otpRecord['code'] === $otp) && (time() <= $otpRecord['expiresAt']);
 
         if (!$isDevBypass && !$isCodeValid) {
-            jsonError('Invalid or expired 2FA code. Please request a new security code or use 123456.');
+            jsonError('Invalid or expired 2FA code. Please request a new security code.');
         }
 
         try {
