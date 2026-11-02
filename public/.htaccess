@@ -21,8 +21,14 @@ DirectoryIndex index.html
   RewriteRule ^(\.env|database\.sql|.*\.log) - [F,L]
   RewriteRule ^api/(?:logs(?:/|$)|.*\.(?:php|json|sql|ini|bak)$) - [F,L,NC]
 
-  # Route API roots and nested endpoints before the SPA fallback (Apache 2.4).
-  RewriteRule ^api(?:/.*)?$ api/index.php [QSA,END]
+  # Route legacy /public/api requests cleanly
+  RewriteRule ^public/api(?:/.*)?$ api/index.php [QSA,L]
+
+  # Route legacy /public/ static assets cleanly
+  RewriteRule ^public/(.*)$ $1 [QSA,L]
+
+  # Route API roots and nested endpoints before the SPA fallback
+  RewriteRule ^api(?:/.*)?$ api/index.php [QSA,L]
 
   # Allow direct access to existing files and directories (assets, images, etc.)
   RewriteCond %{REQUEST_FILENAME} -f [OR]
