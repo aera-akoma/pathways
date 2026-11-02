@@ -22,3 +22,4 @@ console.log(`\nSUCCESS! Created production archives:`);
 console.log(` - ${prodZip} (${sizeMB} MB)`);
 console.log(` - ${publicZip} (${sizeMB} MB)`);
 console.log(`\nUpload either ZIP directly into your cPanel 'public_html/' directory and click Extract.`);
+
