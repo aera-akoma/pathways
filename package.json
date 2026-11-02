@@ -8,6 +8,7 @@
     "dev": "node scripts/start-server.mjs",
     "server": "node scripts/start-server.mjs",
     "build": "vite build",
+    "build:zip": "node scripts/build-zip.mjs",
     "client:dev": "vite"
   },
   "dependencies": {
