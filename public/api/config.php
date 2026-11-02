@@ -113,6 +113,18 @@ define('OTP_MAX_ATTEMPTS', 5);                 // Max verification attempts befo
 define('RATE_LIMIT_SECONDS', 30);              // Min seconds between resending OTP to same email
 define('APP_ENV', getEnvVar('APP_ENV', 'production'));
 
+/**
+ * Determine if running in local development mode (e.g. localhost, 127.0.0.1, or non-production)
+ */
+function isDevEnvironment(): bool {
+    $host = strtolower($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '');
+    return (DIRECTORY_SEPARATOR === '\\')
+        || (defined('APP_ENV') && APP_ENV !== 'production')
+        || str_contains($host, 'localhost')
+        || str_contains($host, '127.0.0.1')
+        || str_contains($host, '::1');
+}
+
 // Log file for OTP audit & emergency debugging
 define('OTP_LOG_FILE', __DIR__ . '/logs/otp_audit.log');
 

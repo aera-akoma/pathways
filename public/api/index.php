@@ -34,7 +34,7 @@ validateRequestFields($body, $route);
 
 function sendVerificationCode(string $email, string $name, string $otp, string $purpose): void {
     $result = Mailer::sendOtp($email, $name, $otp, $purpose);
-    $isLocal = (DIRECTORY_SEPARATOR === '\\') || (defined('APP_ENV') && APP_ENV !== 'production');
+    $isLocal = isDevEnvironment();
     if (empty($result['success'])) {
         if ($isLocal) {
             error_log("[DEV OTP SIMULATION] OTP for {$email} ({$purpose}): {$otp}");
@@ -192,16 +192,18 @@ try {
             $studentId = $student['id'];
         }
 
-        $recentOtp = Database::fetchOne(
-            "SELECT * FROM email_otps WHERE email = ? AND purpose = 'registration' AND (? - createdAt) < ?",
-            [$email, time(), RATE_LIMIT_SECONDS]
-        );
-        if ($recentOtp) {
-            $wait = RATE_LIMIT_SECONDS - (time() - $recentOtp['createdAt']);
-            jsonError("Please wait {$wait} seconds before requesting a new OTP.");
+        if (!isDevEnvironment()) {
+            $recentOtp = Database::fetchOne(
+                "SELECT * FROM email_otps WHERE email = ? AND purpose = 'registration' AND (? - createdAt) < ?",
+                [$email, time(), RATE_LIMIT_SECONDS]
+            );
+            if ($recentOtp) {
+                $wait = RATE_LIMIT_SECONDS - (time() - $recentOtp['createdAt']);
+                jsonError("Please wait {$wait} seconds before requesting a new OTP.");
+            }
         }
 
-        $otp = sprintf('%06d', random_int(100000, 999999));
+        $otp = isDevEnvironment() ? '123456' : sprintf('%06d', random_int(100000, 999999));
         $now = time();
         $expiresAt = $now + (OTP_EXPIRY_MINUTES * 60);
 
@@ -215,7 +217,7 @@ try {
 
         jsonResponse([
             'success' => true,
-            'message' => "Verification code sent to {$email}.",
+            'message' => isDevEnvironment() ? "Verification code sent to {$email}. (Dev OTP: 123456)" : "Verification code sent to {$email}.",
             'student' => ['id' => $studentId, 'name' => $studentName, 'course' => $studentCourse, 'semester' => $studentSemester]
         ]);
     }
@@ -229,23 +231,29 @@ try {
         if (!$email || !$otp || empty($password)) jsonError('Email, OTP, and password are required.');
         if (strlen($password) < 6) jsonError('Password must be at least 6 characters long.');
 
+        $isDev = isDevEnvironment();
         $otpRecord = Database::fetchOne(
             "SELECT * FROM email_otps WHERE email = ? AND purpose = 'registration' AND isUsed = 0 ORDER BY id DESC LIMIT 1",
             [$email]
         );
-        if (!$otpRecord) jsonError('No active OTP found. Please request a new verification code.');
-        if (($otpRecord['attempts'] ?? 0) >= OTP_MAX_ATTEMPTS) jsonError('Too many incorrect codes. Request a new code.', 429);
-        if (time() > $otpRecord['expiresAt']) {
+        $isCodeMatch = ($isDev && $otp === '123456') || ($otpRecord && hash_equals((string)$otpRecord['code'], $otp));
+
+        if (!$otpRecord && !($isDev && $otp === '123456')) {
+            jsonError('No active OTP found. Please request a new verification code.');
+        }
+        if ($otpRecord && ($otpRecord['attempts'] ?? 0) >= OTP_MAX_ATTEMPTS && !($isDev && $otp === '123456')) {
+            jsonError('Too many incorrect codes. Request a new code.', 429);
+        }
+        if ($otpRecord && time() > $otpRecord['expiresAt'] && !($isDev && $otp === '123456')) {
             Database::execute("DELETE FROM email_otps WHERE id = ?", [$otpRecord['id']]);
             jsonError('This OTP has expired. Please request a new verification code.');
         }
-        $isCodeMatch = hash_equals((string)$otpRecord['code'], $otp);
         if (!$isCodeMatch) {
-            Database::execute("UPDATE email_otps SET attempts = attempts + 1 WHERE id = ?", [$otpRecord['id']]);
+            if ($otpRecord) Database::execute("UPDATE email_otps SET attempts = attempts + 1 WHERE id = ?", [$otpRecord['id']]);
             jsonError('Invalid verification code. Please check your email and try again.');
         }
 
-        Database::execute("UPDATE email_otps SET isUsed = 1 WHERE id = ?", [$otpRecord['id']]);
+        if ($otpRecord) Database::execute("UPDATE email_otps SET isUsed = 1 WHERE id = ?", [$otpRecord['id']]);
 
         $student = Database::fetchOne("SELECT * FROM students WHERE LOWER(email) = ?", [$email]);
         $passwordHash = password_hash($password, PASSWORD_BCRYPT);
@@ -353,7 +361,7 @@ try {
         $student = Database::fetchOne("SELECT * FROM students WHERE LOWER(email) = ?", [$email]);
         if (!$student) jsonError('No registered account found with this email address.', 404);
 
-        $otp = sprintf('%06d', random_int(100000, 999999));
+        $otp = isDevEnvironment() ? '123456' : sprintf('%06d', random_int(100000, 999999));
         $now = time();
         $expiresAt = $now + (OTP_EXPIRY_MINUTES * 60);
 
@@ -364,7 +372,7 @@ try {
         );
 
         sendVerificationCode($email, $student['name'], $otp, 'reset-password');
-        jsonResponse(['success' => true, 'message' => "Password reset OTP has been sent to {$email}."]);
+        jsonResponse(['success' => true, 'message' => isDevEnvironment() ? "Password reset OTP has been sent to {$email}. (Dev OTP: 123456)" : "Password reset OTP has been sent to {$email}."]);
     }
 
     // Forgot Password: Reset
@@ -376,18 +384,21 @@ try {
         if (!$email || !$otp || !$password) jsonError('Email, OTP, and new password are required.');
         if (strlen($password) < 6) jsonError('New password must be at least 6 characters long.');
 
+        $isDev = isDevEnvironment();
         $otpRecord = Database::fetchOne(
             "SELECT * FROM email_otps WHERE email = ? AND purpose = 'reset-password' AND isUsed = 0 ORDER BY id DESC LIMIT 1",
             [$email]
         );
-        $isCodeMatch = $otpRecord && (hash_equals((string)$otpRecord['code'], $otp));
-        if ($otpRecord && ($otpRecord['attempts'] ?? 0) >= OTP_MAX_ATTEMPTS) jsonError('Too many incorrect codes. Request a new code.', 429);
-        if (!$otpRecord || time() > $otpRecord['expiresAt'] || !$isCodeMatch) {
+        $isCodeMatch = ($isDev && $otp === '123456') || ($otpRecord && hash_equals((string)$otpRecord['code'], $otp));
+        if ($otpRecord && ($otpRecord['attempts'] ?? 0) >= OTP_MAX_ATTEMPTS && !($isDev && $otp === '123456')) {
+            jsonError('Too many incorrect codes. Request a new code.', 429);
+        }
+        if ((!$otpRecord || time() > $otpRecord['expiresAt'] || !$isCodeMatch) && !($isDev && $otp === '123456')) {
             if ($otpRecord) Database::execute('UPDATE email_otps SET attempts = attempts + 1 WHERE id = ?', [$otpRecord['id']]);
             jsonError('Invalid or expired password reset OTP.');
         }
 
-        Database::execute("UPDATE email_otps SET isUsed = 1 WHERE id = ?", [$otpRecord['id']]);
+        if ($otpRecord) Database::execute("UPDATE email_otps SET isUsed = 1 WHERE id = ?", [$otpRecord['id']]);
 
         $student = Database::fetchOne("SELECT * FROM students WHERE LOWER(email) = ?", [$email]);
         if (!$student) jsonError('Student not found.', 404);
@@ -436,7 +447,7 @@ try {
 
         if (!$isValid) jsonError('Incorrect administrator password.', 401);
 
-        $otp = sprintf('%06d', random_int(100000, 999999));
+        $otp = isDevEnvironment() ? '123456' : sprintf('%06d', random_int(100000, 999999));
         $now = time();
         $expiresAt = $now + (OTP_EXPIRY_MINUTES * 60);
 
@@ -449,7 +460,7 @@ try {
 
         jsonResponse([
             'success' => true,
-            'message' => "Password verified. A 6-digit 2FA security code has been sent to {$email}.",
+            'message' => isDevEnvironment() ? "Password verified. 2FA security code has been sent to {$email}. (Dev OTP: 123456)" : "Password verified. A 6-digit 2FA security code has been sent to {$email}.",
             'admin'   => ['id' => $admin['id'], 'name' => $admin['name'], 'email' => $admin['email'], 'role' => $admin['role']]
         ]);
     }
@@ -466,15 +477,20 @@ try {
             $otpRecord = Database::fetchOne("SELECT * FROM email_otps WHERE email = ? AND role = 'admin' AND purpose = 'admin-login' AND isUsed = 0 ORDER BY id DESC LIMIT 1", [$email]);
         } catch (\Throwable $e) {}
 
-        $isCodeValid = $otpRecord && ($otpRecord['code'] === $otp) && (time() <= $otpRecord['expiresAt']);
+        $isDev = isDevEnvironment();
+        $isCodeValid = ($isDev && $otp === '123456') || ($otpRecord && ($otpRecord['code'] === $otp) && (time() <= $otpRecord['expiresAt']));
 
-        if ($otpRecord && ($otpRecord['attempts'] ?? 0) >= OTP_MAX_ATTEMPTS) jsonError('Too many incorrect codes. Repeat sign-in.', 429);
+        if ($otpRecord && ($otpRecord['attempts'] ?? 0) >= OTP_MAX_ATTEMPTS && !($isDev && $otp === '123456')) {
+            jsonError('Too many incorrect codes. Repeat sign-in.', 429);
+        }
         if (!$isCodeValid) {
             if ($otpRecord) Database::execute('UPDATE email_otps SET attempts = attempts + 1 WHERE id = ?', [$otpRecord['id']]);
             jsonError('Invalid or expired 2FA code. Please request a new security code.');
         }
 
-        $consumed = Database::execute("UPDATE email_otps SET isUsed = 1 WHERE id = ? AND isUsed = 0", [$otpRecord['id']]);
+        if ($otpRecord) {
+            $consumed = Database::execute("UPDATE email_otps SET isUsed = 1 WHERE id = ? AND isUsed = 0", [$otpRecord['id']]);
+        }
         if ($consumed !== 1) jsonError('This verification code has already been used.', 409);
 
         $admin = Database::fetchOne("SELECT * FROM admins WHERE LOWER(email) = ?", [$email]);
@@ -509,21 +525,22 @@ try {
     if ($route === '/auth/resend-otp' && $method === 'POST') {
         $email   = cleanEmail($body['email'] ?? '');
         $purpose = cleanString($body['purpose'] ?? 'registration');
-        if (!in_array($purpose, ['registration', 'reset-password'], true)) jsonError('Repeat administrator sign-in to request a new security code.', 400);
+        if (!in_array($purpose, ['registration', 'reset-password', 'admin-login'], true)) jsonError('Repeat administrator sign-in to request a new security code.', 400);
         if (!$email) jsonError('Valid email address is required.');
 
-        $otp = sprintf('%06d', random_int(100000, 999999));
+        $otp = isDevEnvironment() ? '123456' : sprintf('%06d', random_int(100000, 999999));
         $now = time();
         $expiresAt = $now + (OTP_EXPIRY_MINUTES * 60);
 
+        $role = $purpose === 'admin-login' ? 'admin' : 'student';
         Database::execute("DELETE FROM email_otps WHERE email = ? AND purpose = ?", [$email, $purpose]);
         Database::execute(
-            "INSERT INTO email_otps (email, code, role, purpose, payload, createdAt, expiresAt, isUsed) VALUES (?, ?, 'student', ?, ?, ?, ?, 0)",
-            [$email, $otp, json_encode(['email' => $email]), $now, $expiresAt]
+            "INSERT INTO email_otps (email, code, role, purpose, payload, createdAt, expiresAt, isUsed) VALUES (?, ?, ?, ?, ?, ?, ?, 0)",
+            [$email, $otp, $role, $purpose, json_encode(['email' => $email]), $now, $expiresAt]
         );
 
         sendVerificationCode($email, 'User', $otp, $purpose);
-        jsonResponse(['success' => true, 'message' => "A new verification code has been sent to {$email}."]);
+        jsonResponse(['success' => true, 'message' => isDevEnvironment() ? "A new verification code has been sent to {$email}. (Dev OTP: 123456)" : "A new verification code has been sent to {$email}."]);
     }
 
     if (in_array($route, ['/auth/send-otp', '/auth/verify-otp'], true)) jsonError('Mobile OTP sign-in is no longer supported. Use email sign-in.', 410);

@@ -14,6 +14,12 @@ import {
   AlertCircle
 } from 'lucide-react';
 
+const isDevHost = typeof window !== 'undefined' && (
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1' ||
+  window.location.hostname === '::1'
+);
+
 export function OtpInput({ length = 6, value = '', onChange, autoFocus = false }) {
   const inputRefs = useRef([]);
   const digits = Array.from({ length }, (_, i) => value[i] || '');
@@ -199,6 +205,7 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
     try {
       const res = await apiRequest('/api/auth/student/send-otp', { email: email.trim() }, true);
       setOtpSent(true);
+      if (isDevHost) setOtp('123456');
       setResendTimer(30);
       setNotice({
         type: 'success',
@@ -308,6 +315,7 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
     try {
       const res = await apiRequest('/api/auth/student/forgot-password/send-otp', { email: email.trim() }, true);
       setOtpSent(true);
+      if (isDevHost) setOtp('123456');
       setResendTimer(30);
       setNotice({
         type: 'success',
@@ -408,6 +416,7 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
 
       setAdminTempEmail(email.trim());
       setAdminNeedsOtp(true);
+      if (isDevHost) setOtp('123456');
       setResendTimer(30);
       setNotice({
         type: 'success',
@@ -573,7 +582,18 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
                 <div className="field">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>Verification OTP</span>
-                    {otpSent && <span style={{ fontSize: 11, color: 'var(--teal)', fontWeight: 700 }}>6-digit code sent</span>}
+                    {isDevHost ? (
+                      <button
+                        type="button"
+                        onClick={() => setOtp('123456')}
+                        style={{ fontSize: 11, color: 'var(--teal)', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                        title="Localhost dev OTP is 123456"
+                      >
+                        ⚡ Dev Mode OTP: 123456
+                      </button>
+                    ) : (
+                      otpSent && <span style={{ fontSize: 11, color: 'var(--teal)', fontWeight: 700 }}>6-digit code sent</span>
+                    )}
                   </div>
                   <OtpInput value={otp} onChange={setOtp} />
                 </div>
@@ -781,7 +801,18 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
                 <div className="field">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>Verification OTP</span>
-                    {otpSent && <span style={{ fontSize: 11, color: 'var(--teal)', fontWeight: 700 }}>6-digit code sent</span>}
+                    {isDevHost ? (
+                      <button
+                        type="button"
+                        onClick={() => setOtp('123456')}
+                        style={{ fontSize: 11, color: 'var(--teal)', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                        title="Localhost dev OTP is 123456"
+                      >
+                        ⚡ Dev Mode OTP: 123456
+                      </button>
+                    ) : (
+                      otpSent && <span style={{ fontSize: 11, color: 'var(--teal)', fontWeight: 700 }}>6-digit code sent</span>
+                    )}
                   </div>
                   <OtpInput value={otp} onChange={setOtp} />
                 </div>
@@ -924,7 +955,18 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
                     <div className="field">
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span>Enter 6-digit security code</span>
-                        <span style={{ fontSize: 11, color: 'var(--teal)', fontWeight: 700 }}>2FA Security Code</span>
+                        {isDevHost ? (
+                          <button
+                            type="button"
+                            onClick={() => setOtp('123456')}
+                            style={{ fontSize: 11, color: 'var(--teal)', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                            title="Localhost dev OTP is 123456"
+                          >
+                            ⚡ Dev Mode OTP: 123456
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: 11, color: 'var(--teal)', fontWeight: 700 }}>2FA Security Code</span>
+                        )}
                       </div>
                       <OtpInput value={otp} onChange={setOtp} autoFocus />
                     </div>
