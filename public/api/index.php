@@ -1689,7 +1689,7 @@ try {
         $admins = Database::fetchAll("SELECT * FROM admins ORDER BY createdAt ASC");
         $safeAdmins = array_map(function($a) {
             unset($a['passwordHash'], $a['salt']);
-            $a['permissions'] = safeJsonDecode($a['permissions'] ?? '[]', ['all']);
+            $a['permissions'] = safeJsonDecode($a['permissions'] ?? '[]', ['manage_students', 'manage_courses']);
             return $a;
         }, $admins);
         jsonResponse($safeAdmins);
@@ -1702,29 +1702,82 @@ try {
         $role        = cleanString($body['role'] ?? 'Admin');
         $department  = cleanString($body['department'] ?? 'Career & Placement Cell');
         $permissions = $body['permissions'] ?? ['manage_students', 'manage_courses'];
-        $avatar      = cleanString($body['avatar'] ?? '');
+        $avatar      = !empty($body['avatar']) ? cleanString($body['avatar']) : null;
         $password    = $body['password'] ?? '';
-        if (strlen($password) < 8) jsonError('Set an administrator password with at least 8 characters.');
 
-        if (!$name || !$email || !$phone) jsonError('Name, email, and mobile number are required.');
+        if (!$name) {
+            jsonError('Full name is required.', 422);
+        }
+        if (!$email) {
+            jsonError('A valid administrator email address is required.', 422);
+        }
+        if (strlen($phone) !== 10) {
+            jsonError('A valid 10-digit mobile number is required.', 422);
+        }
+        if (strlen($password) < 8) {
+            jsonError('Set an administrator password with at least 8 characters.', 422);
+        }
 
-        $existing = Database::fetchOne("SELECT id FROM admins WHERE LOWER(email) = ? OR phone = ?", [$email, $phone]);
-        if ($existing) jsonError('An administrator with this email or mobile already exists.');
+        // Validate password complexity
+        validatePassword($password);
+
+        // Normalize permissions to JSON array string
+        if (is_string($permissions)) {
+            $decoded = json_decode($permissions, true);
+            $permissions = is_array($decoded) ? $decoded : ['manage_students', 'manage_courses'];
+        } else if (!is_array($permissions)) {
+            $permissions = ['manage_students', 'manage_courses'];
+        }
+        $permsJson = json_encode(array_values($permissions));
+
+        // Check for duplicate administrator email or phone
+        $existingEmail = Database::fetchOne("SELECT id FROM admins WHERE LOWER(TRIM(email)) = ?", [$email]);
+        if ($existingEmail) {
+            jsonError('An administrator with this email address already exists.', 409);
+        }
+
+        $existingPhone = Database::fetchOne("SELECT id FROM admins WHERE TRIM(phone) = ?", [$phone]);
+        if ($existingPhone) {
+            jsonError('An administrator with this mobile number already exists.', 409);
+        }
 
         $id = 'admin-' . time() . '-' . random_int(100, 999);
         $now = nowIso();
         $hash = password_hash($password, PASSWORD_BCRYPT);
-        $permsJson = json_encode($permissions);
 
-        Database::execute("
-            INSERT INTO admins (id, name, phone, email, passwordHash, role, department, permissions, avatar, status, createdAt, updatedAt)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
-        ", [$id, $name, $phone, $email, $hash, $role, $department, $permsJson, $avatar, $now, $now]);
+        try {
+            Database::execute("
+                INSERT INTO admins (id, name, phone, email, passwordHash, salt, role, department, permissions, avatar, status, createdAt, updatedAt)
+                VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, 'active', ?, ?)
+            ", [$id, $name, $phone, $email, $hash, $role, $department, $permsJson, $avatar, $now, $now]);
+        } catch (\PDOException $e) {
+            $msg = $e->getMessage();
+            if ($e->getCode() === '23000' || str_contains($msg, 'Duplicate entry')) {
+                if (str_contains($msg, 'phone') || str_contains($msg, 'idx_admins_phone')) {
+                    jsonError('An administrator with this mobile number already exists.', 409);
+                }
+                if (str_contains($msg, 'email') || str_contains($msg, 'idx_admins_email')) {
+                    jsonError('An administrator with this email address already exists.', 409);
+                }
+                jsonError('An administrator with this email or mobile number already exists.', 409);
+            }
+            error_log("[ADMIN CREATE DB ERROR] " . $msg);
+            jsonError('Database error creating administrator: ' . $msg, 500);
+        }
 
         $created = Database::fetchOne("SELECT * FROM admins WHERE id = ?", [$id]);
+        if (!$created) {
+            jsonError('Administrator was registered but could not be reloaded.', 500);
+        }
         unset($created['passwordHash'], $created['salt']);
         $created['permissions'] = $permissions;
-        jsonResponse($created, 201);
+        $created['isMain'] = false;
+
+        jsonResponse(array_merge($created, [
+            'success' => true,
+            'message' => "Administrator \"{$name}\" added successfully.",
+            'admin'   => $created
+        ]), 201);
     }
 
     if (preg_match('#^/admins/([^/]+)$#', $route, $matches)) {
@@ -1734,29 +1787,71 @@ try {
             $admin = Database::fetchOne("SELECT * FROM admins WHERE id = ?", [$adminId]);
             if (!$admin) jsonError('Administrator not found.', 404);
 
+            $isMain = ($adminId === 'admin-jatp-main' || $adminId === 'admin-root' || $adminId === 'admin-podar-root' || strtolower($admin['email'] ?? '') === 'jatp22316@gmail.com' || strtolower($admin['email'] ?? '') === 'admin@podar.edu');
+
             $name        = cleanString($body['name'] ?? $admin['name']);
             $phone       = cleanPhone($body['phone'] ?? $admin['phone']);
             $role        = cleanString($body['role'] ?? $admin['role']);
             $department  = cleanString($body['department'] ?? $admin['department']);
-            $avatar      = cleanString($body['avatar'] ?? $admin['avatar']);
+            $avatar      = array_key_exists('avatar', $body) ? (!empty($body['avatar']) ? cleanString($body['avatar']) : null) : $admin['avatar'];
             $status      = cleanString($body['status'] ?? $admin['status']);
-            $permsJson   = isset($body['permissions']) ? json_encode($body['permissions']) : $admin['permissions'];
 
-            Database::execute("
-                UPDATE admins SET name = ?, phone = ?, role = ?, department = ?, avatar = ?, status = ?, permissions = ?, updatedAt = ?
-                WHERE id = ?
-            ", [$name, $phone, $role, $department, $avatar, $status, $permsJson, nowIso(), $adminId]);
+            // Email updating for non-main admins
+            $newEmail = cleanEmail($body['email'] ?? $admin['email']);
+            if (!$isMain && $newEmail && $newEmail !== strtolower($admin['email'])) {
+                $emailConflict = Database::fetchOne("SELECT id FROM admins WHERE LOWER(TRIM(email)) = ? AND id != ?", [$newEmail, $adminId]);
+                if ($emailConflict) jsonError('An administrator with this email address already exists.', 409);
+                $email = $newEmail;
+            } else {
+                $email = $admin['email'];
+            }
+
+            // Phone conflict check
+            if ($phone && $phone !== $admin['phone']) {
+                $phoneConflict = Database::fetchOne("SELECT id FROM admins WHERE TRIM(phone) = ? AND id != ?", [$phone, $adminId]);
+                if ($phoneConflict) jsonError('An administrator with this mobile number already exists.', 409);
+            }
+
+            // Permissions
+            if ($isMain) {
+                $permsJson = $admin['permissions'];
+            } else if (isset($body['permissions'])) {
+                $permsArray = is_array($body['permissions']) ? $body['permissions'] : safeJsonDecode($body['permissions'], []);
+                $permsJson = json_encode(array_values($permsArray));
+            } else {
+                $permsJson = $admin['permissions'];
+            }
+
+            try {
+                Database::execute("
+                    UPDATE admins SET name = ?, email = ?, phone = ?, role = ?, department = ?, avatar = ?, status = ?, permissions = ?, updatedAt = ?
+                    WHERE id = ?
+                ", [$name, $email, $phone, $role, $department, $avatar, $status, $permsJson, nowIso(), $adminId]);
+            } catch (\PDOException $e) {
+                $msg = $e->getMessage();
+                if ($e->getCode() === '23000' || str_contains($msg, 'Duplicate entry')) {
+                    jsonError('An administrator with this email or mobile number already exists.', 409);
+                }
+                error_log("[ADMIN UPDATE DB ERROR] " . $msg);
+                jsonError('Database error updating administrator: ' . $msg, 500);
+            }
 
             $updated = Database::fetchOne("SELECT * FROM admins WHERE id = ?", [$adminId]);
             unset($updated['passwordHash'], $updated['salt']);
             $updated['permissions'] = safeJsonDecode($updated['permissions'] ?? '[]', []);
-            jsonResponse($updated);
+            $updated['isMain'] = $isMain;
+
+            jsonResponse(array_merge($updated, [
+                'success' => true,
+                'message' => "Administrator \"{$name}\" updated successfully.",
+                'admin'   => $updated
+            ]));
         }
 
         if ($method === 'DELETE') {
             $admin = Database::fetchOne("SELECT * FROM admins WHERE id = ?", [$adminId]);
             $admEmail = strtolower($admin['email'] ?? '');
-            if ($admin && ($admEmail === 'admin@podar.edu' || $admEmail === 'jatp22316@gmail.com' || $adminId === 'admin-jatp-main' || $adminId === 'admin-podar-root')) {
+            if ($admin && ($admEmail === 'admin@podar.edu' || $admEmail === 'jatp22316@gmail.com' || $adminId === 'admin-jatp-main' || $adminId === 'admin-root' || $adminId === 'admin-podar-root')) {
                 jsonError('Main Administrator account cannot be deleted.', 403);
             }
             Database::execute("DELETE FROM admins WHERE id = ?", [$adminId]);

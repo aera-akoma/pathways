@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS `admins` (
   `salt` VARCHAR(64) DEFAULT NULL,
   `role` VARCHAR(50) DEFAULT 'Admin',
   `department` VARCHAR(100) DEFAULT 'Career & Placement Cell',
-  `permissions` TEXT NOT NULL,
+  `permissions` TEXT DEFAULT NULL,
   `avatar` MEDIUMTEXT DEFAULT NULL,
   `status` ENUM('active', 'suspended') DEFAULT 'active',
   `createdAt` DATETIME NOT NULL,

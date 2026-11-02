@@ -27,6 +27,7 @@ import {
   Award,
   Download,
   Eye,
+  EyeOff,
   CheckCircle2,
   ShieldAlert,
   FileText,
@@ -2028,6 +2029,7 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
     : defaultAdmins;
 
   const [formError, setFormError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
   const [search, setSearch] = useState('');
@@ -2068,6 +2070,7 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
     setDepartment('Career & Placement Cell');
     setRole('Placement Officer');
     setPassword('');
+    setShowPassword(false);
     setFormError('');
     setPermissions(['manage_students', 'manage_internships', 'manage_placements']);
     setModalMode('add');
@@ -2075,6 +2078,7 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
 
   const openEditModal = (admin) => {
     setFormError('');
+    setShowPassword(false);
     setActiveAdmin(admin);
     setName(admin.name || '');
     setEmail(admin.email || '');
@@ -2089,6 +2093,7 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
   const closeModal = () => {
     if (savingRef.current) return;
     setFormError('');
+    setShowPassword(false);
     setModalMode(null);
     setActiveAdmin(null);
   };
@@ -2130,15 +2135,34 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
     setFormError('');
     e.preventDefault();
     if (!name.trim() || !email.trim()) {
-      setFormError('Name and email are required.');
+      const msg = 'Name and email are required.';
+      setFormError(msg);
+      notify?.(msg);
       return;
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setFormError('Enter a valid email address.'); return; }
-    if (!/^[0-9]{10}$/.test(phone.replace(/\D/g, ''))) { setFormError('Enter a valid 10-digit mobile number.'); return; }
-    if (modalMode === 'add' && passwordError(password)) { setFormError(PASSWORD_HINT); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      const msg = 'Enter a valid email address.';
+      setFormError(msg);
+      notify?.(msg);
+      return;
+    }
+
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (!/^[0-9]{10}$/.test(cleanPhone)) {
+      const msg = 'Enter a valid 10-digit mobile number.';
+      setFormError(msg);
+      notify?.(msg);
+      return;
+    }
+
+    if (modalMode === 'add' && passwordError(password)) {
+      setFormError(PASSWORD_HINT);
+      notify?.(PASSWORD_HINT);
+      return;
+    }
+
     if (modalMode === 'add') {
-      const cleanPhone = phone.replace(/\D/g, '');
       try {
         const data = await requestJson('/api/admins', {
           method: 'POST',
@@ -2155,21 +2179,24 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
         });
 
         const saved = requireRecord(data, 'admin');
-        setState(prev => ({ ...prev, admins: [...(prev.admins || []), { ...saved, isMain: false }] }));
+        setState(prev => ({
+          ...prev,
+          admins: [...(prev.admins || []).filter(a => a.id !== saved.id), { ...saved, isMain: false }]
+        }));
+        notify?.(`Administrator "${name.trim()}" added successfully!`);
       } catch (error) {
-        setFormError(error.message || 'Could not create administrator.');
+        const errorMsg = error.message || 'Could not create administrator.';
+        setFormError(errorMsg);
+        notify?.(errorMsg);
         return;
       }
-
-      notify?.(`Administrator "${name}" added successfully!`);
     } else if (modalMode === 'edit' && activeAdmin) {
-      const cleanPhone = phone.replace(/\D/g, '') || activeAdmin.phone;
       const isMain = isMainAdminAccount(activeAdmin);
       const updated = {
         ...activeAdmin,
         name: name.trim(),
         email: email.trim().toLowerCase(),
-        phone: cleanPhone,
+        phone: cleanPhone || activeAdmin.phone,
         department: department.trim(),
         role: role.trim(),
         permissions: isMain ? activeAdmin.permissions : permissions
@@ -2182,13 +2209,17 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
           body: JSON.stringify(updated)
         });
         const saved = requireRecord(data, 'admin');
-        setState(prev => ({ ...prev, admins: (prev.admins || []).map(a => a.id === activeAdmin.id ? { ...a, ...saved } : a) }));
+        setState(prev => ({
+          ...prev,
+          admins: (prev.admins || []).map(a => a.id === activeAdmin.id ? { ...a, ...saved } : a)
+        }));
+        notify?.(`Administrator "${updated.name}" updated!`);
       } catch (error) {
-        setFormError(error.message || 'Could not update administrator.');
+        const errorMsg = error.message || 'Could not update administrator.';
+        setFormError(errorMsg);
+        notify?.(errorMsg);
         return;
       }
-
-      notify?.(`Administrator "${updated.name}" updated!`);
     }
 
     setModalMode(null);
@@ -2435,13 +2466,38 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
                 {modalMode === 'add' && (
                   <div className="minimal-form-group">
                     <label>Password *</label>
-                    <input
-                      type="password" required autoComplete="new-password"
-                      placeholder="Create a strong password"
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                    />
-                    <small>{PASSWORD_HINT}</small>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        autoComplete="new-password"
+                        placeholder="Create a strong password"
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        style={{ paddingRight: '40px' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(p => !p)}
+                        style={{
+                          position: 'absolute',
+                          right: '10px',
+                          background: 'none',
+                          border: 'none',
+                          color: '#6b7280',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '4px'
+                        }}
+                        title={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                    <small style={{ display: 'block', fontSize: '11.5px', color: '#6b7280', marginTop: '4px', lineHeight: 1.4 }}>
+                      {PASSWORD_HINT}
+                    </small>
                   </div>
                 )}
 
@@ -2469,7 +2525,12 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
                 )}
               </div>
 
-              <div className="minimal-modal-footer">
+              <div className="minimal-modal-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
+                {formError && (
+                  <span style={{ color: '#dc2626', fontSize: '12px', marginRight: 'auto', fontWeight: 500, maxWidth: '60%', lineHeight: 1.3 }}>
+                    {formError}
+                  </span>
+                )}
                 <button type="button" className="minimal-btn-secondary" onClick={closeModal}>
                   Cancel
                 </button>
