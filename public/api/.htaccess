@@ -15,16 +15,15 @@
     RewriteEngine On
 
     # Block direct HTTP access to internal PHP logic files & env
-    RewriteRule ^(config|db|mailer)\.php$ - [F,L]
+    RewriteRule ^(config|db|mailer|router)\.php$ - [F,L,NC]
     RewriteRule ^(\.env|.*\.log)$ - [F,L]
     
     # Block direct access to log files
     RewriteRule ^logs/.*$ - [F,L]
 
     # Route all other API requests to index.php
-    RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteRule ^(.*)$ index.php [QSA,L]
+    RewriteRule ^index\.php$ - [L]
+    RewriteRule ^ index.php [QSA,L]
 </IfModule>
 
 # Prevent directory browsing

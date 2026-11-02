@@ -280,6 +280,33 @@ export function CourseCatalog({
   const handleOpenCourse = async (course) => {
     setOpeningCourseId(course.id);
     try {
+      const studentName = student?.name || session?.student?.name || session?.name || 'Student';
+      const studentPhone = student?.phone || session?.student?.phone || '';
+
+      if (currentStudentId) {
+        const payload = {
+          studentId: currentStudentId,
+          studentName,
+          studentPhone,
+          courseTitle: course.title,
+          programTitle: course.title,
+          url: course.url || course.link || ''
+        };
+        fetch('/api/programs/' + encodeURIComponent(course.id) + '/click', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).catch(() => {
+          fetch('/api/courses/' + encodeURIComponent(course.id) + '/click', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          }).catch(() => {});
+        });
+      }
+
       if (setState) {
         const enrolledCourse = {
           ...course,
@@ -287,25 +314,58 @@ export function CourseCatalog({
           enrolled_at: new Date().toISOString()
         };
 
-        setState(prev => ({
-          ...prev,
-          courses: (prev.courses || []).map(c => c.id === course.id ? enrolledCourse : c),
-          studentCourses: [
-            ...(prev.studentCourses || []).filter(c => c.id !== course.id),
-            enrolledCourse
-          ],
-          students: (prev.students || []).map(s =>
-            s.id === currentStudentId
-              ? {
-                  ...s,
-                  enrolledCourses: [
-                    ...(s.enrolledCourses || []).filter(c => c.id !== course.id),
-                    enrolledCourse
-                  ]
-                }
-              : s
-          )
-        }));
+        setState(prev => {
+          const prevClicks = Array.isArray(prev?.courseClicks) ? prev.courseClicks : [];
+          const existingClick = prevClicks.find(c => c.programId === course.id && c.studentId === currentStudentId);
+          const nowStr = new Date().toISOString();
+
+          return {
+            ...prev,
+            courses: (prev.courses || []).map(c => {
+              if (c.id === course.id) {
+                const clickedStudentIds = Array.isArray(c.clickedStudentIds) ? c.clickedStudentIds : [];
+                const updatedIds = currentStudentId && !clickedStudentIds.includes(currentStudentId)
+                  ? [...clickedStudentIds, currentStudentId]
+                  : clickedStudentIds;
+                return {
+                  ...c,
+                  ...enrolledCourse,
+                  clickCount: updatedIds.length || (c.clickCount ? c.clickCount + 1 : 1),
+                  clickedStudentIds: updatedIds
+                };
+              }
+              return c;
+            }),
+            studentCourses: [
+              ...(prev.studentCourses || []).filter(c => c.id !== course.id),
+              enrolledCourse
+            ],
+            courseClicks: existingClick
+              ? prevClicks.map(c => c.id === existingClick.id ? { ...c, clickedAt: nowStr } : c)
+              : [
+                  ...prevClicks,
+                  {
+                    id: `pclk-${Date.now()}`,
+                    programId: course.id,
+                    studentId: currentStudentId,
+                    studentName,
+                    studentPhone,
+                    clickedAt: nowStr
+                  }
+                ],
+            students: (prev.students || []).map(s =>
+              s.id === currentStudentId
+                ? {
+                    ...s,
+                    enrolledCourses: [
+                      ...(s.enrolledCourses || []).filter(c => c.id !== course.id),
+                      enrolledCourse
+                    ]
+                  }
+                : s
+            )
+          };
+        });
       }
 
       const destinationUrl = course.url || course.link || 'https://www.coursera.org';

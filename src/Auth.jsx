@@ -1,3 +1,4 @@
+import { passwordError, PASSWORD_HINT } from './validation.js';
 import React, { useState, useEffect, useRef } from 'react';
 import './styles.css';
 import { DEFAULT_STUDENT_AVATAR } from './defaultAvatar.js';
@@ -152,133 +153,7 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
     setAuthView(newView);
   };
 
-  // Fallback for static hosting without Node.js backend
-  const handleStaticFallback = (url, body = {}) => {
-    const cleanEmail = (body.email || '').trim().toLowerCase();
-
-    // 1. Send OTP (Registration or Forgot Password)
-    if (url.includes('/send-otp')) {
-      return {
-        success: true,
-        message: `Verification code sent to ${cleanEmail}. Please check your inbox or spam folder.`
-      };
-    }
-
-    // 2. Student Registration
-    if (url.includes('/student/register')) {
-      const existing = (state?.students || []).find(s => s.email?.toLowerCase() === cleanEmail);
-      const studentId = existing?.id || `student-static-${Date.now()}`;
-      const namePart = cleanEmail.split('@')[0].replace(/[._-]/g, ' ');
-      const formattedName = namePart.charAt(0).toUpperCase() + namePart.slice(1) || 'Student';
-      const newStudent = existing || {
-        id: studentId,
-        name: formattedName,
-        phone: '9000000001',
-        course: 'BCA',
-        semester: 'V',
-        email: cleanEmail,
-        goal: 'Software Engineer',
-        score: 0,
-        completion: 0,
-        applications: 0,
-        projects: 0,
-        certificates: 0,
-        avatar: DEFAULT_STUDENT_AVATAR
-      };
-      return {
-        success: true,
-        message: `Welcome, ${newStudent.name}!`,
-        session: {
-          role: 'student',
-          id: newStudent.id,
-          token: `session-${newStudent.id}-${Date.now()}`,
-          avatar: (newStudent?.avatar && typeof newStudent.avatar === 'string' && !newStudent.avatar.startsWith('data:image/jpeg;base64')) ? newStudent.avatar : DEFAULT_STUDENT_AVATAR,
-          student: newStudent
-        }
-      };
-    }
-
-    // 3. Student Login
-    if (url.includes('/student/login')) {
-      const match = (state?.students || []).find(s => s.email?.toLowerCase() === cleanEmail);
-      if (!match) {
-        return {
-          success: false,
-          error: 'No student account found with this email. Please sign up first.'
-        };
-      }
-
-      return {
-        success: true,
-        message: `Welcome back, ${match.name}!`,
-        session: {
-          role: 'student',
-          id: match.id,
-          token: `session-${match.id}-${Date.now()}`,
-          avatar: (match?.avatar && typeof match.avatar === 'string' && !match.avatar.startsWith('data:image/jpeg;base64')) ? match.avatar : DEFAULT_STUDENT_AVATAR,
-          student: match
-        }
-      };
-    }
-
-    // 4. Student Forgot Password Reset
-    if (url.includes('/forgot-password/reset')) {
-      const match = (state?.students || []).find(s => s.email?.toLowerCase() === cleanEmail);
-      if (!match) {
-        return {
-          success: false,
-          error: 'No student account found with this email.'
-        };
-      }
-      return {
-        success: true,
-        message: 'Password reset successfully!',
-        session: {
-          role: 'student',
-          id: match.id,
-          token: `session-${match.id}-${Date.now()}`,
-          avatar: (match?.avatar && typeof match.avatar === 'string' && !match.avatar.startsWith('data:image/jpeg;base64')) ? match.avatar : DEFAULT_STUDENT_AVATAR,
-          student: match
-        }
-      };
-    }
-
-    // 5. Admin Login Step 1
-    if (url.includes('/admin/login-step1')) {
-      return {
-        success: true,
-        message: 'Credentials verified. 2FA security code has been sent to your registered email.'
-      };
-    }
-
-    // 6. Admin Verify OTP
-    if (url.includes('/admin/verify-otp')) {
-      return {
-        success: true,
-        message: 'Welcome to Admin Console!',
-        session: {
-          role: 'admin',
-          id: 'admin-workspace',
-          name: 'Admin Workspace',
-          email: body.email || 'admin@podar.edu',
-          token: `admin-token-${Date.now()}`,
-          avatar: null
-        }
-      };
-    }
-
-    // 7. Resend OTP
-    if (url.includes('/resend-otp')) {
-      return {
-        success: true,
-        message: 'A new security code has been sent to your email.'
-      };
-    }
-
-    return { success: true };
-  };
-
-  // Helper for API calls with automatic static hosting fallback
+  // Authentication requires a successful response from the server.
   const apiRequest = async (url, body, isOtpAction = false) => {
     if (isOtpAction) setOtpLoading(true);
     else setLoading(true);
@@ -287,21 +162,22 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
     try {
       const res = await fetch(url, {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
       const contentType = res.headers.get('content-type') || '';
       if (!contentType.includes('application/json')) {
-        return handleStaticFallback(url, body);
+        throw new Error('The sign-in service is unavailable. Please try again later.');
       }
       const data = await res.json();
-      if (!res.ok) {
+      if (!res.ok || data.success === false || data.error) {
         throw new Error(data.error || 'Request failed. Please try again.');
       }
       return data;
     } catch (err) {
       if (err.name === 'TypeError' || err.message?.includes('fetch') || err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
-        return handleStaticFallback(url, body);
+        throw new Error('Unable to reach the sign-in service. Check your connection and try again.');
       }
       throw err;
     } finally {
@@ -346,9 +222,7 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
     if (!otp || otp.trim().length !== 6) {
       return setNotice({ type: 'error', text: 'Please enter the 6-digit OTP code sent to your email.' });
     }
-    if (!password || password.length < 6) {
-      return setNotice({ type: 'error', text: 'Password must be at least 6 characters long.' });
-    }
+    if (passwordError(password)) { return setNotice({ type: 'error', text: PASSWORD_HINT }); }
     if (password !== confirmPassword) {
       return setNotice({ type: 'error', text: 'Passwords do not match.' });
     }
@@ -362,6 +236,7 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
 
       // Update state if new student created
       const sessionData = res.session || res;
+      if (!sessionData?.id || !['student', 'admin'].includes(sessionData.role)) throw new Error('The server did not return a valid session. Please sign in again.');
       if (sessionData?.student) {
         setState(prev => {
           const list = prev.students || [];
@@ -401,6 +276,7 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
       });
 
       const sessionData = res.session || res;
+      if (!sessionData?.id || !['student', 'admin'].includes(sessionData.role)) throw new Error('The server did not return a valid session. Please sign in again.');
       if (sessionData?.student) {
         setState(prev => {
           const list = prev.students || [];
@@ -454,9 +330,7 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
     if (!otp || otp.trim().length !== 6) {
       return setNotice({ type: 'error', text: 'Please enter the 6-digit OTP code sent to your email.' });
     }
-    if (!password || password.length < 6) {
-      return setNotice({ type: 'error', text: 'New password must be at least 6 characters long.' });
-    }
+    if (passwordError(password)) { return setNotice({ type: 'error', text: PASSWORD_HINT }); }
     if (password !== confirmPassword) {
       return setNotice({ type: 'error', text: 'Passwords do not match.' });
     }
@@ -482,6 +356,7 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
       }
 
       const sessionData = res.session || res;
+      if (!sessionData?.id || !['student', 'admin'].includes(sessionData.role)) throw new Error('The server did not return a valid session. Please sign in again.');
       notify(res.message || 'Password reset successfully!');
       onLogin(sessionData);
     } catch (err) {
@@ -508,6 +383,7 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
         });
 
         const sessionData = res.session || res;
+      if (!sessionData?.id || !['student', 'admin'].includes(sessionData.role)) throw new Error('The server did not return a valid session. Please sign in again.');
         notify(res.message || 'Welcome to Admin Console!');
         onLogin(sessionData);
       } catch (err) {
@@ -711,12 +587,14 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={e => setPassword(e.target.value)}
-                      placeholder="Minimum 6 characters"
+                      placeholder="8–72 characters, uppercase, lowercase, number & symbol"
                       required
                     />
                     <button
                       type="button"
                       className="input-eye-btn"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      aria-pressed={showPassword}
                       onClick={() => setShowPassword(!showPassword)}
                     >
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -739,6 +617,8 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
                     <button
                       type="button"
                       className="input-eye-btn"
+                      aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                      aria-pressed={showConfirmPassword}
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     >
                       {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -810,6 +690,8 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
                     <button
                       type="button"
                       className="input-eye-btn"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      aria-pressed={showPassword}
                       onClick={() => setShowPassword(!showPassword)}
                     >
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -912,12 +794,14 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={e => setPassword(e.target.value)}
-                      placeholder="Minimum 6 characters"
+                      placeholder="8–72 characters, uppercase, lowercase, number & symbol"
                       required
                     />
                     <button
                       type="button"
                       className="input-eye-btn"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      aria-pressed={showPassword}
                       onClick={() => setShowPassword(!showPassword)}
                     >
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -939,6 +823,8 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
                     <button
                       type="button"
                       className="input-eye-btn"
+                      aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                      aria-pressed={showConfirmPassword}
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     >
                       {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -1019,7 +905,9 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
                         <button
                           type="button"
                           className="input-eye-btn"
-                          onClick={() => setShowPassword(!showPassword)}
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      aria-pressed={showPassword}
+                      onClick={() => setShowPassword(!showPassword)}
                         >
                           {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>

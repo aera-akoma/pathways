@@ -1,4 +1,6 @@
 # Podar Pathways - Production SPA .htaccess
+Options -Indexes -MultiViews
+DirectoryIndex index.html
 
 # Block direct browser access to sensitive files (.env, .sql, .log, etc.)
 <FilesMatch "^\.|\.(env|sql|log|ini|sh|bak)$">
@@ -17,14 +19,14 @@
 
   # Forbid direct HTTP access to .env and database files
   RewriteRule ^(\.env|database\.sql|.*\.log) - [F,L]
+  RewriteRule ^api/(?:logs(?:/|$)|.*\.(?:php|json|sql|ini|bak)$) - [F,L,NC]
+
+  # Route API roots and nested endpoints before the SPA fallback (Apache 2.4).
+  RewriteRule ^api(?:/.*)?$ api/index.php [QSA,END]
 
   # Allow direct access to existing files and directories (assets, images, etc.)
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
-  RewriteRule ^ - [L]
-
-  # Allow direct pass-through for API requests to backend PHP handler
-  RewriteCond %{REQUEST_URI} ^/api [NC]
   RewriteRule ^ - [L]
 
   # Route all other web URL paths (e.g. /projects, /courses, /opportunities) to index.html

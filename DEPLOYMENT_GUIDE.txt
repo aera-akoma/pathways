@@ -1,50 +1,49 @@
-=============================================================================
-PODAR PATHWAYS - phpMyAdmin & MySQL PRODUCTION DEPLOYMENT GUIDE
-=============================================================================
+PODAR PATHWAYS - PHP / MYSQL DEPLOYMENT
 
-1. UPLOAD FILES TO CPANEL:
-   - Log into your cPanel File Manager.
-   - Navigate to 'public_html' (or your target domain web root).
-   - Upload 'podar-pathways-production.zip' (or 'public.zip').
-   - Extract the zip file directly in 'public_html'.
-   - IMPORTANT (Dotfiles / Hidden Files): By default, cPanel hides files starting with a dot (.env, .htaccess).
-     If you don't see '.env' or '.htaccess', click "Settings" in the top-right corner of cPanel File Manager,
-     check "Show Hidden Files (dotfiles)", and click "Save".
-   - Ensure 'index.html', '.htaccess', '.env', 'api/', and 'assets/' are in the web root.
+Requirements: PHP 8+ with PDO MySQL, MySQL, Node.js compatible with the installed
+Vite release, and Apache 2.4 with mod_rewrite and AllowOverride enabled for hosting.
 
-2. IMPORT THE DATABASE IN phpMyAdmin:
-   - In cPanel, go to "MySQL Databases" and create the database(s):
-       * Main DB:         mpoda209_pathways      (or podar_pathways)
-       * Certificates DB: mpoda209_certificates  (or podar_certificates)
-       * Projects DB:     mpoda209_projects      (or podar_projects)
-     (Tip: You can also use a single database name for all 3 if preferred.)
-   - Create a database user, assign ALL PRIVILEGES, and add to the database(s).
-   - Open "phpMyAdmin".
-   - Select your database and click "Import".
-   - Choose the included 'database.sql' and click "Go / Import".
-   - The tables and default administrator (jatp22316@gmail.com) will be set up.
+LOCAL DEVELOPMENT
+1. Run npm ci, then npm run build.
+2. Copy .env.example to .env and fill in your database and SMTP credentials.
+3. Run npm start. Open http://127.0.0.1:5000.
+   PHP is found through PATH, PHP_BINARY, or C:/xampp/php/php.exe on Windows.
+   Optional process environment variable PORT changes the local port.
+4. For frontend hot reload, keep the PHP server on port 5000 and run
+   npm run client:dev in another terminal. Open http://localhost:5173.
 
-3. CONFIGURE .env:
-   - Open '.env' (in the web root or inside 'api/').
-   - Verify/update your MySQL credentials:
-       DB_DRIVER=mysql
-       DB_HOST=localhost
-       DB_PORT=3306
-       DB_NAME=mpoda209_pathways
-       DB_USER=mpoda209_admin
-       DB_PASS=Admin@2026!
-       DB_CERTIFICATES_NAME=mpoda209_certificates
-       DB_PROJECTS_NAME=mpoda209_projects
-   - Set SMTP email credentials for live OTP delivery:
-       SMTP_HOST=mail.podarpathways.com
-       SMTP_PORT=465
-       SMTP_SECURE=ssl
-       SMTP_USER=noreply@podarpathways.com
-       SMTP_PASS=noreply@podar.com
-       EMAIL_FROM="Podar Pathways Academic Board <noreply@podarpathways.com>"
+PRODUCTION BUILD AND UPLOAD
+1. Run npm ci and npm run build. The build creates dist/ with the frontend,
+   API PHP files, router.php, and hidden .htaccess files. Runtime audit logs,
+   .env files, database dumps and backups are excluded.
+2. Upload the CONTENTS of dist/ to your domain's document root. Enable
+   "Show Hidden Files" in cPanel and ensure both .htaccess files are uploaded.
+   Do not upload the repository, database.sql, old ZIP archives, or node_modules.
+   Do not reuse the pre-existing production ZIPs: they may contain stale code.
+3. Back up the existing deployment and database before replacing files.
+   Preserve server-only configuration and runtime logs; do not publish logs.
+4. Keep .env one directory ABOVE the document root wherever possible.
+   The API also supports .env at the document root or api/.env, protected by
+   Apache rules, but a location outside the document root is preferred.
+5. Set APP_ENV=production. Supply DB_HOST, DB_PORT, DB_NAME, DB_USER and DB_PASS.
+   Use a fresh, long random ADMIN_KEY; no shared example secret is provided.
+6. On a NEW database only, import database.sql through phpMyAdmin. Review the
+   schema and seed administrator before use. Do not import over live data.
+   DB_CERTIFICATES_NAME and DB_PROJECTS_NAME may use the same main database.
+7. Configure a working SMTP account: USE_SMTP=true, SMTP_HOST, SMTP_USER,
+   SMTP_PASS; use SMTP_PORT=587 with SMTP_SECURE=tls, or port 465 with ssl.
+   EMAIL_FROM must be a plain email address; MAIL_FROM_NAME is its display name.
+   Keep all credentials server-side; never use a VITE_ variable for secrets.
+8. Enable HTTPS using the hosting control panel. The PHP built-in server is
+   for local development only, not public production hosting.
 
-4. PURE phpMyAdmin / MySQL ARCHITECTURE:
-   - Strictly uses MySQL / phpMyAdmin. No SQLite files or fallbacks are included.
-   - Zero demo entries, zero sample students. Ready for real production deployment.
-=============================================================================
-
+VERIFY BEFORE RELEASE
+- / and a frontend route such as /projects render the application.
+- /robots.txt and /sitemap.xml have text/plain and application/xml MIME types.
+- /api/health returns JSON; check its database status.
+- /api and unknown /api routes return JSON, not the frontend HTML.
+- /.env, /package.json, /api/config.php and /api/logs/otp_audit.log are denied.
+- Test authentication, OTP delivery and writes against a disposable test
+  database and test SMTP account before changing production data.
+- If API routes return 404 or SPA HTML, confirm Apache's rewrite module and
+  AllowOverride support; this deployment expects a domain-root installation.

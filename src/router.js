@@ -96,6 +96,10 @@ export function pageToPath(page, role = 'student', params = {}) {
 /**
  * Parse the current browser location (pathname, hash, search) into page and params
  */
+function safeDecodePath(value) {
+  try { return decodeURIComponent(value); } catch { return value; }
+}
+
 export function parseCurrentLocation(role = 'student') {
   if (typeof window === 'undefined') {
     return { page: 'dashboard', params: {}, rawPath: '/' };
@@ -110,9 +114,7 @@ export function parseCurrentLocation(role = 'student') {
     const rawHash = hash.replace(/^#\/?/, '/');
     const hashSplit = rawHash.split('?');
     pathname = hashSplit[0] || '/';
-    if (hashSplit[1]) {
-      search = '?' + hashSplit[1];
-    }
+    search = hashSplit.length > 1 ? '?' + hashSplit.slice(1).join('?') : '';
   }
 
   // Strip index.html and trailing slashes
@@ -153,7 +155,7 @@ export function parseCurrentLocation(role = 'student') {
     return { page: 'students', params, rawPath: pathname, role: 'admin' };
   }
   if (pathname.startsWith('/admin/student/')) {
-    const studentId = decodeURIComponent(pathname.slice(15));
+    const studentId = safeDecodePath(pathname.slice(15));
     return {
       page: `admin-student:${studentId}`,
       params: { ...params, studentId },
@@ -194,7 +196,7 @@ export function parseCurrentLocation(role = 'student') {
     return { page: 'projects', params, rawPath: pathname, role };
   }
   if (pathname.startsWith('/projects/')) {
-    const projId = decodeURIComponent(pathname.slice(10));
+    const projId = safeDecodePath(pathname.slice(10));
     return {
       page: 'projects',
       params: { ...params, project: projId },
@@ -270,18 +272,18 @@ export function pushRoute(page, role = 'student', options = {}) {
 
   let targetPath = pageToPath(page, role, params);
 
-  // If params are passed and not already in path
-  const urlSearchParams = new URLSearchParams(keepSearch ? window.location.search : '');
-  Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== null && !targetPath.includes(`${k}=`)) {
-      urlSearchParams.set(k, v);
-    }
+  // Merge existing and new query parameters without dropping filters.
+  const [pathname, existingSearch = ''] = targetPath.split('?');
+  const currentSearch = window.location.hash.startsWith('#/')
+    ? window.location.hash.split('?').slice(1).join('?')
+    : window.location.search;
+  const urlSearchParams = new URLSearchParams(keepSearch ? currentSearch : '');
+  new URLSearchParams(existingSearch).forEach((value, key) => urlSearchParams.set(key, value));
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) urlSearchParams.set(key, value);
   });
-
   const queryString = urlSearchParams.toString();
-  if (queryString && !targetPath.includes('?')) {
-    targetPath += `?${queryString}`;
-  }
+  targetPath = pathname + (queryString ? '?' + queryString : '');
 
   // Check if hash mode is currently active
   const isHashMode = window.location.hash.startsWith('#/');

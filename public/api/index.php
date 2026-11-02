@@ -11,6 +11,9 @@ define('PODAR_APP', true);
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/mailer.php';
+require_once __DIR__ . '/validation.php';
+require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/public-certificates.php';
 
 // Normalize URI path to extract relative API route
 $requestUri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
@@ -27,6 +30,20 @@ $route = '/' . trim($route, '/');
 
 // Parse request payload
 $body = getJsonInput();
+validateRequestFields($body, $route);
+
+function sendVerificationCode(string $email, string $name, string $otp, string $purpose): void {
+    $result = Mailer::sendOtp($email, $name, $otp, $purpose);
+    $isLocal = (DIRECTORY_SEPARATOR === '\\') || (defined('APP_ENV') && APP_ENV !== 'production');
+    if (empty($result['success'])) {
+        if ($isLocal) {
+            error_log("[DEV OTP SIMULATION] OTP for {$email} ({$purpose}): {$otp}");
+            return;
+        }
+        Database::execute('DELETE FROM email_otps WHERE email = ? AND purpose = ?', [$email, $purpose]);
+        jsonError('Verification email could not be sent. Please try again later.', 503);
+    }
+}
 
 // Helper to generate MySQL-compatible datetime timestamps
 function nowIso(): string {
@@ -72,6 +89,25 @@ $enrichPhpProject = function($post, $currentStudentId = '') {
 // ========================================================
 
 try {
+    if ($route === '/auth/logout' && $method === 'POST') {
+        startAuthSession();
+        $_SESSION = [];
+        session_destroy();
+        setcookie('podar_session', '', ['expires' => time() - 3600, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
+        jsonResponse(['success' => true]);
+    }
+    if ($route === '/auth/session' && $method === 'GET') {
+        startAuthSession();
+        $auth = $_SESSION['auth'] ?? null;
+        if (!$auth || ($_SESSION['expiresAt'] ?? 0) < time()) {
+            jsonResponse(['authenticated' => false, 'session' => null]);
+        }
+        jsonResponse(['authenticated' => true, 'session' => authenticatedSession()]);
+    }
+    $auth = authorizeRoute($route, $method, $body);
+    if ($method === 'GET' && preg_match('#^/students/([^/]+)/public-certificates$#', $route, $matches)) {
+        jsonResponse(publicCertificatesForStudent(rawurldecode($matches[1])));
+    }
 
     // ----------------------------------------------------
     // 1. HEALTH CHECK
@@ -175,7 +211,7 @@ try {
             [$email, $otp, json_encode(['email' => $email, 'studentId' => $studentId]), $now, $expiresAt]
         );
 
-        Mailer::sendOtp($email, $studentName, $otp, 'registration');
+        sendVerificationCode($email, $studentName, $otp, 'registration');
 
         jsonResponse([
             'success' => true,
@@ -198,12 +234,12 @@ try {
             [$email]
         );
         if (!$otpRecord) jsonError('No active OTP found. Please request a new verification code.');
+        if (($otpRecord['attempts'] ?? 0) >= OTP_MAX_ATTEMPTS) jsonError('Too many incorrect codes. Request a new code.', 429);
         if (time() > $otpRecord['expiresAt']) {
             Database::execute("DELETE FROM email_otps WHERE id = ?", [$otpRecord['id']]);
             jsonError('This OTP has expired. Please request a new verification code.');
         }
-        $isDevMode = (defined('APP_ENV') && APP_ENV !== 'production');
-        $isCodeMatch = ($otpRecord['code'] === $otp) || ($isDevMode && $otp === '123456');
+        $isCodeMatch = hash_equals((string)$otpRecord['code'], $otp);
         if (!$isCodeMatch) {
             Database::execute("UPDATE email_otps SET attempts = attempts + 1 WHERE id = ?", [$otpRecord['id']]);
             jsonError('Invalid verification code. Please check your email and try again.');
@@ -261,6 +297,7 @@ try {
             'avatar'  => $updated['avatar'] ?? '',
             'student' => $updated
         ];
+        establishSession($sessionObj);
         jsonResponse(array_merge([
             'success' => true,
             'session' => $sessionObj,
@@ -285,11 +322,6 @@ try {
         if (!empty($student['passwordHash']) && str_starts_with($student['passwordHash'], '$')) {
             $isValid = password_verify($password, $student['passwordHash']);
         }
-        if (!$isValid && ($password === 'Student@123' || $password === 'Admin@123')) {
-            $newHash = password_hash($password, PASSWORD_BCRYPT);
-            Database::execute("UPDATE students SET passwordHash = ? WHERE id = ?", [$newHash, $student['id']]);
-            $isValid = true;
-        }
 
         if (!$isValid) jsonError('Incorrect email or password. Please try again.', 401);
 
@@ -305,6 +337,7 @@ try {
             'student' => $student
         ];
 
+        establishSession($sessionObj);
         jsonResponse(array_merge([
             'success' => true,
             'session' => $sessionObj,
@@ -330,7 +363,7 @@ try {
             [$email, $otp, json_encode(['email' => $email]), $now, $expiresAt]
         );
 
-        Mailer::sendOtp($email, $student['name'], $otp, 'reset-password');
+        sendVerificationCode($email, $student['name'], $otp, 'reset-password');
         jsonResponse(['success' => true, 'message' => "Password reset OTP has been sent to {$email}."]);
     }
 
@@ -347,9 +380,10 @@ try {
             "SELECT * FROM email_otps WHERE email = ? AND purpose = 'reset-password' AND isUsed = 0 ORDER BY id DESC LIMIT 1",
             [$email]
         );
-        $isDevMode = (defined('APP_ENV') && APP_ENV !== 'production');
-        $isCodeMatch = $otpRecord && (($otpRecord['code'] === $otp) || ($isDevMode && $otp === '123456'));
+        $isCodeMatch = $otpRecord && (hash_equals((string)$otpRecord['code'], $otp));
+        if ($otpRecord && ($otpRecord['attempts'] ?? 0) >= OTP_MAX_ATTEMPTS) jsonError('Too many incorrect codes. Request a new code.', 429);
         if (!$otpRecord || time() > $otpRecord['expiresAt'] || !$isCodeMatch) {
+            if ($otpRecord) Database::execute('UPDATE email_otps SET attempts = attempts + 1 WHERE id = ?', [$otpRecord['id']]);
             jsonError('Invalid or expired password reset OTP.');
         }
 
@@ -373,6 +407,7 @@ try {
             'student' => $student
         ];
 
+        establishSession($sessionObj);
         jsonResponse(array_merge([
             'success' => true,
             'session' => $sessionObj,
@@ -388,23 +423,7 @@ try {
         if (!$email || empty($password)) jsonError('Administrator email and password are required.');
 
         $admin = Database::fetchOne("SELECT * FROM admins WHERE LOWER(email) = ?", [$email]);
-        if (!$admin) {
-            if ($email === 'jatp22316@gmail.com' || $email === 'admin@podar.edu') {
-                $now = nowIso();
-                $defPerms = json_encode(['all', 'manage_students', 'manage_courses', 'manage_certificates', 'manage_opportunities', 'manage_internships', 'manage_placements', 'manage_admins']);
-                $adminId = ($email === 'jatp22316@gmail.com') ? 'admin-jatp-main' : 'admin-podar-root';
-                $adminName = ($email === 'jatp22316@gmail.com') ? 'Main Administrator' : 'Podar Administrator';
-                $adminPhone = ($email === 'jatp22316@gmail.com') ? '9000000000' : '9999988888';
-                $adminDept = ($email === 'jatp22316@gmail.com') ? 'Executive Governance Desk' : 'Career & Placement Cell';
-                Database::execute(
-                    "INSERT INTO admins (id, name, phone, email, passwordHash, role, department, permissions, status, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)",
-                    [$adminId, $adminName, $adminPhone, $email, password_hash('Admin@123', PASSWORD_BCRYPT), 'Super Admin', $adminDept, $defPerms, $now, $now]
-                );
-                $admin = Database::fetchOne("SELECT * FROM admins WHERE LOWER(email) = ?", [$email]);
-            } else {
-                jsonError('Administrator account not found.', 404);
-            }
-        }
+        if (!$admin) jsonError('Incorrect email or password.', 401);
 
         if (($admin['status'] ?? '') === 'suspended') {
             jsonError('This administrator account has been disabled.', 403);
@@ -414,10 +433,6 @@ try {
         if (!empty($admin['passwordHash']) && str_starts_with($admin['passwordHash'], '$')) {
             $isValid = password_verify($password, $admin['passwordHash']);
         }
-        if (!$isValid && $password === 'Admin@123') {
-            Database::execute("UPDATE admins SET passwordHash = ? WHERE id = ?", [password_hash($password, PASSWORD_BCRYPT), $admin['id']]);
-            $isValid = true;
-        }
 
         if (!$isValid) jsonError('Incorrect administrator password.', 401);
 
@@ -425,29 +440,12 @@ try {
         $now = time();
         $expiresAt = $now + (OTP_EXPIRY_MINUTES * 60);
 
-        try {
-            Database::execute("DELETE FROM email_otps WHERE email = ?", [$email]);
-        } catch (\Throwable $e) {}
-
-        try {
-            Database::execute(
-                "INSERT INTO email_otps (email, code, role, purpose, payload, createdAt, expiresAt) VALUES (?, ?, 'admin', 'admin-login', ?, ?, ?)",
-                [$email, $otp, json_encode(['adminId' => $admin['id']]), $now, $expiresAt]
-            );
-        } catch (\Throwable $e) {
-            try {
-                Database::execute(
-                    "INSERT INTO email_otps (email, code, role, purpose, payload, createdAt, expiresAt, isUsed) VALUES (?, ?, 'admin', 'admin-login', ?, ?, ?, 0)",
-                    [$email, $otp, json_encode(['adminId' => $admin['id']]), $now, $expiresAt]
-                );
-            } catch (\Throwable $e2) {}
-        }
-
-        try {
-            Mailer::sendOtp($email, $admin['name'], $otp, 'admin-login');
-        } catch (\Throwable $e) {
-            error_log("Mailer send error: " . $e->getMessage());
-        }
+        Database::execute("DELETE FROM email_otps WHERE email = ? AND purpose = 'admin-login'", [$email]);
+        Database::execute(
+            "INSERT INTO email_otps (email, code, role, purpose, payload, createdAt, expiresAt, isUsed) VALUES (?, ?, 'admin', 'admin-login', ?, ?, ?, 0)",
+            [$email, $otp, json_encode(['adminId' => $admin['id']]), $now, $expiresAt]
+        );
+        sendVerificationCode($email, $admin['name'], $otp, 'admin-login');
 
         jsonResponse([
             'success' => true,
@@ -465,22 +463,22 @@ try {
 
         $otpRecord = null;
         try {
-            $otpRecord = Database::fetchOne("SELECT * FROM email_otps WHERE email = ? LIMIT 1", [$email]);
+            $otpRecord = Database::fetchOne("SELECT * FROM email_otps WHERE email = ? AND role = 'admin' AND purpose = 'admin-login' AND isUsed = 0 ORDER BY id DESC LIMIT 1", [$email]);
         } catch (\Throwable $e) {}
 
-        $isDevMode = (defined('APP_ENV') && APP_ENV !== 'production');
-        $isDevBypass = $isDevMode && ($otp === '123456');
         $isCodeValid = $otpRecord && ($otpRecord['code'] === $otp) && (time() <= $otpRecord['expiresAt']);
 
-        if (!$isDevBypass && !$isCodeValid) {
+        if ($otpRecord && ($otpRecord['attempts'] ?? 0) >= OTP_MAX_ATTEMPTS) jsonError('Too many incorrect codes. Repeat sign-in.', 429);
+        if (!$isCodeValid) {
+            if ($otpRecord) Database::execute('UPDATE email_otps SET attempts = attempts + 1 WHERE id = ?', [$otpRecord['id']]);
             jsonError('Invalid or expired 2FA code. Please request a new security code.');
         }
 
-        try {
-            Database::execute("DELETE FROM email_otps WHERE email = ?", [$email]);
-        } catch (\Throwable $e) {}
+        $consumed = Database::execute("UPDATE email_otps SET isUsed = 1 WHERE id = ? AND isUsed = 0", [$otpRecord['id']]);
+        if ($consumed !== 1) jsonError('This verification code has already been used.', 409);
 
         $admin = Database::fetchOne("SELECT * FROM admins WHERE LOWER(email) = ?", [$email]);
+        if (!$admin || ($admin['status'] ?? '') === 'suspended') jsonError('Administrator account unavailable.', 403);
         unset($admin['passwordHash'], $admin['salt']);
         $admin['permissions'] = safeJsonDecode($admin['permissions'] ?? '[]', ['all']);
 
@@ -499,6 +497,7 @@ try {
             'admin'       => $admin
         ];
 
+        establishSession($sessionObj);
         jsonResponse(array_merge([
             'success'     => true,
             'session'     => $sessionObj,
@@ -510,6 +509,7 @@ try {
     if ($route === '/auth/resend-otp' && $method === 'POST') {
         $email   = cleanEmail($body['email'] ?? '');
         $purpose = cleanString($body['purpose'] ?? 'registration');
+        if (!in_array($purpose, ['registration', 'reset-password'], true)) jsonError('Repeat administrator sign-in to request a new security code.', 400);
         if (!$email) jsonError('Valid email address is required.');
 
         $otp = sprintf('%06d', random_int(100000, 999999));
@@ -522,37 +522,17 @@ try {
             [$email, $otp, json_encode(['email' => $email]), $now, $expiresAt]
         );
 
-        Mailer::sendOtp($email, 'User', $otp, $purpose);
+        sendVerificationCode($email, 'User', $otp, $purpose);
         jsonResponse(['success' => true, 'message' => "A new verification code has been sent to {$email}."]);
     }
 
-    // Legacy OTP Endpoints (Fallback)
-    if ($route === '/auth/send-otp' && $method === 'POST') {
-        $phone = cleanPhone($body['phone'] ?? '');
-        $role  = cleanString($body['role'] ?? 'student');
-        if (!preg_match('/^[0-9]{10}$/', $phone)) jsonError('Enter a valid 10-digit mobile number.');
-        jsonResponse(['success' => true, 'message' => 'OTP dispatched to registered mobile (simulation mode).', 'phone' => $phone]);
-    }
-    if ($route === '/auth/verify-otp' && $method === 'POST') {
-        $phone = cleanPhone($body['phone'] ?? '');
-        $role  = cleanString($body['role'] ?? 'student');
-        if ($role === 'admin') {
-            $admin = Database::fetchOne("SELECT * FROM admins WHERE phone = ? LIMIT 1", [$phone]);
-            if (!$admin) $admin = Database::fetchOne("SELECT * FROM admins LIMIT 1");
-            unset($admin['passwordHash'], $admin['salt']);
-            jsonResponse(['token' => 'admin-token-' . time(), 'role' => 'admin', 'name' => $admin['name'] ?? 'Admin', 'phone' => $phone, 'admin' => $admin]);
-        } else {
-            $student = Database::fetchOne("SELECT * FROM students WHERE phone = ? LIMIT 1", [$phone]);
-            if (!$student) $student = Database::fetchOne("SELECT * FROM students LIMIT 1");
-            unset($student['passwordHash'], $student['salt']);
-            jsonResponse(['token' => 'student-token-' . time(), 'role' => 'student', 'id' => $student['id'], 'student' => $student]);
-        }
-    }
+    if (in_array($route, ['/auth/send-otp', '/auth/verify-otp'], true)) jsonError('Mobile OTP sign-in is no longer supported. Use email sign-in.', 410);
 
     // ----------------------------------------------------
     // 4. STUDENTS DIRECTORY & MANAGEMENT
     // ----------------------------------------------------
     if ($route === '/students' && $method === 'GET') {
+        if (($auth['role'] ?? '') === 'student') jsonResponse(Database::fetchAll("SELECT id, name, avatar, course, semester, bio, skills, linkedin, github, portfolio FROM students WHERE status != 'suspended' ORDER BY name"));
         $students = Database::fetchAll("SELECT * FROM students ORDER BY name ASC");
         $safeList = array_map(function($s) {
             unset($s['passwordHash'], $s['salt']);
@@ -738,8 +718,10 @@ try {
 
         // PUT Update Student Details
         if (!$sub && $method === 'PUT') {
+            $student = Database::fetchOne('SELECT * FROM students WHERE id = ?', [$studentId]);
+            if (!$student) jsonError('Student not found.', 404);
             $fields = [
-                'name', 'fathersName', 'phone', 'course', 'semester', 'email', 'linkedin', 'github',
+                'name', 'gender', 'fathersName', 'phone', 'course', 'semester', 'email', 'linkedin', 'github',
                 'portfolio', 'skills', 'softSkills', 'goal', 'bio', 'rollNo', 'graduationYear', 'jobType',
                 'city', 'address', 'houseNo', 'district', 'state', 'pinCode', 'dob', 'avatar', 'resumeUrl',
                 'score', 'completion', 'applications', 'projects', 'certificates', 'status'
@@ -750,6 +732,7 @@ try {
             foreach ($fields as $field) {
                 if (array_key_exists($field, $body)) {
                     $val = $body[$field];
+                    if ($field === 'dob' && $val === '') $val = null;
                     if ($field === 'email') {
                         $val = cleanEmail($val);
                         $val = !empty($val) ? $val : null;
@@ -759,6 +742,13 @@ try {
                     $updates[] = "{$field} = ?";
                     $params[] = $val;
                 }
+            }
+
+            if (array_key_exists('goal', $body)) {
+                $profilePhone = cleanPhone($body['phone'] ?? $student['phone'] ?? '');
+                if (trim((string)$body['goal']) === '' || !preg_match('/^[0-9]{10}$/', $profilePhone)) jsonError('Add your career goal and a valid mobile number to complete your profile.');
+                $updates[] = 'profileCompletedAt = ?';
+                $params[] = nowIso();
             }
 
             if (!empty($updates)) {
@@ -885,6 +875,22 @@ try {
         jsonResponse($created, 201);
     }
 
+    if ($route === '/programs/all-clicks' || $route === '/courses/all-clicks') {
+        if ($method === 'GET') {
+            $allClicks = Database::fetchAll("
+                SELECT pc.*, COALESCE(s.name, pc.studentName) as studentName,
+                       COALESCE(s.phone, pc.studentPhone) as studentPhone,
+                       s.course as studentCourse, s.semester as studentSemester, s.email, s.rollNo, s.avatar,
+                       p.title as programTitle
+                FROM program_clicks pc
+                LEFT JOIN students s ON pc.studentId = s.id
+                LEFT JOIN programs p ON pc.programId = p.id
+                ORDER BY pc.clickedAt DESC
+            ");
+            jsonResponse(['clicks' => $allClicks, 'total' => count($allClicks)]);
+        }
+    }
+
     if (preg_match('#^/(?:programs|courses)/([^/]+)(?:/(click|clicks))?$#', $route, $matches)) {
         $progId = $matches[1];
         $sub = $matches[2] ?? '';
@@ -895,16 +901,31 @@ try {
             $studentName  = cleanString($body['studentName'] ?? 'Student');
             $studentPhone = cleanPhone($body['studentPhone'] ?? '');
 
+            if (!$studentId && !empty($auth['id'])) {
+                $studentId    = $auth['id'];
+                $studentName  = $auth['student']['name'] ?? $studentName;
+                $studentPhone = $auth['student']['phone'] ?? $studentPhone;
+            }
+
             if (!$studentId) jsonError('Student ID is required.');
 
             $prog = Database::fetchOne("SELECT id, title FROM programs WHERE id = ?", [$progId]);
-            if (!$prog) jsonError('Program not found.', 404);
-
             $now = nowIso();
+
+            if (!$prog) {
+                $progTitle = cleanString($body['courseTitle'] ?? $body['programTitle'] ?? 'Curated Course');
+                $progLink  = cleanString($body['url'] ?? $body['link'] ?? 'https://www.coursera.org');
+                Database::execute(
+                    "INSERT INTO programs (id, title, issuer, description, link, targetCourse, targetSemester, deadline, rewardPoints, status, createdAt, updatedAt)
+                     VALUES (?, ?, 'Podar Pathways', 'Curated career preparation course', ?, 'All', 'All', '2026-12-31', 15, 'active', ?, ?)",
+                    [$progId, $progTitle, $progLink, $now, $now]
+                );
+            }
+
             $existing = Database::fetchOne("SELECT id FROM program_clicks WHERE programId = ? AND studentId = ?", [$progId, $studentId]);
 
             if ($existing) {
-                Database::execute("UPDATE program_clicks SET clickedAt = ?, studentName = ? WHERE id = ?", [$now, $studentName, $existing['id']]);
+                Database::execute("UPDATE program_clicks SET clickedAt = ?, studentName = ?, studentPhone = ? WHERE id = ?", [$now, $studentName, $studentPhone, $existing['id']]);
             } else {
                 $clickId = 'pclk-' . time() . '-' . random_int(100, 999);
                 Database::execute(
@@ -919,14 +940,17 @@ try {
         // Get Program Clicks & Analytics
         if ($sub === 'clicks' && $method === 'GET') {
             $clicks = Database::fetchAll("
-                SELECT pc.*, s.course, s.semester, s.email, s.rollNo
+                SELECT pc.id, pc.programId, pc.studentId, pc.clickedAt,
+                       COALESCE(s.name, pc.studentName) as studentName,
+                       COALESCE(s.phone, pc.studentPhone) as studentPhone,
+                       s.course, s.semester, s.email, s.rollNo, s.avatar
                 FROM program_clicks pc
                 LEFT JOIN students s ON pc.studentId = s.id
                 WHERE pc.programId = ?
                 ORDER BY pc.clickedAt DESC
             ", [$progId]);
 
-            $allStudents = Database::fetchAll("SELECT id, name, phone, course, semester, rollNo FROM students ORDER BY name ASC");
+            $allStudents = Database::fetchAll("SELECT id, name, phone, email, course, semester, rollNo, avatar FROM students WHERE status != 'suspended' ORDER BY name ASC");
             $clickedIds = array_column($clicks, 'studentId');
             $notClicked = array_values(array_filter($allStudents, function($s) use ($clickedIds) {
                 return !in_array($s['id'], $clickedIds);
@@ -988,6 +1012,14 @@ try {
     // Structure: id, programTitle, studentName, certificateImg, verifiedBy, status, createdAt
     // ----------------------------------------------------
     if ($route === '/certificates' && $method === 'GET') {
+        if (($auth['role'] ?? '') === 'student') {
+            $stmt = Database::getCertificatesConnection()->prepare('SELECT id, programTitle, studentName, certificateImg, verifiedBy, status, createdAt FROM certificates WHERE studentName = ? ORDER BY createdAt DESC');
+            $stmt->execute([$auth['student']['name']]);
+            $certificates = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($certificates as &$certificate) { $certificate['studentId'] = $auth['id']; $certificate['fileData'] = $certificate['certificateImg']; $certificate['submittedAt'] = $certificate['createdAt']; }
+            unset($certificate);
+            jsonResponse($certificates);
+        }
         try {
             $pdo = Database::getCertificatesConnection();
             $certs = $pdo->query("SELECT id, programTitle, studentName, certificateImg, verifiedBy, status, createdAt FROM certificates ORDER BY createdAt DESC")->fetchAll(PDO::FETCH_ASSOC);
@@ -1138,7 +1170,7 @@ try {
         if ($studentId === 'all') {
             Database::execute("UPDATE notifications SET isRead = 1");
         } else {
-            Database::execute("UPDATE notifications SET isRead = 1 WHERE studentId = 'all' OR studentId = ?", [$studentId]);
+            Database::execute("UPDATE notifications SET isRead = 1 WHERE studentId = ?", [$studentId]);
         }
         jsonResponse(['success' => true, 'message' => 'All notifications marked as read']);
     }
@@ -1148,7 +1180,7 @@ try {
         if ($studentId === 'all') {
             Database::execute("DELETE FROM notifications WHERE isRead = 1");
         } else {
-            Database::execute("DELETE FROM notifications WHERE isRead = 1 AND (studentId = 'all' OR studentId = ?)", [$studentId]);
+            Database::execute("DELETE FROM notifications WHERE isRead = 1 AND studentId = ?", [$studentId]);
         }
         jsonResponse(['success' => true, 'message' => 'Read notifications cleared']);
     }
@@ -1181,6 +1213,10 @@ try {
         $enhanced = array_map(function($t) {
             $t['questions'] = safeJsonDecode($t['questions'] ?? '[]', []);
             $t['questionsCount'] = count($t['questions']);
+            if (($_SESSION['auth']['role'] ?? '') !== 'admin') {
+                foreach ($t['questions'] as &$question) unset($question['correctAnswer'], $question['explanation']);
+                unset($question);
+            }
             return $t;
         }, $tests);
 
@@ -1306,6 +1342,10 @@ try {
             $test = Database::fetchOne("SELECT * FROM tests WHERE id = ?", [$testId]);
             if (!$test) jsonError('Test not found', 404);
             $test['questions'] = safeJsonDecode($test['questions'] ?? '[]', []);
+            if (($auth['role'] ?? '') !== 'admin') {
+                foreach ($test['questions'] as &$question) unset($question['correctAnswer'], $question['explanation']);
+                unset($question);
+            }
             jsonResponse($test);
         }
 
@@ -1647,20 +1687,6 @@ try {
     // ----------------------------------------------------
     if ($route === '/admins' && $method === 'GET') {
         $admins = Database::fetchAll("SELECT * FROM admins ORDER BY createdAt ASC");
-        if (empty($admins)) {
-            $now = nowIso();
-            $defaultPerms = json_encode(['all', 'manage_students', 'manage_courses', 'manage_certificates', 'manage_opportunities', 'manage_internships', 'manage_placements', 'manage_admins']);
-            Database::execute("
-                INSERT INTO admins (id, name, phone, email, passwordHash, role, department, permissions, status, createdAt, updatedAt)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ", ['admin-jatp-main', 'Main Administrator', '9000000000', 'jatp22316@gmail.com', password_hash('Admin@123', PASSWORD_BCRYPT), 'Super Admin', 'Executive Governance Desk', $defaultPerms, 'active', $now, $now]);
-            Database::execute("
-                INSERT INTO admins (id, name, phone, email, passwordHash, role, department, permissions, status, createdAt, updatedAt)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ", ['admin-podar-root', 'Podar Administrator', '9999988888', 'admin@podar.edu', password_hash('Admin@123', PASSWORD_BCRYPT), 'Super Admin', 'Career & Placement Cell', $defaultPerms, 'active', $now, $now]);
-            $admins = Database::fetchAll("SELECT * FROM admins ORDER BY createdAt ASC");
-        }
-
         $safeAdmins = array_map(function($a) {
             unset($a['passwordHash'], $a['salt']);
             $a['permissions'] = safeJsonDecode($a['permissions'] ?? '[]', ['all']);
@@ -1677,7 +1703,8 @@ try {
         $department  = cleanString($body['department'] ?? 'Career & Placement Cell');
         $permissions = $body['permissions'] ?? ['manage_students', 'manage_courses'];
         $avatar      = cleanString($body['avatar'] ?? '');
-        $password    = $body['password'] ?? 'Admin@123';
+        $password    = $body['password'] ?? '';
+        if (strlen($password) < 8) jsonError('Set an administrator password with at least 8 characters.');
 
         if (!$name || !$email || !$phone) jsonError('Name, email, and mobile number are required.');
 
@@ -1860,7 +1887,7 @@ try {
         Database::execute("DELETE FROM project_comments WHERE id = ?", [$commentId]);
 
         Database::execute(
-            "UPDATE project_posts SET commentsCount = MAX(0, commentsCount - ?) WHERE id = ?",
+            "UPDATE project_posts SET commentsCount = GREATEST(0, commentsCount - ?) WHERE id = ?",
             [1 + $childCount, $comment['postId']]
         );
 
@@ -1938,7 +1965,7 @@ try {
 
             if ($existing) {
                 Database::execute("DELETE FROM project_likes WHERE postId = ? AND studentId = ?", [$postId, $studentId]);
-                Database::execute("UPDATE project_posts SET likesCount = MAX(0, likesCount - 1) WHERE id = ?", [$postId]);
+                Database::execute("UPDATE project_posts SET likesCount = GREATEST(0, likesCount - 1) WHERE id = ?", [$postId]);
                 $isLiked = false;
             } else {
                 $likeId = 'like-' . time() . '-' . random_int(100, 999);
@@ -2156,7 +2183,7 @@ try {
             Database::execute("DELETE FROM project_notifications WHERE postId = ?", [$postId]);
             Database::execute("DELETE FROM project_posts WHERE id = ?", [$postId]);
 
-            Database::execute("UPDATE students SET projects = MAX(0, COALESCE(projects, 1) - 1) WHERE id = ?", [$existing['studentId']]);
+            Database::execute("UPDATE students SET projects = GREATEST(0, COALESCE(projects, 1) - 1) WHERE id = ?", [$existing['studentId']]);
 
             jsonResponse(['success' => true, 'message' => 'Project deleted successfully.']);
         }
@@ -2167,5 +2194,5 @@ try {
 
 } catch (\Throwable $e) {
     error_log("[API EXCEPTION] " . $e->getMessage() . "\n" . $e->getTraceAsString());
-    jsonError("Internal Server Error: " . $e->getMessage(), 500);
+    jsonError("Internal server error. Please try again later.", 500);
 }

@@ -1,77 +1,44 @@
 <?php
-/**
- * Podar Pathways - Unified PHP Application Server
- * Serves both the compiled React Frontend (SPA) and PHP REST API (Backend)
- * Usage: php -S 0.0.0.0:5000 router.php
- */
-
-$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-
-// 1. API Routing -> route all /api/* requests to PHP API
-if (strpos($uri, '/api') === 0) {
-    if (file_exists(__DIR__ . '/public/api/index.php')) {
-        require __DIR__ . '/public/api/index.php';
-        exit;
-    } elseif (file_exists(__DIR__ . '/api/index.php')) {
-        require __DIR__ . '/api/index.php';
-        exit;
-    }
+// Local development server: php -S 127.0.0.1:5000 router.php
+$path = rawurldecode(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/');
+header('X-Content-Type-Options: nosniff');
+if (preg_match('~(?:^|/)[.]|[\\\\\x00-\x1f]~', $path)) {
+    http_response_code(404);
+    exit;
 }
-
-// 2. Direct Static Files (check dist, public, root)
-$searchDirs = [
-    __DIR__ . '/dist',
-    __DIR__ . '/public',
-    __DIR__
+// Select exactly one public web root. Never expose the repository itself.
+$webRoot = is_file(__DIR__ . '/dist/index.html') ? __DIR__ . '/dist' :
+    (is_dir(__DIR__ . '/public') ? __DIR__ . '/public' : __DIR__);
+if ($path === '/api' || str_starts_with($path, '/api/')) {
+    $apiRoot = is_file(__DIR__ . '/public/api/index.php') ? __DIR__ . '/public/api' : __DIR__ . '/api';
+    require $apiRoot . '/router.php';
+    exit;
+}
+$mimes = [
+    'js' => 'application/javascript', 'mjs' => 'application/javascript',
+    'css' => 'text/css', 'html' => 'text/html', 'json' => 'application/json',
+    'svg' => 'image/svg+xml', 'png' => 'image/png', 'jpg' => 'image/jpeg',
+    'jpeg' => 'image/jpeg', 'gif' => 'image/gif', 'webp' => 'image/webp',
+    'ico' => 'image/x-icon', 'woff' => 'font/woff', 'woff2' => 'font/woff2',
+    'ttf' => 'font/ttf', 'txt' => 'text/plain', 'xml' => 'application/xml',
+    'pdf' => 'application/pdf'
 ];
-
-$cleanPath = ltrim($uri, '/');
-if (!empty($cleanPath)) {
-    foreach ($searchDirs as $dir) {
-        $candidate = $dir . '/' . $cleanPath;
-        if (file_exists($candidate) && is_file($candidate)) {
-            $ext = strtolower(pathinfo($candidate, PATHINFO_EXTENSION));
-            $mimes = [
-                'js'    => 'application/javascript; charset=utf-8',
-                'mjs'   => 'application/javascript; charset=utf-8',
-                'css'   => 'text/css; charset=utf-8',
-                'html'  => 'text/html; charset=utf-8',
-                'json'  => 'application/json; charset=utf-8',
-                'svg'   => 'image/svg+xml',
-                'png'   => 'image/png',
-                'jpg'   => 'image/jpeg',
-                'jpeg'  => 'image/jpeg',
-                'webp'  => 'image/webp',
-                'ico'   => 'image/x-icon',
-                'woff'  => 'font/woff',
-                'woff2' => 'font/woff2',
-                'ttf'   => 'font/ttf'
-            ];
-            if (isset($mimes[$ext])) {
-                header("Content-Type: {$mimes[$ext]}");
-            }
-            readfile($candidate);
-            exit;
-        }
-    }
+$root = realpath($webRoot);
+$candidate = realpath($webRoot . '/' . ltrim($path, '/'));
+$ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+if ($candidate && str_starts_with($candidate, $root . DIRECTORY_SEPARATOR) && is_file($candidate) && isset($mimes[$ext])) {
+    header('Content-Type: ' . $mimes[$ext]);
+    readfile($candidate);
+    exit;
 }
-
-// 3. Single-Page Application Fallback -> Serve dist/index.html
-$indexCandidates = [
-    __DIR__ . '/dist/index.html',
-    __DIR__ . '/public/index.html',
-    __DIR__ . '/index.html'
-];
-
-foreach ($indexCandidates as $indexFile) {
-    if (file_exists($indexFile) && is_file($indexFile)) {
-        header('Content-Type: text/html; charset=utf-8');
-        readfile($indexFile);
-        exit;
-    }
+if ($ext !== '' || preg_match('~^/(?:src|public|dist|node_modules|scripts|adapters)(?:/|$)~i', $path)) {
+    http_response_code(404);
+    exit;
 }
-
-// 4. 404 Fallback
-http_response_code(404);
-echo "404 Not Found";
-
+if (is_file($webRoot . '/index.html')) {
+    header('Content-Type: text/html; charset=utf-8');
+    readfile($webRoot . '/index.html');
+    exit;
+}
+http_response_code(503);
+echo 'Frontend not built. Run npm run build, or use npm run client:dev.';

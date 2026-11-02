@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { parseCurrentLocation, pushRoute } from '../src/router.js';
+let target;
+globalThis.CustomEvent = class { constructor(type, options) { this.type = type; this.detail = options.detail; } };
+globalThis.window = { location: {pathname:'/dashboard',search:'?stale=1',hash:''}, history:{pushState:(_s,_t,url)=>target=url,replaceState:(_s,_t,url)=>target=url}, dispatchEvent:()=>{} };
+pushRoute('projects','student',{params:{project:'a/b',category:'Web Apps'}});
+assert.equal(target,'/projects?project=a%2Fb&category=Web+Apps');
+window.location.hash='#/courses';
+assert.deepEqual(parseCurrentLocation().params,{});
+window.location.hash='#/projects?category=Web';
+pushRoute('projects','student',{keepSearch:true,params:{project:'one'}});
+assert.equal(target,'#/projects?category=Web&project=one');
+window.location.hash='';window.location.pathname='/projects/%invalid';
+assert.equal(parseCurrentLocation().params.project,'%invalid');
+window.location.pathname='/admin/student/student%20one';
+assert.equal(parseCurrentLocation('admin').page,'admin-student:student one');
+console.log('PASS: router query merging, hash isolation and malformed deep links');

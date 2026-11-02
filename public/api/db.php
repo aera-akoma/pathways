@@ -37,29 +37,8 @@ class Database {
             self::$driver   = 'mysql';
             return self::$instance;
         } catch (\Throwable $e) {
-            // Localhost fallback: if localhost/127.0.0.1 and custom user fails, attempt local root
-            if ((DB_HOST === 'localhost' || DB_HOST === '127.0.0.1') && DB_USER !== 'root') {
-                try {
-                    $localDsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=%s', DB_HOST, DB_PORT, DB_NAME, DB_CHARSET);
-                    self::$instance = new PDO($localDsn, 'root', '', $options);
-                    self::$driver   = 'mysql';
-                    return self::$instance;
-                } catch (\Throwable $localErr) {
-                    try {
-                        $fallbackDsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=%s', DB_HOST, DB_PORT, 'podar_pathways', DB_CHARSET);
-                        self::$instance = new PDO($fallbackDsn, 'root', '', $options);
-                        self::$driver   = 'mysql';
-                        return self::$instance;
-                    } catch (\Throwable $fallbackErr) {}
-                }
-            }
-
             error_log('[DB FATAL] MySQL / phpMyAdmin connection failed: ' . $e->getMessage());
-            jsonError(
-                'phpMyAdmin MySQL database connection failed. Please verify DB_HOST, DB_NAME, DB_USER, and DB_PASS in your .env file.',
-                500,
-                ['error' => $e->getMessage()]
-            );
+            jsonError('Database service is unavailable. Please try again later.', 503);
         }
     }
 

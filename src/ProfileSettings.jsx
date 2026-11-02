@@ -1,6 +1,8 @@
+import { requestJson } from './api.js';
+import { passwordError, profileError, PASSWORD_HINT } from './validation.js';
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { DEFAULT_STUDENT_AVATAR, DEFAULT_ADMIN_AVATAR } from './defaultAvatar.js';
-import { INITIAL_CERTIFICATES } from './defaultCertificates.js';
+
 import {
   User,
   Search,
@@ -107,7 +109,9 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
   };
 
   const [activeTab, setActiveTab] = useState(getTabFromUrl);
+  useEffect(() => { if (initialTab) setActiveTab(initialTab); }, [initialTab]);
 
+  useEffect(() => { const sync = event => { if (event.detail?.page === 'profile' && event.detail?.params?.tab === 'edit') setActiveTab('edit'); }; window.addEventListener('podar-route-change', sync); return () => window.removeEventListener('podar-route-change', sync); }, []);
   const handleTabChange = (newTab) => {
     setActiveTab(newTab);
     try {
@@ -152,14 +156,14 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
     phone: student?.phone || '',
     linkedin: student?.linkedin || '',
     github: student?.github || '',
-    portfolioUrl: student?.portfolioUrl || '',
+    portfolioUrl: student?.portfolio || student?.portfolioUrl || '',
     dob: student?.dob || '',
-    avatar: (student?.avatar && typeof student.avatar === 'string' && !student.avatar.startsWith('data:image/jpeg;base64')) ? student.avatar : DEFAULT_STUDENT_AVATAR,
-    course: student?.course || 'BCA',
-    semester: student?.semester || 'V',
-    goal: student?.goal || 'Aspiring Software Engineer',
-    gender: student?.gender || 'Male',
-    bio: student?.bio || 'Building modern full-stack web and cloud applications. Passionate about algorithms, design systems, and practical AI solutions. Podar Pathways \'26 🚀'
+    avatar: (student?.avatar && typeof student.avatar === 'string') ? student.avatar : DEFAULT_STUDENT_AVATAR,
+    course: student?.course || '',
+    semester: student?.semester || '',
+    goal: student?.goal || '',
+    gender: student?.gender || '',
+    bio: student?.bio || ''
   });
 
   // Sync state if student changes
@@ -180,9 +184,9 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
         github: student.github || prev.github,
         portfolioUrl: student.portfolioUrl || prev.portfolioUrl,
         dob: student.dob || prev.dob,
-        avatar: (student?.avatar && typeof student.avatar === 'string' && !student.avatar.startsWith('data:image/jpeg;base64'))
+        avatar: (student?.avatar && typeof student.avatar === 'string')
           ? student.avatar
-          : ((prev?.avatar && typeof prev.avatar === 'string' && !prev.avatar.startsWith('data:image/jpeg;base64')) ? prev.avatar : DEFAULT_STUDENT_AVATAR),
+          : DEFAULT_STUDENT_AVATAR,
         course: student.course || prev.course,
         semester: student.semester || prev.semester,
         goal: student.goal || prev.goal,
@@ -231,24 +235,13 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
   // Student Certificates
   const [userCertificates, setUserCertificates] = useState([]);
   useEffect(() => {
-    let certsList = INITIAL_CERTIFICATES;
-    try {
-      const saved = localStorage.getItem('podar-pathways-certificates');
-      if (saved) certsList = JSON.parse(saved);
-    } catch (e) {}
-
-    fetch('/api/certificates')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          setUserCertificates(data.filter(c => c.studentId === student?.id));
-        } else {
-          setUserCertificates(certsList.filter(c => c.studentId === student?.id));
-        }
-      })
-      .catch(() => {
-        setUserCertificates(certsList.filter(c => c.studentId === student?.id));
-      });
+    let cancelled = false;
+    setUserCertificates([]);
+    if (!student?.id) return;
+    requestJson('/api/certificates')
+      .then(data => { if (!cancelled) setUserCertificates(Array.isArray(data) ? data.filter(c => c.studentId === student.id) : []); })
+      .catch(() => { if (!cancelled) setUserCertificates([]); });
+    return () => { cancelled = true; };
   }, [student?.id]);
 
   // Password change state
@@ -268,7 +261,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
   // Dynamic districts based on selected state
   const currentDistricts = (formData.state && INDIAN_STATES_DISTRICTS[formData.state])
     ? INDIAN_STATES_DISTRICTS[formData.state]
-    : INDIAN_STATES_DISTRICTS['Rajasthan'];
+    : [];
 
   // Notification Preferences
   const [notifications, setNotifications] = useState(() => {
@@ -289,120 +282,86 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
 
   const fileInputRef = useRef(null);
 
-  // Avatar Upload with Compression
-  const handleAvatarUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const [isSavingAvatar, setIsSavingAvatar] = useState(false);
+  const avatarSaveInFlight = useRef(false);
+  const persistAvatar = async (avatar) => {
+    if (!student?.id) throw new Error('Please sign in again to update your photo.');
+    await requestJson('/api/students/' + encodeURIComponent(student.id), {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ avatar })
+    });
+    setFormData(prev => ({ ...prev, avatar }));
+    if (setState) setState(prev => ({ ...prev, students: (prev.students || []).map(s =>
+      s.id === student.id ? { ...s, avatar } : s) }));
+    try {
+      const cur = JSON.parse(localStorage.getItem('podar-pathways-session') || 'null');
+      if (cur) {
+        if (cur.student) cur.student.avatar = avatar;
+        cur.avatar = avatar;
+        localStorage.setItem('podar-pathways-session', JSON.stringify(cur));
+      }
+    } catch (error) {}
+    window.dispatchEvent(new CustomEvent('podar-student-updated', { detail: { avatar } }));
+  };
 
+  // Publish the compressed photo only after the server accepts it.
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || avatarSaveInFlight.current) return;
     if (!file.type.startsWith('image/')) {
       notify?.('Please select an image file (PNG, JPG, or WebP).');
       return;
     }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const maxDim = 320;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > maxDim) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          }
-        } else {
-          if (height > maxDim) {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-
-        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.88);
-
-        setFormData(prev => ({ ...prev, avatar: compressedBase64 }));
-
-        if (setState) {
-          setState(prev => {
-            const list = prev.students || [];
-            return {
-              ...prev,
-              students: list.map(s => s.id === student?.id ? { ...s, avatar: compressedBase64 } : s)
-            };
-          });
-        }
-
-        try {
-          const cur = JSON.parse(localStorage.getItem('podar-pathways-session') || 'null');
-          if (cur) {
-            if (cur.student) cur.student.avatar = compressedBase64;
-            cur.avatar = compressedBase64;
-            localStorage.setItem('podar-pathways-session', JSON.stringify(cur));
-          }
-        } catch (sessErr) {}
-
-        if (student?.id) {
-          fetch(`/api/students/${student.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ avatar: compressedBase64 })
-          }).catch(() => {});
-        }
-
-        window.dispatchEvent(new CustomEvent('podar-student-updated', { detail: { avatar: compressedBase64 } }));
-        notify?.('Profile photo updated successfully!');
-      };
-      img.src = event.target.result;
-    };
-    reader.readAsDataURL(file);
+    avatarSaveInFlight.current = true;
+    setIsSavingAvatar(true);
+    try {
+      const compressedBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Could not read this photo.'));
+        reader.onload = event => {
+          const img = new Image();
+          img.onerror = () => reject(new Error('Could not open this photo.'));
+          img.onload = () => {
+            try {
+              const scale = Math.min(1, 320 / Math.max(img.width, img.height));
+              const canvas = document.createElement('canvas');
+              canvas.width = Math.round(img.width * scale);
+              canvas.height = Math.round(img.height * scale);
+              canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+              resolve(canvas.toDataURL('image/jpeg', 0.88));
+            } catch (error) { reject(error); }
+          };
+          img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+      await persistAvatar(compressedBase64);
+      notify?.('Profile photo updated successfully!');
+    } catch (error) { notify?.(error.message || 'Could not update your profile photo.'); }
+    finally {
+      avatarSaveInFlight.current = false;
+      setIsSavingAvatar(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
-  const handleRemoveAvatar = () => {
-    setFormData(prev => ({ ...prev, avatar: '' }));
-    if (fileInputRef.current) fileInputRef.current.value = '';
-
-    if (setState) {
-      setState(prev => {
-        const list = prev.students || [];
-        return {
-          ...prev,
-          students: list.map(s => s.id === student?.id ? { ...s, avatar: '' } : s)
-        };
-      });
-    }
-
+  const handleRemoveAvatar = async () => {
+    if (avatarSaveInFlight.current) return;
+    avatarSaveInFlight.current = true;
+    setIsSavingAvatar(true);
     try {
-      const cur = JSON.parse(localStorage.getItem('podar-pathways-session') || 'null');
-      if (cur) {
-        if (cur.student) cur.student.avatar = '';
-        cur.avatar = '';
-        localStorage.setItem('podar-pathways-session', JSON.stringify(cur));
-      }
-    } catch (sessErr) {}
-
-    if (student?.id) {
-      fetch(`/api/students/${student.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ avatar: '' })
-      }).catch(() => {});
-    }
-
-    window.dispatchEvent(new CustomEvent('podar-student-updated', { detail: { avatar: '' } }));
-    notify?.('Profile photo removed.');
+      await persistAvatar('');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      notify?.('Profile photo removed.');
+    } catch (error) { notify?.(error.message || 'Could not remove your profile photo.'); }
+    finally { avatarSaveInFlight.current = false; setIsSavingAvatar(false); }
   };
 
   // Save Profile Form
   const handleSaveProfile = async (e) => {
     if (e) e.preventDefault();
 
+    const error = profileError(formData);
+    if (error) { notify?.(error); return; }
     if (formData.phone && !/^[0-9]{10}$/.test(formData.phone.replace(/\D/g, ''))) {
       notify?.('Please enter a valid 10-digit mobile number.');
       return;
@@ -418,17 +377,21 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
     try {
       if (student?.id) {
         try {
-          await fetch(`/api/students/${student.id}`, {
+          const response = await fetch(`/api/students/${student.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               ...formData,
+              portfolio: formData.portfolioUrl,
               name: student.name,
               email: student.email
             })
           });
-        } catch (serverErr) {}
-      }
+          const saved = await response.json();
+          if (!response.ok) throw new Error(saved.error || 'Could not save your profile.');
+          if (setState) setState(prev => ({...prev, students: (prev.students || []).map(item => item.id === student.id ? {...item, ...saved} : item)}));
+        } catch (serverErr) { throw serverErr; }
+      } else { throw new Error('Please sign in again to save your profile.'); }
 
       if (setState) {
         setState(prev => {
@@ -459,13 +422,15 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
   const handleUpdatePassword = async (e) => {
     if (e) e.preventDefault();
 
+    if (!passwordData.currentPassword) { notify?.('Enter your current password.'); return; }
+    if (passwordData.newPassword === passwordData.currentPassword) { notify?.('Choose a different new password.'); return; }
     if (!passwordData.newPassword) {
       notify?.('Please enter your new password.');
       return;
     }
 
-    if (passwordData.newPassword.length < 6) {
-      notify?.('New password must be at least 6 characters long.');
+    if (passwordError(passwordData.newPassword)) {
+      notify?.(PASSWORD_HINT);
       return;
     }
 
@@ -496,7 +461,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
         notify?.('Password updated successfully! You can now use your new password.');
       } else {
         setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-        notify?.('Account password updated successfully.');
+        throw new Error('Please sign in again to change your password.');
       }
     } catch (err) {
       notify?.(err.message || 'Could not update password.');
@@ -531,18 +496,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
   }, [studentId]);
 
   // Load all administrators for Directory & Profile Switching
-  const [allAdmins, setAllAdmins] = useState([
-    {
-      id: 'admin-podar-root',
-      name: 'Podar Administrator',
-      email: 'admin@podar.edu',
-      phone: '9999988888',
-      role: 'Super Admin',
-      department: 'Career & Placement Cell',
-      avatar: DEFAULT_ADMIN_AVATAR,
-      bio: 'Directing career guidance, industry placements, examinations, and technical incubation for Podar institutions.'
-    }
-  ]);
+  const [allAdmins, setAllAdmins] = useState([]);
 
   useEffect(() => {
     fetch('/api/admins')
@@ -582,7 +536,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
     if (student && !map.has(student.id)) map.set(student.id, student);
     return Array.from(map.values()).map(s => ({
       ...s,
-      avatar: (s?.avatar && typeof s.avatar === 'string' && !s.avatar.startsWith('data:image/jpeg;base64')) ? s.avatar : DEFAULT_STUDENT_AVATAR,
+      avatar: (s?.avatar && typeof s.avatar === 'string') ? s.avatar : DEFAULT_STUDENT_AVATAR,
       userType: 'student'
     }));
   }, [state?.students, fetchedStudents, student]);
@@ -630,21 +584,14 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
   // Target peer certificates
   const [peerCertificates, setPeerCertificates] = useState([]);
   useEffect(() => {
-    if (!activeProfileUser || isViewingAdmin) {
-      setPeerCertificates([]);
-      return;
-    }
-    fetch('/api/certificates')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (Array.isArray(data)) {
-          setPeerCertificates(data.filter(c => c.studentId === activeProfileUser.id));
-        } else {
-          setPeerCertificates([]);
-        }
-      })
-      .catch(() => setPeerCertificates([]));
-  }, [activeProfileUser, isViewingAdmin]);
+    let cancelled = false;
+    setPeerCertificates([]);
+    if (!activeProfileUser || isViewingAdmin || isOwnProfile) return;
+    requestJson('/api/students/' + encodeURIComponent(activeProfileUser.id) + '/public-certificates')
+      .then(data => { if (!cancelled) setPeerCertificates(Array.isArray(data) ? data : []); })
+      .catch(() => { if (!cancelled) setPeerCertificates([]); });
+    return () => { cancelled = true; };
+  }, [activeProfileUser?.id, isViewingAdmin, isOwnProfile]);
 
   const currentProjects = isOwnProfile ? userProjects : peerProjects;
   const currentCertificates = isOwnProfile ? userCertificates : peerCertificates;
@@ -657,7 +604,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
     const sList = allStudents.map(s => ({
       ...s,
       userType: 'student',
-      displayRole: `${s.course || 'BCA'} • Sem ${s.semester || 'V'}`,
+      displayRole: `${s.course || 'Course not added'} • Sem ${s.semester || 'Not added'}`,
       displayHeadline: s.goal || 'Student at Podar Pathways'
     }));
     const aList = allAdmins.map(a => ({
@@ -777,18 +724,18 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
   };
 
   const studentName = formData?.name || student?.name || 'Student';
-  const studentSem = formData?.semester ? (String(formData.semester).toLowerCase().startsWith('sem') ? formData.semester : `Semester ${formData.semester}`) : 'Semester V';
+  const studentSem = formData?.semester ? (String(formData.semester).toLowerCase().startsWith('sem') ? formData.semester : `Semester ${formData.semester}`) : 'Semester not added';
   const studentScore = Number.isFinite(Number(student?.score)) ? Number(student.score) : 0;
   const studentCompletion = Number.isFinite(Number(student?.completion)) ? Number(student.completion) : 0;
 
   const displayName = isOwnProfile ? studentName : (activeProfileUser?.name || 'User Profile');
-  const cleanFormAvatar = (formData?.avatar && typeof formData.avatar === 'string' && !formData.avatar.startsWith('data:image/jpeg;base64')) ? formData.avatar : DEFAULT_STUDENT_AVATAR;
-  const cleanActiveAvatar = (activeProfileUser?.avatar && typeof activeProfileUser?.avatar === 'string' && !activeProfileUser?.avatar.startsWith('data:image/jpeg;base64')) ? activeProfileUser.avatar : (isViewingAdmin ? DEFAULT_ADMIN_AVATAR : DEFAULT_STUDENT_AVATAR);
+  const cleanFormAvatar = (formData?.avatar && typeof formData.avatar === 'string') ? formData.avatar : DEFAULT_STUDENT_AVATAR;
+  const cleanActiveAvatar = (activeProfileUser?.avatar && typeof activeProfileUser?.avatar === 'string') ? activeProfileUser.avatar : (isViewingAdmin ? DEFAULT_ADMIN_AVATAR : DEFAULT_STUDENT_AVATAR);
   const displayAvatar = isOwnProfile ? cleanFormAvatar : (cleanActiveAvatar || (isViewingAdmin ? DEFAULT_ADMIN_AVATAR : DEFAULT_STUDENT_AVATAR));
-  const displayDeptOrCourse = isOwnProfile ? (formData?.course || 'BCA') : (isViewingAdmin ? (activeProfileUser?.department || 'Administration') : (activeProfileUser?.course || 'BCA'));
-  const displaySemOrRole = isOwnProfile ? studentSem : (isViewingAdmin ? (activeProfileUser?.role || 'Super Admin') : (activeProfileUser?.semester ? `Semester ${activeProfileUser?.semester}` : 'Semester V'));
-  const displayGoal = isOwnProfile ? (formData?.goal || 'Aspiring Professional') : (isViewingAdmin ? (activeProfileUser?.role || 'Super Admin') : (activeProfileUser?.goal || 'Aspiring Professional'));
-  const displayBio = isOwnProfile ? (formData?.bio || 'Building modern projects and advancing skills at Podar Pathways.') : (activeProfileUser?.bio || (isViewingAdmin ? 'Directing career guidance, industry placements, examinations, and technical incubation for Podar institutions.' : 'Building modern projects and advancing skills at Podar Pathways.'));
+  const displayDeptOrCourse = isOwnProfile ? (formData?.course || 'Course not added') : (isViewingAdmin ? (activeProfileUser?.department || 'Administration') : (activeProfileUser?.course || 'Course not added'));
+  const displaySemOrRole = isOwnProfile ? studentSem : (isViewingAdmin ? (activeProfileUser?.role || 'Super Admin') : (activeProfileUser?.semester ? `Semester ${activeProfileUser?.semester}` : 'Semester not added'));
+  const displayGoal = isOwnProfile ? (formData?.goal || 'Career goal not added') : (isViewingAdmin ? (activeProfileUser?.role || 'Super Admin') : (activeProfileUser?.goal || 'Career goal not added'));
+  const displayBio = isOwnProfile ? (formData?.bio || 'No biography added yet.') : (activeProfileUser?.bio || (isViewingAdmin ? 'No biography added yet.' : 'No biography added yet.'));
   const displayScore = isOwnProfile ? studentScore : (Number.isFinite(Number(activeProfileUser?.score)) ? Number(activeProfileUser?.score) : 0);
   const displayCompletion = isOwnProfile ? studentCompletion : (Number.isFinite(Number(activeProfileUser?.completion)) ? Number(activeProfileUser?.completion) : 0);
   const displayPortfolio = isOwnProfile ? formData?.portfolioUrl : activeProfileUser?.portfolioUrl;
@@ -1531,6 +1478,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
                     type="button"
                     className="button outline small"
                     onClick={() => fileInputRef.current?.click()}
+                    disabled={isSavingAvatar}
                   >
                     <Upload size={14} />
                     <span>Change Photo</span>
@@ -1540,6 +1488,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
                       type="button"
                       className="button ghost small"
                       onClick={handleRemoveAvatar}
+                      disabled={isSavingAvatar}
                       style={{ color: '#dc2626' }}
                     >
                       <Trash2 size={14} />
@@ -1574,6 +1523,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
               <input
                 type="text"
                 placeholder="e.g. Cloud Solutions Architect, Full-Stack Developer"
+                required maxLength={200}
                 value={formData.goal}
                 onChange={e => setFormData({ ...formData, goal: e.target.value })}
                 className="field-input"
@@ -1628,7 +1578,8 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
                 <label className="field-label">Registered Mobile (10-Digit)</label>
                 <input
                   type="tel"
-                  placeholder="9000000001"
+                  placeholder="Enter your 10-digit mobile number"
+                  required pattern="[0-9]{10}"
                   value={formData.phone}
                   onChange={e => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
                   className="field-input"
@@ -1639,9 +1590,11 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
                 <label className="field-label">Gender</label>
                 <select
                   value={formData.gender}
+                  aria-label="Gender"
                   onChange={e => setFormData({ ...formData, gender: e.target.value })}
                   className="field-select"
                 >
+                  <option value="">Select Gender</option>
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
                   <option value="Other">Other</option>
@@ -1666,10 +1619,12 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
               <div className="form-group">
                 <label className="field-label">State</label>
                 <select
-                  value={formData.state || 'Rajasthan'}
+                  value={formData.state}
+                  aria-label="State"
                   onChange={e => setFormData({ ...formData, state: e.target.value, district: '' })}
                   className="field-select"
                 >
+                  <option value="">Select State</option>
                   {Object.keys(INDIAN_STATES_DISTRICTS).map(st => (
                     <option key={st} value={st}>{st}</option>
                   ))}
@@ -1680,6 +1635,8 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
                 <label className="field-label">District</label>
                 <select
                   value={formData.district}
+                  disabled={!formData.state}
+                  aria-label="District"
                   onChange={e => setFormData({ ...formData, district: e.target.value })}
                   className="field-select"
                 >
@@ -1694,7 +1651,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
                 <label className="field-label">PIN Code (6 Digits)</label>
                 <input
                   type="text"
-                  placeholder="302001"
+                  placeholder="Enter your 6-digit PIN code"
                   maxLength={6}
                   value={formData.pinCode}
                   onChange={e => setFormData({ ...formData, pinCode: e.target.value.replace(/\D/g, '').slice(0, 6) })}
@@ -1796,7 +1753,9 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
                 <button
                   type="button"
                   className="insta-pw-eye"
-                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  aria-label={showCurrentPassword ? 'Hide password' : 'Show password'}
+                      aria-pressed={showCurrentPassword}
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                 >
                   {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -1817,7 +1776,9 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
                   <button
                     type="button"
                     className="insta-pw-eye"
-                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                      aria-pressed={showNewPassword}
+                      onClick={() => setShowNewPassword(!showNewPassword)}
                   >
                     {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -1837,7 +1798,9 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
                   <button
                     type="button"
                     className="insta-pw-eye"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                      aria-pressed={showConfirmPassword}
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   >
                     {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -2059,7 +2022,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
                   <BadgeCheck size={16} fill="#0284c7" color="#ffffff" />
                 </div>
                 <span style={{ fontSize: '12px', color: '#64748b' }}>
-                  {formData.course || 'BCA'} • {studentSem}
+                  {formData.course || 'Course not added'} • {studentSem}
                 </span>
                 {formData.goal && (
                   <p style={{ margin: '3px 0 0 0', fontSize: '12px', color: '#0284c7', fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -2149,10 +2112,10 @@ export function AdminProfileSettings({ session, state, setState, notify, onLogou
     session?.avatar || session?.admin?.avatar || DEFAULT_ADMIN_AVATAR
   );
   const [name, setName] = React.useState(session?.name || session?.admin?.name || 'Podar Administrator');
-  const [phone, setPhone] = React.useState(session?.adminPhone || session?.admin?.phone || '9999988888');
+  const [phone, setPhone] = React.useState(session?.adminPhone || session?.admin?.phone || '');
   const [department, setDepartment] = React.useState(session?.department || session?.admin?.department || 'Career & Placement Cell');
   const [role, setRole] = React.useState(session?.adminRole || session?.admin?.role || 'Super Admin');
-  const email = session?.email || session?.admin?.email || 'admin@podar.edu';
+  const email = session?.email || session?.admin?.email || '';
   const [saving, setSaving] = React.useState(false);
 
   // Compress & handle photo upload
@@ -2203,13 +2166,11 @@ export function AdminProfileSettings({ session, state, setState, notify, onLogou
         } catch {}
 
         // Persist to server
-        fetch('/api/admins/admin-podar-root', {
+        fetch(`/api/admins/${encodeURIComponent(session.id)}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ avatar: compressedDataUrl })
-        }).catch(() => {});
-
-        notify?.('Admin profile photo updated successfully!');
+        }).then(res => { if(!res.ok) throw Error('Unable to save profile photo.'); notify?.('Admin profile photo updated successfully!'); }).catch(err => notify?.(err.message));
       };
       img.src = event.target.result;
     };
@@ -2225,13 +2186,11 @@ export function AdminProfileSettings({ session, state, setState, notify, onLogou
       localStorage.setItem('podar-pathways-session', JSON.stringify(savedSession));
     } catch {}
 
-    fetch('/api/admins/admin-podar-root', {
+    fetch(`/api/admins/${encodeURIComponent(session.id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ avatar: DEFAULT_ADMIN_AVATAR })
-    }).catch(() => {});
-
-    notify?.('Profile photo reset to default.');
+    }).then(res => { if(!res.ok) throw Error('Unable to reset profile photo.'); notify?.('Profile photo reset to default.'); }).catch(err => notify?.(err.message));
   };
 
   const handleSaveProfile = (e) => {
@@ -2253,7 +2212,7 @@ export function AdminProfileSettings({ session, state, setState, notify, onLogou
       localStorage.setItem('podar-pathways-session', JSON.stringify(savedSession));
     } catch {}
 
-    fetch('/api/admins/admin-podar-root', {
+    fetch(`/api/admins/${encodeURIComponent(session.id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2262,12 +2221,7 @@ export function AdminProfileSettings({ session, state, setState, notify, onLogou
         department,
         avatar
       })
-    }).catch(() => {});
-
-    setTimeout(() => {
-      setSaving(false);
-      notify?.('Administrator profile saved successfully!');
-    }, 300);
+    }).then(res => { if(!res.ok) throw Error('Unable to save administrator profile.'); notify?.('Administrator profile saved successfully!'); }).catch(err => notify?.(err.message)).finally(() => setSaving(false));
   };
 
   return (
@@ -2311,6 +2265,7 @@ export function AdminProfileSettings({ session, state, setState, notify, onLogou
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
+                    
               style={{
                 position: 'absolute',
                 bottom: '0',
@@ -2353,6 +2308,7 @@ export function AdminProfileSettings({ session, state, setState, notify, onLogou
                 type="button"
                 className="minimal-btn-secondary"
                 onClick={() => fileInputRef.current?.click()}
+                    
               >
                 <Camera size={13} style={{ display: 'inline', marginRight: '5px', verticalAlign: 'middle' }} />
                 Upload Photo

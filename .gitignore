@@ -9,3 +9,6 @@ app-debug.apk
 *.db-wal
 *.zip
 scratch/
+.gsd/backups/
+.gemini/
+.agent/

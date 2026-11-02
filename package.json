@@ -4,10 +4,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "start": "start-php-backend.bat",
-    "dev": "start-php-backend.bat",
-    "server": "start-php-backend.bat",
-    "build": "vite build && powershell Copy-Item -Recurse -Force public/api dist/ && powershell Copy-Item -Force router.php dist/router.php",
+    "start": "node scripts/start-server.mjs",
+    "dev": "node scripts/start-server.mjs",
+    "server": "node scripts/start-server.mjs",
+    "build": "vite build",
     "client:dev": "vite"
   },
   "dependencies": {

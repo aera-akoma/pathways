@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { passwordError, profileError, needsProfileCompletion } from '../src/validation.js';
+for (const value of ['', 'password', 'Password1', 'abc123!@', 'A'.repeat(73)+'a1!']) assert.ok(passwordError(value));
+assert.equal(passwordError('SafeExample1!'), '');
+assert.ok(profileError({goal:'Developer',phone:'123'}));
+assert.ok(profileError({goal:'Developer',phone:'9876543210',pinCode:'abcdef'}));
+assert.ok(profileError({goal:'Developer',phone:'9876543210',dob:'2999-01-01'}));
+assert.ok(profileError({goal:'Developer',phone:'9876543210',github:'javascript:alert(1)'}));
+assert.equal(profileError({goal:'Developer',phone:'9876543210',github:'github.com/example'}),'');
+assert.equal(needsProfileCompletion({goal:'',phone:'9876543210'}),true);
+assert.equal(needsProfileCompletion({goal:'Developer',phone:'9876543210',profileCompletedAt:'2026-11-02 12:00:00'}),false);
+console.log('PASS: password, profile and onboarding validation');

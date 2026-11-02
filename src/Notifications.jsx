@@ -261,6 +261,8 @@ export function NotificationBell({ session, student, navigate, notify }) {
         className={`notif-trigger-btn ${isOpen ? 'active' : ''} ${!settings.enabled ? 'is-muted' : ''}`}
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Notifications"
+        aria-expanded={isOpen}
+        aria-controls="notifications-popover"
         title={settings.enabled ? (unreadCount > 0 ? `${unreadCount} unread notifications` : 'Notifications') : 'Notifications paused'}
       >
         {settings.enabled ? (
@@ -283,7 +285,7 @@ export function NotificationBell({ session, student, navigate, notify }) {
 
       {/* Modern Popover Panel */}
       {isOpen && (
-        <div className="notif-dropdown-card">
+        <div className="notif-dropdown-card" id="notifications-popover">
           {/* Header */}
           <div className="notif-card-header">
             <div className="notif-card-title-group">
@@ -311,7 +313,7 @@ export function NotificationBell({ session, student, navigate, notify }) {
                 className="notif-micro-btn icon-only"
                 onClick={() => {
                   setIsOpen(false);
-                  if (navigate) navigate('profile');
+                  if (navigate) navigate(session?.role === 'admin' ? 'admin-profile' : 'profile', {params: {tab: 'notifications'}});
                 }}
                 title="Notification preferences"
               >

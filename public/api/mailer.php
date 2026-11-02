@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/email-template.php';
 
 class Mailer {
 
@@ -15,9 +16,9 @@ class Mailer {
      */
     public static function sendOtp(string $to, string $name, string $otp, string $purpose = 'registration'): array {
         $subjectTitles = [
-            'registration'   => "Podar Pathways - Student Verification Code: {$otp}",
-            'admin-login'    => "Podar Pathways Admin - 2FA Security Code: {$otp}",
-            'reset-password' => "Podar Pathways - Password Reset Code: {$otp}"
+            'registration'   => "Your Podar Pathways verification code",
+            'admin-login'    => "Verify your Podar Pathways administrator sign-in",
+            'reset-password' => "Reset your Podar Pathways password"
         ];
 
         $pillTitles = [
@@ -45,47 +46,7 @@ class Mailer {
         $safeName    = htmlspecialchars($name ?: 'Student', ENT_QUOTES, 'UTF-8');
         $year        = date('Y');
 
-        $contentHtml = <<<HTML
-        <div style="margin-bottom: 24px;">
-          <p style="font-size: 15px; line-height: 1.6; color: #334155; margin: 0 0 16px 0;">
-            Hello <strong>{$safeName}</strong>,
-          </p>
-          <p style="font-size: 14.5px; line-height: 1.6; color: #475569; margin: 0 0 24px 0;">
-            {$description}
-          </p>
-
-          <!-- OTP CODE DISPLAY BOX -->
-          <div style="background: linear-gradient(180deg, #f0fdfa 0%, #e6fffa 100%); border: 2px dashed #0d9488; border-radius: 14px; padding: 26px 20px; text-align: center; margin-bottom: 24px; box-shadow: inset 0 2px 4px rgba(13, 148, 136, 0.04);">
-            <div style="font-size: 11.5px; font-weight: 700; color: #0d9488; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">
-              ONE-TIME VERIFICATION CODE
-            </div>
-            <div style="font-size: 38px; font-weight: 800; letter-spacing: 12px; color: #0f766e; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; padding-left: 12px; text-shadow: 0 1px 2px rgba(15, 118, 110, 0.15);">
-              {$otp}
-            </div>
-            <div style="display: inline-block; margin-top: 12px; background-color: #ffffff; border: 1px solid #99f6e4; border-radius: 20px; padding: 4px 14px; font-size: 12px; color: #0f766e; font-weight: 600;">
-              ⏳ Valid for 10 minutes
-            </div>
-          </div>
-
-          <!-- SECURITY REMINDER BOX -->
-          <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 14px 16px; margin-bottom: 20px;">
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-              <tr>
-                <td style="vertical-align: top; width: 22px; font-size: 16px;">🔒</td>
-                <td style="vertical-align: top; padding-left: 8px;">
-                  <p style="margin: 0; font-size: 12.5px; color: #92400e; line-height: 1.5; font-weight: 500;">
-                    <strong>Security Notice:</strong> Never share this verification code with anyone. Podar Pathways faculty or administrators will <strong>never</strong> ask for your OTP or password.
-                  </p>
-                </td>
-              </tr>
-            </table>
-          </div>
-
-          <p style="font-size: 12.5px; color: #64748b; line-height: 1.5; margin: 0;">
-            If you did not initiate this action on Podar Pathways, you can safely ignore this email or notify the IT placement cell immediately.
-          </p>
-        </div>
-HTML;
+        $contentHtml = EmailTemplate::otp($name, $otp, OTP_EXPIRY_MINUTES);
 
         $textBody = "Podar Pathways - Institutional Career Operating System\n"
                   . "====================================================\n\n"
@@ -97,7 +58,7 @@ HTML;
                   . "Career Development & Placement Cell\n"
                   . "© {$year} Podar Pathways (noreply@podarpathways.com)";
 
-        self::logAudit($to, "OTP: {$otp} ({$purpose})");
+        self::logAudit($to, "OTP requested ({$purpose})");
 
         $htmlBody = self::renderMasterTemplate([
             'title'     => $subject,
@@ -112,8 +73,8 @@ HTML;
         $isWindows = (DIRECTORY_SEPARATOR === '\\');
         if ($isWindows && !USE_SMTP) {
             return [
-                'success' => true,
-                'message' => "OTP logged to audit log for local development: {$otp}"
+                'success' => false,
+                'message' => 'Email delivery is not configured. Configure SMTP to send verification codes.'
             ];
         }
 
@@ -367,128 +328,7 @@ HTML;
      * Master Responsive HTML Template with Podar Pathways Logo & Institutional Theme
      */
     private static function renderMasterTemplate(array $params): string {
-        $title     = htmlspecialchars($params['title'] ?? 'Podar Pathways Notification', ENT_QUOTES, 'UTF-8');
-        $pill      = htmlspecialchars($params['pill'] ?? 'OFFICIAL NOTIFICATION', ENT_QUOTES, 'UTF-8');
-        $pillColor = $params['pillColor'] ?? '#0d9488';
-        $headline  = htmlspecialchars($params['headline'] ?? 'Podar Pathways Notification', ENT_QUOTES, 'UTF-8');
-        $content   = $params['content'] ?? '';
-        $recipient = htmlspecialchars($params['recipient'] ?? '', ENT_QUOTES, 'UTF-8');
-        $year      = date('Y');
-
-        $baseUrl = self::getBaseUrl();
-        $remoteLogoUrl = rtrim($baseUrl, '/') . '/pathways-logo-email.jpeg';
-
-        return <<<HTML
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>{$title}</title>
-  <!--[if mso]>
-  <style type="text/css">
-    body, table, td, h1, h2, h3, p, a { font-family: Arial, Helvetica, sans-serif !important; }
-  </style>
-  <![endif]-->
-</head>
-<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; color: #1e293b;">
-
-  <!-- TOP BACKGROUND WRAPPER -->
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 36px 12px;">
-    <tr>
-      <td align="center">
-
-        <!-- MAIN CONTAINER CARD (Max 580px) -->
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 580px; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08);">
-          
-          <!-- BRAND HEADER: Institutional Deep Navy with Teal Gradient -->
-          <tr>
-            <td style="background: #0b192c; background: linear-gradient(135deg, #0b192c 0%, #1e3e62 55%, #0d9488 100%); padding: 32px 24px 28px 24px; text-align: center; color: #ffffff;">
-              
-              <!-- LOGO EMBLEM CONTAINER -->
-              <table role="presentation" cellspacing="0" cellpadding="0" align="center" style="margin: 0 auto 12px auto;">
-                <tr>
-                  <td align="center" style="width: 64px; height: 64px; border-radius: 50%; background-color: #ffffff; padding: 2px; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);">
-                    <!-- Dual-source logo: CID fallback to remote URL -->
-                    <img src="cid:pathways_logo" onerror="this.onerror=null;this.src='{$remoteLogoUrl}';" alt="Podar Pathways Logo" width="60" height="60" style="display: block; width: 60px; height: 60px; border-radius: 50%; object-fit: contain; border: 0;" />
-                  </td>
-                </tr>
-              </table>
-
-              <!-- INSTITUTION TITLE -->
-              <h1 style="margin: 0; font-size: 23px; font-weight: 800; letter-spacing: 0.8px; color: #ffffff; text-transform: uppercase;">
-                PODAR PATHWAYS
-              </h1>
-              
-              <!-- COLLEGE SUBTITLE -->
-              <p style="margin: 6px 0 0 0; font-size: 11px; color: #99f6e4; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700;">
-                Career Operating System &bull; Placement Cell
-              </p>
-              <p style="margin: 3px 0 0 0; font-size: 10px; color: #cbd5e1; letter-spacing: 0.5px; opacity: 0.9;">
-                Sheth L.U.J. &amp; Sir M.V. College of Arts, Science &amp; Commerce
-              </p>
-            </td>
-          </tr>
-
-          <!-- GOLDEN ACCENT RIBBON -->
-          <tr>
-            <td style="height: 4px; background: linear-gradient(90deg, #d97706 0%, #fbbf24 50%, #14b8a6 100%); line-height: 4px; font-size: 0;">&nbsp;</td>
-          </tr>
-
-          <!-- BODY CONTENT -->
-          <tr>
-            <td style="padding: 34px 30px 24px 30px; background-color: #ffffff;">
-              
-              <!-- CATEGORY PILL -->
-              <div style="margin-bottom: 14px;">
-                <span style="display: inline-block; background-color: #f8fafc; border: 1px solid #cbd5e1; border-left: 3px solid {$pillColor}; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; color: {$pillColor}; letter-spacing: 1px; text-transform: uppercase;">
-                  {$pill}
-                </span>
-              </div>
-
-              <!-- HEADLINE -->
-              <h2 style="font-size: 20px; font-weight: 800; color: #0f172a; margin: 0 0 18px 0; letter-spacing: -0.3px;">
-                {$headline}
-              </h2>
-
-              <!-- INJECTED BODY -->
-              {$content}
-
-            </td>
-          </tr>
-
-          <!-- INSTITUTIONAL FOOTER -->
-          <tr>
-            <td style="background-color: #f8fafc; padding: 24px 30px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; line-height: 1.6;">
-              <p style="margin: 0 0 8px 0; font-weight: 700; color: #334155; font-size: 12.5px;">
-                Sheth L.U.J. &amp; Sir M.V. College of Arts, Science &amp; Commerce
-              </p>
-              <p style="margin: 0 0 12px 0; font-size: 11.5px; color: #64748b;">
-                Career Development &amp; Placement Cell &bull; Dr. Sarvepalli Radhakrishnan Marg, Andheri (E), Mumbai 400069
-              </p>
-              
-              <div style="height: 1px; background-color: #e2e8f0; width: 60%; margin: 12px auto;"></div>
-
-              <p style="margin: 0 0 6px 0; font-size: 11px; color: #94a3b8;">
-                Sent automatically by the Podar Pathways Security Engine to <strong style="color: #64748b;">{$recipient}</strong>.<br>
-                For placement queries, please visit the college campus or contact <a href="mailto:noreply@podarpathways.com" style="color: #0d9488; text-decoration: none; font-weight: 600;">noreply@podarpathways.com</a>.
-              </p>
-              <p style="margin: 0; font-size: 11px; color: #94a3b8;">
-                &copy; {$year} Podar Pathways. All rights reserved.
-              </p>
-            </td>
-          </tr>
-
-        </table>
-
-      </td>
-    </tr>
-  </table>
-
-</body>
-</html>
-HTML;
+        return EmailTemplate::render($params);
     }
 
     /**

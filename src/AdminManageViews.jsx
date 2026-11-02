@@ -1,3 +1,5 @@
+import { requestJson, requireRecord } from './api.js';
+import { passwordError, PASSWORD_HINT } from './validation.js';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { DEFAULT_ADMIN_AVATAR, DEFAULT_STUDENT_AVATAR } from './defaultAvatar.js';
@@ -46,6 +48,25 @@ function formatAdminDate(val) {
     const d = new Date(val);
     if (!isNaN(d.getTime())) {
       return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+  } catch (e) {}
+  return String(val);
+}
+
+// Helper: Format date and time for admin engagement tracking
+function formatAdminDateTime(val) {
+  if (!val) return '—';
+  try {
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
     }
   } catch (e) {}
   return String(val);
@@ -103,6 +124,14 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
   const [activeCourse, setActiveCourse] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
+  // Student clicks & engagement tracking modal state
+  const [clicksModalCourse, setClicksModalCourse] = useState(null);
+  const [clicksData, setClicksData] = useState({ clicks: [], notClicked: [], totalClicked: 0, totalStudents: 0 });
+  const [loadingClicks, setLoadingClicks] = useState(false);
+  const [clicksSearch, setClicksSearch] = useState('');
+  const [clicksStatusFilter, setClicksStatusFilter] = useState('all'); // 'all' | 'clicked' | 'not_clicked'
+  const [clicksDeptFilter, setClicksDeptFilter] = useState('all');
+
   // Form Fields
   const [title, setTitle] = useState('');
   const [provider, setProvider] = useState('');
@@ -136,6 +165,8 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
                 bannerImg: p.bannerImg || '',
                 image: p.bannerImg || '',
                 image_url: p.bannerImg || '',
+                clickCount: p.clickCount || 0,
+                clickedStudentIds: p.clickedStudentIds || [],
                 createdAt: p.createdAt
               };
               map.set(p.id, { ...(map.get(p.id) || {}), ...item });
@@ -243,103 +274,53 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
     setActiveCourse(null);
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     if (!title.trim() || !url.trim()) {
       notify?.('Please provide course title and learning link.');
       return;
     }
-
-    if (modalMode === 'add') {
-      const newCourse = {
-        id: `course-${Date.now()}`,
-        title: title.trim(),
-        provider: provider.trim() || 'Curated Academic Partner',
-        url: url.trim(),
-        targetCourse: targetCourse || 'All',
-        validTill: validTill || '2026-12-31',
-        deadline: validTill || '2026-12-31',
-        description: description.trim() || 'Curated career preparation course.',
-        bannerImg: bannerImg.trim(),
-        image: bannerImg.trim(),
-        image_url: bannerImg.trim(),
-        createdAt: new Date().toISOString()
-      };
-
+    const course = {
+      ...(modalMode === 'edit' ? activeCourse : {}),
+      title: title.trim(),
+      provider: provider.trim() || 'Curated Academic Partner',
+      url: url.trim(),
+      targetCourse: targetCourse || 'All',
+      validTill: validTill || activeCourse?.validTill || '2026-12-31',
+      description: description.trim() || activeCourse?.description || 'Curated career preparation course.',
+      bannerImg: bannerImg.trim(), image: bannerImg.trim(), image_url: bannerImg.trim()
+    };
+    const adding = modalMode === 'add';
+    if (!adding && !activeCourse) return;
+    try {
+      const data = await requestJson(adding ? '/api/programs' : '/api/programs/' + activeCourse.id, {
+        method: adding ? 'POST' : 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...course, issuer: course.provider, link: course.url, deadline: course.validTill })
+      });
+      const saved = { ...course, ...requireRecord(data, 'program') };
       setState(prev => ({
         ...prev,
-        courses: [newCourse, ...(prev.courses || [])]
+        courses: adding ? [saved, ...(prev.courses || [])] : (prev.courses || []).map(c => c.id === activeCourse.id ? saved : c)
       }));
-
-      fetch('/api/programs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: newCourse.title,
-          issuer: newCourse.provider,
-          link: newCourse.url,
-          targetCourse: newCourse.targetCourse,
-          deadline: newCourse.validTill,
-          validTill: newCourse.validTill,
-          description: newCourse.description,
-          bannerImg: newCourse.bannerImg,
-          image: newCourse.bannerImg
-        })
-      }).catch(() => {});
-
-      notify?.(`Course "${newCourse.title}" added successfully!`);
-    } else if (modalMode === 'edit' && activeCourse) {
-      const updatedCourse = {
-        ...activeCourse,
-        title: title.trim(),
-        provider: provider.trim() || 'Curated Academic Partner',
-        url: url.trim(),
-        targetCourse: targetCourse || 'All',
-        validTill: validTill || activeCourse.validTill || '2026-12-31',
-        deadline: validTill || activeCourse.deadline || activeCourse.validTill || '2026-12-31',
-        description: description.trim() || activeCourse.description,
-        bannerImg: bannerImg.trim(),
-        image: bannerImg.trim(),
-        image_url: bannerImg.trim()
-      };
-
-      setState(prev => ({
-        ...prev,
-        courses: (prev.courses || []).map(c => c.id === activeCourse.id ? updatedCourse : c)
-      }));
-
-      fetch(`/api/programs/${activeCourse.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...updatedCourse,
-          issuer: updatedCourse.provider,
-          link: updatedCourse.url,
-          deadline: updatedCourse.validTill,
-          validTill: updatedCourse.validTill,
-          bannerImg: updatedCourse.bannerImg,
-          image: updatedCourse.bannerImg
-        })
-      }).catch(() => {});
-
-      notify?.(`Course "${updatedCourse.title}" updated successfully!`);
+      notify?.('Course "' + saved.title + '" ' + (adding ? 'added' : 'updated') + ' successfully!');
+      closeModal();
+    } catch (error) {
+      notify?.(error.message || 'Could not save course. Please try again.');
     }
-
-    closeModal();
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteTarget) return;
     const { id, title: cTitle } = deleteTarget;
-
-    setState(prev => ({
-      ...prev,
-      courses: (prev.courses || []).filter(c => c.id !== id)
-    }));
-
-    fetch(`/api/programs/${id}`, { method: 'DELETE' }).catch(() => {});
-    notify?.(`Course "${cTitle}" deleted.`);
-    setDeleteTarget(null);
+    try {
+      await requestJson('/api/programs/' + id, { method: 'DELETE' });
+      setState(prev => ({ ...prev, courses: (prev.courses || []).filter(c => c.id !== id) }));
+      notify?.('Course "' + cTitle + '" deleted.');
+      setDeleteTarget(null);
+    } catch (error) {
+      notify?.(error.message || 'Could not delete course. Please try again.');
+    }
   };
 
   const filtered = useMemo(() => {
@@ -349,6 +330,199 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
         (c.provider && c.provider.toLowerCase().includes(search.toLowerCase()));
     });
   }, [courses, search]);
+
+  const openClicksModal = async (course) => {
+    setClicksModalCourse(course);
+    setClicksSearch('');
+    setClicksStatusFilter('all');
+    setClicksDeptFilter('all');
+    setLoadingClicks(true);
+
+    try {
+      let res = await fetch('/api/programs/' + encodeURIComponent(course.id) + '/clicks');
+      if (!res.ok) {
+        res = await fetch('/api/courses/' + encodeURIComponent(course.id) + '/clicks');
+      }
+      if (res.ok) {
+        const json = await res.json();
+        const clicks = Array.isArray(json.clicks) ? json.clicks : [];
+        const notClicked = Array.isArray(json.notClicked) ? json.notClicked : [];
+        setClicksData({
+          clicks,
+          notClicked,
+          totalClicked: typeof json.totalClicked === 'number' ? json.totalClicked : clicks.length,
+          totalStudents: typeof json.totalStudents === 'number' ? json.totalStudents : (clicks.length + notClicked.length)
+        });
+        setLoadingClicks(false);
+        return;
+      }
+    } catch (err) {
+      console.warn('API clicks fetch error, using local fallback:', err);
+    }
+
+    // Local fallback using state.students & state.courseClicks
+    const allStudents = state?.students || [];
+    const courseClicks = (state?.courseClicks || []).filter(c => c.programId === course.id);
+    const clickedIdMap = new Map();
+    courseClicks.forEach(c => {
+      clickedIdMap.set(c.studentId, c.clickedAt || new Date().toISOString());
+    });
+    (course.clickedStudentIds || []).forEach(id => {
+      if (!clickedIdMap.has(id)) clickedIdMap.set(id, new Date().toISOString());
+    });
+
+    const clicks = [];
+    const notClicked = [];
+    allStudents.forEach(s => {
+      if (clickedIdMap.has(s.id)) {
+        clicks.push({
+          id: s.id,
+          studentId: s.id,
+          name: s.name,
+          studentName: s.name,
+          email: s.email,
+          phone: s.phone,
+          course: s.course,
+          semester: s.semester,
+          rollNo: s.rollNo,
+          avatar: s.avatar,
+          clickedAt: clickedIdMap.get(s.id)
+        });
+      } else {
+        notClicked.push({
+          id: s.id,
+          studentId: s.id,
+          name: s.name,
+          email: s.email,
+          phone: s.phone,
+          course: s.course,
+          semester: s.semester,
+          rollNo: s.rollNo,
+          avatar: s.avatar
+        });
+      }
+    });
+
+    setClicksData({
+      clicks,
+      notClicked,
+      totalClicked: clicks.length,
+      totalStudents: allStudents.length
+    });
+    setLoadingClicks(false);
+  };
+
+  const closeClicksModal = () => {
+    setClicksModalCourse(null);
+    setClicksData({ clicks: [], notClicked: [], totalClicked: 0, totalStudents: 0 });
+  };
+
+  const availableDepartments = useMemo(() => {
+    const depts = new Set();
+    (clicksData.clicks || []).forEach(s => { if (s.course && s.course !== '—') depts.add(s.course); });
+    (clicksData.notClicked || []).forEach(s => { if (s.course && s.course !== '—') depts.add(s.course); });
+    return Array.from(depts).sort();
+  }, [clicksData]);
+
+  const modalStudentList = useMemo(() => {
+    if (!clicksModalCourse) return [];
+    const clickedList = (clicksData.clicks || []).map(c => ({
+      id: c.studentId || c.id,
+      studentId: c.studentId || c.id,
+      name: c.studentName || c.name || 'Student',
+      phone: c.studentPhone || c.phone || '—',
+      email: c.email || '—',
+      course: c.course || '—',
+      semester: c.semester || '—',
+      rollNo: c.rollNo || '—',
+      avatar: c.avatar || DEFAULT_STUDENT_AVATAR,
+      isClicked: true,
+      clickedAt: c.clickedAt
+    }));
+
+    const notClickedList = (clicksData.notClicked || []).map(s => ({
+      id: s.id || s.studentId,
+      studentId: s.id || s.studentId,
+      name: s.name || s.studentName || 'Student',
+      phone: s.phone || s.studentPhone || '—',
+      email: s.email || '—',
+      course: s.course || '—',
+      semester: s.semester || '—',
+      rollNo: s.rollNo || '—',
+      avatar: s.avatar || DEFAULT_STUDENT_AVATAR,
+      isClicked: false,
+      clickedAt: null
+    }));
+
+    let combined = [...clickedList, ...notClickedList];
+
+    // Status Filter
+    if (clicksStatusFilter === 'clicked') {
+      combined = combined.filter(s => s.isClicked);
+    } else if (clicksStatusFilter === 'not_clicked') {
+      combined = combined.filter(s => !s.isClicked);
+    }
+
+    // Department / Academic Program Filter
+    if (clicksDeptFilter !== 'all') {
+      combined = combined.filter(s => {
+        const dept = (s.course || '').trim().toLowerCase();
+        return dept === clicksDeptFilter.toLowerCase();
+      });
+    }
+
+    // Search Filter
+    if (clicksSearch.trim()) {
+      const q = clicksSearch.trim().toLowerCase();
+      combined = combined.filter(s =>
+        (s.name && s.name.toLowerCase().includes(q)) ||
+        (s.rollNo && s.rollNo.toLowerCase().includes(q)) ||
+        (s.email && s.email.toLowerCase().includes(q)) ||
+        (s.phone && s.phone.toLowerCase().includes(q)) ||
+        (s.course && s.course.toLowerCase().includes(q))
+      );
+    }
+
+    return combined;
+  }, [clicksModalCourse, clicksData, clicksStatusFilter, clicksDeptFilter, clicksSearch]);
+
+  const handleExportClicks = (course, studentList) => {
+    try {
+      const rows = studentList.map((s, idx) => ({
+        'Sr. No': idx + 1,
+        'Roll No': s.rollNo || 'N/A',
+        'Student Name': s.name || s.studentName || 'Student',
+        'Academic Program': s.course || 'N/A',
+        'Semester': s.semester || 'N/A',
+        'Email Address': s.email || 'N/A',
+        'Mobile Number': s.phone || s.studentPhone || 'N/A',
+        'Course Status': s.isClicked ? 'Selected / Clicked' : 'Not Clicked',
+        'Engagement Date & Time': s.isClicked ? formatAdminDateTime(s.clickedAt) : 'Not Yet Clicked'
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws['!cols'] = [
+        { wch: 8 },  // Sr No
+        { wch: 14 }, // Roll No
+        { wch: 26 }, // Name
+        { wch: 22 }, // Program
+        { wch: 10 }, // Semester
+        { wch: 28 }, // Email
+        { wch: 16 }, // Mobile
+        { wch: 20 }, // Status
+        { wch: 25 }  // Date & Time
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Course Engagement');
+      const safeTitle = (course.title || 'Course').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 30);
+      XLSX.writeFile(wb, safeTitle + '_Engagement_List_' + new Date().toISOString().split('T')[0] + '.xlsx');
+      notify?.('Course engagement report exported successfully!');
+    } catch (err) {
+      console.error('Export error:', err);
+      notify?.('Failed to export. Please try again.');
+    }
+  };
 
   return (
     <div className="minimal-admin-container">
@@ -397,8 +571,19 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
                 </div>
 
                 <div className="minimal-item-info">
-                  <h4 className="minimal-item-title">{course.title}</h4>
-                  <div className="minimal-item-meta">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <h4 className="minimal-item-title" style={{ margin: 0 }}>{course.title}</h4>
+                    <span
+                      className="minimal-item-clicks-badge"
+                      onClick={() => openClicksModal(course)}
+                      style={{ cursor: 'pointer' }}
+                      title="Click to view student engagement list"
+                    >
+                      <Users size={12} />
+                      <strong>{course.clickCount || 0}</strong> {course.clickCount === 1 ? 'Student Clicked' : 'Students Clicked'}
+                    </span>
+                  </div>
+                  <div className="minimal-item-meta" style={{ marginTop: '4px' }}>
                     <span>{course.provider || 'Academic Partner'}</span>
                     <span>•</span>
                     <span>{course.targetCourse || 'All Programs'}</span>
@@ -414,8 +599,16 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
                   </div>
                 </div>
 
-                {/* ONLY Edit and Delete Buttons */}
+                {/* Actions: Students Engagement / Edit / Delete */}
                 <div className="minimal-item-actions">
+                  <button
+                    onClick={() => openClicksModal(course)}
+                    className="minimal-btn-action engagement"
+                    title="View students who clicked/selected this course"
+                  >
+                    <Users size={14} />
+                    <span>Students ({course.clickCount || 0})</span>
+                  </button>
                   <button
                     onClick={() => openEditModal(course)}
                     className="minimal-btn-action edit"
@@ -474,7 +667,8 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
                   <label>Target Academic Program</label>
                   <select value={targetCourse} onChange={e => setTargetCourse(e.target.value)}>
                     <option value="All">All Programs</option>
-                    <option value="BCA">BCA</option>
+                    <option value="">Select course</option>
+                      <option value="BCA">BCA</option>
                     <option value="BSc IT">BSc IT</option>
                     <option value="MCA">MCA</option>
                     <option value="BBA">BBA</option>
@@ -647,6 +841,254 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
               </button>
               <button className="minimal-btn-danger" onClick={confirmDelete}>
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Student Course Engagement Analytics Modal */}
+      {clicksModalCourse && (
+        <div className="minimal-modal-backdrop" onClick={closeClicksModal}>
+          <div
+            className="minimal-modal-dialog course-engagement-modal-dialog"
+            onClick={e => e.stopPropagation()}
+            style={{ maxWidth: '960px', width: '95%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}
+          >
+            {/* Modal Header */}
+            <div className="minimal-modal-header" style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', background: '#f8fafc' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: '#0369a1', background: '#e0f2fe', padding: '2px 8px', borderRadius: '4px' }}>
+                    Course Engagement & Student Selection
+                  </span>
+                  <span style={{ fontSize: '12px', color: '#64748b' }}>
+                    • Program: <strong>{clicksModalCourse.targetCourse || 'All Programs'}</strong>
+                  </span>
+                </div>
+                <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                  {clicksModalCourse.title}
+                </h3>
+                <p style={{ margin: '3px 0 0', fontSize: '12.5px', color: '#64748b' }}>
+                  Partner: <strong>{clicksModalCourse.provider || 'Podar Pathways'}</strong> • Link:{' '}
+                  <a href={clicksModalCourse.url} target="_blank" rel="noreferrer" style={{ color: '#0284c7', textDecoration: 'underline' }}>
+                    {clicksModalCourse.url}
+                  </a>
+                </p>
+              </div>
+              <button className="minimal-close-btn" onClick={closeClicksModal} title="Close Modal">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Stats Cards Grid */}
+            <div className="course-engagement-stats-grid">
+              <div className="course-stat-card">
+                <div className="course-stat-icon total">
+                  <Users size={18} />
+                </div>
+                <div className="course-stat-info">
+                  <h5>Total Enrolled Students</h5>
+                  <div className="course-stat-val">{clicksData.totalStudents}</div>
+                </div>
+              </div>
+
+              <div className="course-stat-card">
+                <div className="course-stat-icon clicked">
+                  <CheckCircle2 size={18} />
+                </div>
+                <div className="course-stat-info">
+                  <h5>Selected / Clicked</h5>
+                  <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                    <span className="course-stat-val" style={{ color: '#15803d' }}>{clicksData.totalClicked}</span>
+                    <span className="course-stat-pct">
+                      ({clicksData.totalStudents > 0 ? Math.round((clicksData.totalClicked / clicksData.totalStudents) * 100) : 0}%)
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="course-stat-card">
+                <div className="course-stat-icon pending">
+                  <Clock size={18} />
+                </div>
+                <div className="course-stat-info">
+                  <h5>Not Yet Clicked</h5>
+                  <div className="course-stat-val" style={{ color: '#b45309' }}>
+                    {Math.max(0, clicksData.totalStudents - clicksData.totalClicked)}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Toolbar: Filter Tabs, Search, Department Dropdown & Excel Export */}
+            <div className="course-engagement-toolbar">
+              <div className="course-engagement-tabs">
+                <button
+                  type="button"
+                  className={`course-tab-btn ${clicksStatusFilter === 'all' ? 'active' : ''}`}
+                  onClick={() => setClicksStatusFilter('all')}
+                >
+                  All Students ({clicksData.totalStudents})
+                </button>
+                <button
+                  type="button"
+                  className={`course-tab-btn ${clicksStatusFilter === 'clicked' ? 'active' : ''}`}
+                  onClick={() => setClicksStatusFilter('clicked')}
+                >
+                  <CheckCircle2 size={13} color="#15803d" /> Clicked ({clicksData.totalClicked})
+                </button>
+                <button
+                  type="button"
+                  className={`course-tab-btn ${clicksStatusFilter === 'not_clicked' ? 'active' : ''}`}
+                  onClick={() => setClicksStatusFilter('not_clicked')}
+                >
+                  <Clock size={13} color="#b45309" /> Not Clicked ({Math.max(0, clicksData.totalStudents - clicksData.totalClicked)})
+                </button>
+              </div>
+
+              <div className="course-engagement-filters">
+                {/* Department Filter */}
+                {availableDepartments.length > 0 && (
+                  <select
+                    value={clicksDeptFilter}
+                    onChange={e => setClicksDeptFilter(e.target.value)}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: '6px',
+                      border: '1px solid #d1d5db',
+                      fontSize: '12.5px',
+                      color: '#374151',
+                      background: '#fff'
+                    }}
+                  >
+                    <option value="all">All Departments</option>
+                    {availableDepartments.map(dept => (
+                      <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                  </select>
+                )}
+
+                {/* Search box */}
+                <div className="minimal-search-box" style={{ maxWidth: '220px' }}>
+                  <Search size={13} />
+                  <input
+                    type="text"
+                    placeholder="Search students..."
+                    value={clicksSearch}
+                    onChange={e => setClicksSearch(e.target.value)}
+                  />
+                  {clicksSearch && <button onClick={() => setClicksSearch('')}><X size={11} /></button>}
+                </div>
+
+                {/* Export Button */}
+                <button
+                  type="button"
+                  onClick={() => handleExportClicks(clicksModalCourse, modalStudentList)}
+                  className="minimal-btn-action"
+                  style={{ background: '#059669', color: '#fff', border: 'none', padding: '6px 12px' }}
+                  title="Export current view to Excel (.xlsx)"
+                >
+                  <Download size={13} />
+                  <span>Export Excel</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Table of Students */}
+            <div className="course-engagement-table-container">
+              {loadingClicks ? (
+                <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontSize: '13.5px' }}>
+                  Loading student course engagement data...
+                </div>
+              ) : modalStudentList.length > 0 ? (
+                <table className="course-engagement-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '35%' }}>Student</th>
+                      <th style={{ width: '20%' }}>Program / Semester</th>
+                      <th style={{ width: '25%' }}>Contact</th>
+                      <th style={{ width: '20%' }}>Engagement Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {modalStudentList.map(s => (
+                      <tr key={s.id}>
+                        <td>
+                          <div className="engagement-student-cell">
+                            <img
+                              src={s.avatar || DEFAULT_STUDENT_AVATAR}
+                              alt={s.name}
+                              className="engagement-student-avatar"
+                              onError={e => { e.currentTarget.src = DEFAULT_STUDENT_AVATAR; }}
+                            />
+                            <div>
+                              <div className="engagement-student-name">{s.name}</div>
+                              <div className="engagement-student-roll">{s.rollNo || 'No Roll No'}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 600, color: '#334155' }}>{s.course || '—'}</div>
+                          <div style={{ fontSize: '11.5px', color: '#64748b' }}>
+                            {s.semester ? `Semester ${s.semester}` : '—'}
+                          </div>
+                        </td>
+                        <td>
+                          <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <Mail size={12} color="#64748b" />
+                            <span style={{ color: '#334155' }}>{s.email || '—'}</span>
+                          </div>
+                          {s.phone && (
+                            <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px' }}>
+                              <Phone size={12} color="#64748b" />
+                              <span style={{ color: '#64748b' }}>{s.phone}</span>
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          {s.isClicked ? (
+                            <div>
+                              <span className="engagement-badge-clicked">
+                                <CheckCircle2 size={12} />
+                                Selected / Clicked
+                              </span>
+                              <div className="engagement-timestamp">
+                                <Clock size={11} />
+                                {formatAdminDateTime(s.clickedAt)}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="engagement-badge-unclicked">
+                              <Clock size={12} />
+                              Not Clicked
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div style={{ padding: '50px 20px', textAlign: 'center', color: '#64748b' }}>
+                  <Users size={32} style={{ margin: '0 auto 8px', color: '#94a3b8', display: 'block' }} />
+                  <p style={{ margin: 0, fontWeight: 600, fontSize: '14px', color: '#475569' }}>
+                    No students match the current filter
+                  </p>
+                  <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: '#94a3b8' }}>
+                    Try clearing your search or switching filter tabs.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="minimal-modal-footer" style={{ padding: '12px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '12px', color: '#64748b' }}>
+                Showing <strong>{modalStudentList.length}</strong> of <strong>{clicksData.totalStudents}</strong> students
+              </div>
+              <button type="button" className="minimal-btn-secondary" onClick={closeClicksModal}>
+                Close
               </button>
             </div>
           </div>
@@ -1656,18 +2098,18 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
     const cur = Array.isArray(target.permissions) ? target.permissions : [];
     const updated = cur.includes(permKey) ? cur.filter(p => p !== permKey) : [...cur, permKey];
 
-    const updatedList = admins.map(a => a.id === adminId ? { ...a, permissions: updated } : a);
-    setState(prev => ({ ...prev, admins: updatedList }));
 
     try {
-      await fetch(`/api/admins/${adminId}`, {
+      const data = await requestJson(`/api/admins/${adminId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ permissions: updated })
       });
+      const saved = requireRecord(data, 'admin');
+      setState(prev => ({ ...prev, admins: (prev.admins || []).map(a => a.id === adminId ? { ...a, ...saved } : a) }));
       notify?.('Permission updated.');
-    } catch {
-      notify?.('Permission updated.');
+    } catch (error) {
+      notify?.(error.message || 'Could not update permission.');
     }
   };
 
@@ -1684,22 +2126,13 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
       return;
     }
 
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { notify?.('Enter a valid email address.'); return; }
+    if (!/^[0-9]{10}$/.test(phone.replace(/\D/g, ''))) { notify?.('Enter a valid 10-digit mobile number.'); return; }
+    if (modalMode === 'add' && passwordError(password)) { notify?.(PASSWORD_HINT); return; }
     if (modalMode === 'add') {
-      const cleanPhone = phone.replace(/\D/g, '') || '9800000000';
-      const newAdminObj = {
-        id: `admin-${Date.now()}`,
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        phone: cleanPhone,
-        department: department.trim(),
-        role: role.trim(),
-        permissions,
-        isMain: false,
-        createdAt: new Date().toISOString()
-      };
-
+      const cleanPhone = phone.replace(/\D/g, '');
       try {
-        const res = await fetch('/api/admins', {
+        const data = await requestJson('/api/admins', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1708,22 +2141,16 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
             phone: cleanPhone,
             department: department.trim(),
             role: role.trim(),
-            password: password || 'Admin@123',
+            password,
             permissions
           })
         });
 
-        if (res.ok) {
-          const data = await res.json();
-          setState(prev => ({
-            ...prev,
-            admins: [...admins, { ...(data.admin || newAdminObj), isMain: false, permissions }]
-          }));
-        } else {
-          setState(prev => ({ ...prev, admins: [...admins, newAdminObj] }));
-        }
-      } catch {
-        setState(prev => ({ ...prev, admins: [...admins, newAdminObj] }));
+        const saved = requireRecord(data, 'admin');
+        setState(prev => ({ ...prev, admins: [...(prev.admins || []), { ...saved, isMain: false }] }));
+      } catch (error) {
+        notify?.(error.message || 'Could not create administrator.');
+        return;
       }
 
       notify?.(`Administrator "${name}" added successfully!`);
@@ -1740,18 +2167,18 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
         permissions: isMain ? activeAdmin.permissions : permissions
       };
 
-      setState(prev => ({
-        ...prev,
-        admins: (prev.admins || []).map(a => a.id === activeAdmin.id ? updated : a)
-      }));
-
       try {
-        await fetch(`/api/admins/${activeAdmin.id}`, {
+        const data = await requestJson('/api/admins/' + activeAdmin.id, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updated)
         });
-      } catch {}
+        const saved = requireRecord(data, 'admin');
+        setState(prev => ({ ...prev, admins: (prev.admins || []).map(a => a.id === activeAdmin.id ? { ...a, ...saved } : a) }));
+      } catch (error) {
+        notify?.(error.message || 'Could not update administrator.');
+        return;
+      }
 
       notify?.(`Administrator "${updated.name}" updated!`);
     }
@@ -1778,17 +2205,19 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
     }
 
     try {
-      await fetch(`/api/admins/${target.id}`, {
+      await requestJson(`/api/admins/${target.id}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
           'x-admin-email': currentEmail || 'admin@podar.edu'
         }
       });
-    } catch {}
+    } catch (error) {
+      notify?.(error.message || 'Could not delete administrator.');
+      return;
+    }
 
-    const filtered = admins.filter(a => a.id !== target.id);
-    setState(prev => ({ ...prev, admins: filtered }));
+    setState(prev => ({ ...prev, admins: (prev.admins || []).filter(a => a.id !== target.id) }));
     notify?.(`Administrator "${target.name}" deleted.`);
     setDeleteTarget(null);
   };
@@ -2190,7 +2619,7 @@ export function AdminCertificatesView({ state, setState, session, notify, naviga
     };
 
     try {
-      await fetch(`/api/certificates/${cert.id}/verify`, {
+      await requestJson(`/api/certificates/${cert.id}/verify`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2200,7 +2629,10 @@ export function AdminCertificatesView({ state, setState, session, notify, naviga
           adminRemarks: 'Verified and approved by college administrator.'
         })
       });
-    } catch (e) {}
+    } catch (error) {
+      notify?.(error.message || 'Could not update certificate. Please try again.');
+      return;
+    }
 
     const updated = certificates.map(c => c.id === cert.id ? verifiedCert : c);
     saveCertificates(updated);
@@ -2243,7 +2675,7 @@ export function AdminCertificatesView({ state, setState, session, notify, naviga
     };
 
     try {
-      await fetch(`/api/certificates/${rejectModalCert.id}/verify`, {
+      await requestJson(`/api/certificates/${rejectModalCert.id}/verify`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2251,22 +2683,27 @@ export function AdminCertificatesView({ state, setState, session, notify, naviga
           adminRemarks: remarks
         })
       });
-    } catch (e) {}
+    } catch (error) {
+      notify?.(error.message || 'Could not update certificate. Please try again.');
+      return;
+    }
 
     const updated = certificates.map(c => c.id === rejectModalCert.id ? rejectedCert : c);
     saveCertificates(updated);
-    const targetStudent = rejectModalCert.studentName || 'Student';
     setRejectModalCert(null);
     setRejectRemarks('');
-    notify?.(`Submission declined. Rejection notification email dispatched to ${targetStudent}.`);
+    notify?.('Submission declined.');
   };
 
   // Action: Confirm Delete
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     try {
-      await fetch(`/api/certificates/${deleteTarget.id}`, { method: 'DELETE' });
-    } catch (e) {}
+      await requestJson(`/api/certificates/${deleteTarget.id}`, { method: 'DELETE' });
+    } catch (error) {
+      notify?.(error.message || 'Could not update certificate. Please try again.');
+      return;
+    }
 
     const updated = certificates.filter(c => c.id !== deleteTarget.id);
     saveCertificates(updated);
@@ -2629,7 +3066,7 @@ export function AdminCertificatesView({ state, setState, session, notify, naviga
                 <span className="minimal-admin-eyebrow">CREDENTIAL INSPECTOR</span>
                 <h3>{selectedCert.programTitle}</h3>
                 <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
-                  Student: <strong>{selectedCert.studentName}</strong> • {selectedCert.studentDepartment || 'BCA • Semester V'}
+                  Student: <strong>{selectedCert.studentName}</strong> • {selectedCert.studentDepartment || 'Academic details not added'}
                 </p>
               </div>
               <button className="minimal-close-btn" onClick={() => setSelectedCert(null)}><X size={18} /></button>
@@ -2977,7 +3414,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
         const course = (row['Course'] || row['course'] || 'BCA').trim();
         const semester = (row['Semester'] || row['semester'] || 'Semester V').trim();
         const email = (row['Email'] || row['email'] || '').trim();
-        const goal = (row['Career Goal'] || row['Goal'] || row['goal'] || 'Software Engineer').trim();
+        const goal = (row['Career Goal'] || row['Goal'] || row['goal'] || '').trim();
         return { name, fathersName, phone, course, semester, email, goal };
       }).filter(s => s.name && s.phone && s.phone.length === 10);
 
@@ -2986,15 +3423,12 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
       }
 
       // Send to server
-      const res = await fetch('/api/students/import-csv', {
+      const resData = await requestJson('/api/students/import-csv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ students: parsedStudents })
       });
-      const resData = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(resData.error || 'Server failed to import students to database.');
-      }
+
 
       // Refresh student list from database
       const freshRes = await fetch('/api/students');
@@ -3039,7 +3473,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
       email: newStudent.email.trim(),
       course: newStudent.course,
       semester: newStudent.semester,
-      goal: newStudent.goal.trim() || 'Software Engineer',
+      goal: newStudent.goal.trim(),
       score: Number.isFinite(Number(newStudent.score)) ? Math.max(0, Number(newStudent.score)) : 0,
       completion: 0,
       applications: 0,
@@ -3049,16 +3483,13 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
     };
 
     try {
-      const res = await fetch('/api/students', {
+      const data = await requestJson('/api/students', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(studentRecord)
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to save student to database.');
-      }
-      const finalRecord = data.student ? { ...studentRecord, ...data.student } : studentRecord;
+
+      const finalRecord = { ...studentRecord, ...requireRecord(data, 'student') };
 
       setState?.(prev => ({
         ...prev,
@@ -3089,15 +3520,12 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
     if (!editStudent) return;
 
     try {
-      const res = await fetch(`/api/students/${editStudent.id}`, {
+      const data = await requestJson(`/api/students/${editStudent.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editStudent)
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to update student profile in database.');
-      }
+
 
       setState?.(prev => ({
         ...prev,
@@ -3116,11 +3544,8 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
     if (!deleteTarget) return;
 
     try {
-      const res = await fetch(`/api/students/${deleteTarget.id}`, { method: 'DELETE' });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to delete student from database.');
-      }
+      const data = await requestJson(`/api/students/${deleteTarget.id}`, { method: 'DELETE' });
+
 
       setState?.(prev => ({
         ...prev,
@@ -3321,7 +3746,8 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
               style={{ width: 'auto', minWidth: '110px' }}
             >
               <option value="all">All Courses</option>
-              <option value="BCA">BCA</option>
+              <option value="">Select course</option>
+                      <option value="BCA">BCA</option>
               <option value="MCA">MCA</option>
               <option value="B.Sc IT">B.Sc IT</option>
               <option value="BBA">BBA</option>
@@ -3351,7 +3777,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div className="avatar small" style={{ width: '34px', height: '34px', flexShrink: 0 }}>
-                          {st?.avatar && typeof st.avatar === 'string' && !st.avatar.startsWith('data:image/jpeg;base64') ? (
+                          {st?.avatar && typeof st.avatar === 'string' ? (
                             <img src={st.avatar} alt={st.name} className="avatar-img" onError={e => { e.currentTarget.style.display = 'none'; }} />
                           ) : (
                             <img src={DEFAULT_STUDENT_AVATAR} alt={st.name} className="avatar-img" />
@@ -3382,7 +3808,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
 
                     <td>
                       <span className="minimal-badge blue">
-                        {st.course || 'BCA'} • {st.semester || 'Sem V'}
+                        {st.course || 'Course not added'} • {st.semester || 'Semester not added'}
                       </span>
                     </td>
 
@@ -3561,6 +3987,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
                       value={newStudent.course}
                       onChange={e => setNewStudent({ ...newStudent, course: e.target.value })}
                     >
+                      <option value="">Select course</option>
                       <option value="BCA">BCA</option>
                       <option value="MCA">MCA</option>
                       <option value="B.Sc IT">B.Sc IT</option>
@@ -3648,9 +4075,10 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
                   <div className="minimal-form-field">
                     <label>Course</label>
                     <select
-                      value={editStudent.course || 'BCA'}
+                      value={editStudent.course || ''}
                       onChange={e => setEditStudent({ ...editStudent, course: e.target.value })}
                     >
+                      <option value="">Select course</option>
                       <option value="BCA">BCA</option>
                       <option value="MCA">MCA</option>
                       <option value="B.Sc IT">B.Sc IT</option>
@@ -3662,7 +4090,8 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
                     <label>Semester</label>
                     <input
                       type="text"
-                      value={editStudent.semester || 'Semester V'}
+                      value={editStudent.semester || ''}
+                      placeholder="Enter semester"
                       onChange={e => setEditStudent({ ...editStudent, semester: e.target.value })}
                     />
                   </div>

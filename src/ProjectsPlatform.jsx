@@ -164,8 +164,8 @@ export function ProjectsPlatform({ session, student, state, setState, notify, na
   const currentStudentId = student?.id || session?.id || '';
   const currentStudentName = student?.name || session?.name || 'Student';
   const currentStudentAvatar = student?.avatar || session?.avatar || '';
-  const currentStudentCourse = student?.course || 'BCA';
-  const currentStudentSem = student?.semester || 'Semester V';
+  const currentStudentCourse = student?.course || '';
+  const currentStudentSem = student?.semester || '';
   const isAdmin = session?.role === 'admin';
 
   // Navigation tab: 'feed' | 'search' | 'saved' | 'students'
@@ -725,7 +725,7 @@ export function ProjectsPlatform({ session, student, state, setState, notify, na
                             {isCurrent && <span className="soc-you-badge">You</span>}
                           </div>
                           <span className="soc-student-meta">
-                            {st.course || 'BCA'} • {st.semester ? (String(st.semester).startsWith('Sem') ? st.semester : `Sem ${st.semester}`) : 'Semester V'}
+                            {st.course || ''} • {st.semester ? (String(st.semester).startsWith('Sem') ? st.semester : `Sem ${st.semester}`) : 'Semester not added'}
                           </span>
                         </div>
                       </div>
@@ -1308,8 +1308,9 @@ function ProjectCard({
         setMenuOpen(false);
       }
     }
-    if (menuOpen) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    function handleKeyDown(e) { if(e.key === 'Escape') { setMenuOpen(false); menuRef.current?.querySelector('button')?.focus(); } }
+    if (menuOpen) { document.addEventListener('mousedown', handleClickOutside); document.addEventListener('keydown', handleKeyDown); }
+    return () => { document.removeEventListener('mousedown', handleClickOutside); document.removeEventListener('keydown', handleKeyDown); };
   }, [menuOpen]);
 
   // Handle comment submit
@@ -1378,6 +1379,7 @@ function ProjectCard({
               className="soc-icon-btn small"
               onClick={() => setMenuOpen(prev => !prev)}
               aria-label="Post Options"
+              aria-expanded={menuOpen}
             >
               <MoreVertical size={16} />
             </button>
@@ -1694,12 +1696,12 @@ function ProjectComposerModal({
 
   const [title, setTitle] = useState(postToEdit?.title || '');
   const [description, setDescription] = useState(postToEdit?.description || '');
-  const [category, setCategory] = useState(postToEdit?.category || 'Web Development');
+  const [category, setCategory] = useState(postToEdit?.category || '');
   const [demoUrl, setDemoUrl] = useState(postToEdit?.demoUrl || '');
   const [githubUrl, setGithubUrl] = useState(postToEdit?.githubUrl || '');
   const [youtubeUrl, setYoutubeUrl] = useState(postToEdit?.youtubeUrl || '');
   const [tagInput, setTagInput] = useState('');
-  const [tags, setTags] = useState(postToEdit?.tags || ['React', 'WebDevelopment']);
+  const [tags, setTags] = useState(postToEdit?.tags || []);
 
   // Images state: array of { imageUrl, caption }
   const [images, setImages] = useState(() => {
@@ -1834,6 +1836,7 @@ function ProjectComposerModal({
   // Save / Publish
   const handlePublish = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
+    if (!category) { notify?.('Please select a project category.'); return; }
     if (!title.trim()) {
       notify?.('Please provide a project title.');
       return;
@@ -1852,11 +1855,11 @@ function ProjectComposerModal({
       studentId: currentStudent?.id || '',
       studentName: currentStudent?.name || 'Student',
       studentAvatar: currentStudent?.avatar || '',
-      studentCourse: currentStudent?.course || 'BCA',
-      studentSemester: currentStudent?.semester || 'Semester V',
+      studentCourse: currentStudent?.course || '',
+      studentSemester: currentStudent?.semester || '',
       title: title.trim(),
       description: description.trim(),
-      category: category || 'Web Development',
+      category,
       demoUrl: cleanedDemo,
       githubUrl: cleanedGithub,
       youtubeUrl: cleanedYoutube,
@@ -1986,7 +1989,9 @@ function ProjectComposerModal({
             <div className="soc-form-row">
               <div className="soc-form-field">
                 <label>Category *</label>
-                <select value={category} onChange={e => setCategory(e.target.value)}>
+                <select required aria-label="Project category" value={category} onChange={e => setCategory(e.target.value)}>
+                  <option value="">Select a category</option>
+                  {category && categories?.length > 0 && !categories.some(item => item.name === category) && <option value={category}>{category}</option>}
                   {(categories && categories.length > 0 ? categories : [
                     { name: 'Web Development' },
                     { name: 'Android Development' },
@@ -3135,7 +3140,7 @@ export function AdminProjectsManagementView({ state, setState, session, notify, 
                   <div>
                     <strong style={{ fontSize: '14px', color: '#0f172a' }}>{inspectingProject.studentName}</strong>
                     <span style={{ display: 'block', fontSize: '12px', color: '#64748b' }}>
-                      {inspectingProject.studentCourse} • {inspectingProject.studentSemester || 'Semester V'}
+                      {inspectingProject.studentCourse} • {inspectingProject.studentSemester || ''}
                     </span>
                   </div>
                 </div>

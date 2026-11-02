@@ -1,17 +1,10 @@
 <?php
-/**
- * Podar Pathways - PHP Built-in Web Server Router
- * Usage: php -S localhost:5000 public/api/router.php
- */
-
-$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-
-// Allow direct serving of static files if requested
-$filePath = __DIR__ . '/../' . ltrim($uri, '/');
-if (file_exists($filePath) && is_file($filePath)) {
-    return false;
+// API requests never fall through to PHP's static file server.
+$path = rawurldecode(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/');
+if (preg_match('~(?:^|/)[.]|[\\\\\x00-\x1f]|/logs(?:/|$)|[.](?:php|log|sql|ini|bak|json)$~i', $path)) {
+    http_response_code(404);
+    header('Content-Type: application/json; charset=utf-8');
+    echo '{"success":false,"error":"Not found."}';
+    exit;
 }
-
-// Route all API requests to index.php
 require __DIR__ . '/index.php';
-

@@ -119,11 +119,18 @@ define('OTP_LOG_FILE', __DIR__ . '/logs/otp_audit.log');
 // ----------------------------------------------------
 // 4. CORS & HTTP HEADERS
 // ----------------------------------------------------
-$origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
-header("Access-Control-Allow-Origin: $origin");
-header("Access-Control-Allow-Credentials: true");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+// Same-origin browser cookies; never reflect an arbitrary Origin.
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+$expectedOrigin = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://') . ($_SERVER['HTTP_HOST'] ?? '');
+if ($origin !== '' && rtrim($origin, '/') !== $expectedOrigin) {
+    http_response_code(403);
+    header('Content-Type: application/json; charset=UTF-8');
+    echo json_encode(['success' => false, 'error' => 'Cross-origin requests are not allowed.']);
+    exit;
+}
+header('Vary: Origin');
+header('X-Content-Type-Options: nosniff');
+header('Cache-Control: no-store');
 
 // Handle preflight OPTIONS request
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
@@ -174,7 +181,8 @@ function getJsonInput(): array {
         return $_POST;
     }
     $decoded = json_decode($raw, true);
-    return is_array($decoded) ? $decoded : [];
+    if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded) || !str_starts_with(ltrim($raw), '{')) { jsonError('Request body must be a valid JSON object.', 400); }
+    return $decoded;
 }
 
 /**

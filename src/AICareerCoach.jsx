@@ -66,7 +66,7 @@ export function AICareerCoach({ student, notify, navigate }) {
       {
         id: 'msg-welcome',
         from: 'bot',
-        text: `Hello ${studentName}! 👋 I am your dedicated **Podar Pathways AI Career Coach**.\n\nI have reviewed your academic pathway for **${studentCourse}** (Current P-CARE Score: **${studentScore}/100**). Whether you want to practice technical mock interviews, optimize your resume for ATS screening, or build a personalized placement strategy, I'm here to help you succeed!\n\nWhat would you like to focus on today?`,
+        text: `Hello ${studentName}! 👋 I am your dedicated **Podar Pathways Career Guide**.\n\nI have reviewed your academic pathway for **${studentCourse}** (Current P-CARE Score: **${studentScore}/100**). Whether you want to practice technical mock interviews, optimize your resume for ATS screening, or build a personalized placement strategy, I'm here to help you succeed!\n\nWhat would you like to focus on today?`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }
     ];
@@ -151,7 +151,7 @@ export function AICareerCoach({ student, notify, navigate }) {
   };
 
   const handleClearHistory = () => {
-    if (window.confirm('Reset conversation history with AI Career Coach?')) {
+    if (window.confirm('Reset conversation history with Career Guide?')) {
       const resetMsg = [
         {
           id: 'msg-welcome-fresh',
@@ -218,9 +218,9 @@ export function AICareerCoach({ student, notify, navigate }) {
       {/* 1. Page Header */}
       <div className="page-header">
         <div>
-          <p className="eyebrow">AI CAREER COMPASS • INSTITUTIONAL ADVISOR</p>
-          <h1>AI Career Coach</h1>
-          <p>Instant, tailored guidance for interview preparation, ATS resumes, skills, and placement drives.</p>
+          <p className="eyebrow">CAREER GUIDE • PREPARED RESOURCES</p>
+          <h1>Career Guide</h1>
+          <p>Prepared guidance matched to common career topics and your profile. Responses are rule-based suggestions, not a live AI conversation.</p>
         </div>
 
         <div className="coach-header-actions">
@@ -248,7 +248,7 @@ export function AICareerCoach({ student, notify, navigate }) {
               </h2>
             </div>
             <p className="coach-sidebar-desc">
-              Select any topic to ask your AI coach or type your custom question below:
+              Select a topic or enter keywords to find relevant guidance:
             </p>
 
             <div className="coach-topic-chips-list">
@@ -296,7 +296,7 @@ export function AICareerCoach({ student, notify, navigate }) {
                 <span className="coach-online-dot" />
               </div>
               <div className="coach-header-details">
-                <strong>Podar Career AI</strong>
+                <strong>Podar Career Guide</strong>
                 <span>Contextual Career Advisor &bull; Sheth L.U.J. &amp; Sir M.V. College</span>
               </div>
             </div>
