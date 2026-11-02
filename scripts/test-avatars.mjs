@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {getInitials,getAvatarColor,initialsAvatar,hasUploadedAvatar} from '../src/avatarUtils.js';
+import {DEFAULT_STUDENT_AVATAR,DEFAULT_ADMIN_AVATAR} from '../src/defaultAvatar.js';
+assert.equal(getInitials('  Aarav   Sharma  '),'AS');
+assert.equal(getInitials('Raaj'),'R');
+assert.equal(getInitials(''),'?' );
+assert.equal(getInitials('Mary Jane Watson'),'MW');
+assert.equal(getAvatarColor('Aarav Sharma'),getAvatarColor(' aarav sharma '));
+assert.ok(new Set(['Aarav Sharma','Raaj Singh','Priya Patel','Rohan Mehta','Neha Shah'].map(getAvatarColor)).size>1);
+assert.equal(hasUploadedAvatar(DEFAULT_STUDENT_AVATAR),false);
+assert.equal(hasUploadedAvatar(DEFAULT_ADMIN_AVATAR),false);
+assert.equal(hasUploadedAvatar('data:image/jpeg;base64,/9j/example'),true);
+assert.equal(hasUploadedAvatar('https://example.com/photo.png'),true);
+assert.equal(hasUploadedAvatar(''),false);
+assert.ok(decodeURIComponent(initialsAvatar('<script>')).includes('&lt;'));
+console.log('PASS: name initials, stable varied colors, uploaded photo preservation and escaped SVG');

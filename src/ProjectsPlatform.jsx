@@ -1,3 +1,4 @@
+import { ProfileAvatar } from './ProfileAvatar.jsx';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { getProjectShareUrl, pushRoute, parseCurrentLocation } from './router.js';
 import {
@@ -686,11 +687,7 @@ export function ProjectsPlatform({ session, student, state, setState, notify, na
                       }}
                     >
                       <div className="soc-creator-chip-avatar">
-                        {creator.avatar ? (
-                          <img src={creator.avatar} alt={creator.name} onError={e => { e.currentTarget.style.display = 'none'; }} />
-                        ) : (
-                          (creator.name || 'S').slice(0, 2).toUpperCase()
-                        )}
+                        <ProfileAvatar src={creator.avatar} name={creator.name} />
                       </div>
                       <div className="soc-creator-chip-info">
                         <strong>{creator.name}</strong>
@@ -712,11 +709,7 @@ export function ProjectsPlatform({ session, student, state, setState, notify, na
                     <div key={st.id} className="soc-student-card">
                       <div className="soc-student-card-header">
                         <div className="soc-student-avatar">
-                          {st.avatar ? (
-                            <img src={st.avatar} alt={st.name} onError={e => { e.currentTarget.style.display = 'none'; }} />
-                          ) : (
-                            (st.name || 'S').slice(0, 2).toUpperCase()
-                          )}
+                          <ProfileAvatar src={st.avatar} name={st.name} />
                         </div>
                         <div className="soc-student-info">
                           <div className="soc-student-name-row">
@@ -1198,11 +1191,7 @@ export function ProjectsPlatform({ session, student, state, setState, notify, na
                       }}
                     >
                       <div className="soc-avatar tiny">
-                        {n.actorAvatar ? (
-                          <img src={n.actorAvatar} alt={n.actorName} onError={e => e.currentTarget.style.display = 'none'} />
-                        ) : (
-                          (n.actorName || 'U').slice(0, 2).toUpperCase()
-                        )}
+                        <ProfileAvatar src={n.actorAvatar} name={n.actorName} />
                       </div>
                       <div className="soc-notif-content">
                         <p>{n.message}</p>
@@ -1353,11 +1342,7 @@ function ProjectCard({
       <div className="soc-post-header">
         <div className="soc-author-box" onClick={onOpenAuthor}>
           <div className="soc-avatar">
-            {post.studentAvatar ? (
-              <img src={post.studentAvatar} alt={post.studentName} onError={e => e.currentTarget.style.display = 'none'} />
-            ) : (
-              (post.studentName || 'S').slice(0, 2).toUpperCase()
-            )}
+            <ProfileAvatar src={post.studentAvatar} name={post.studentName} />
           </div>
           <div className="soc-author-meta">
             <strong className="soc-author-name">{post.studentName}</strong>
@@ -1624,11 +1609,7 @@ function ProjectCard({
               comments.map(c => (
                 <div key={c.id} className="soc-comment-bubble">
                   <div className="soc-avatar tiny">
-                    {c.studentAvatar ? (
-                      <img src={c.studentAvatar} alt={c.studentName} onError={e => e.currentTarget.style.display = 'none'} />
-                    ) : (
-                      (c.studentName || 'U').slice(0, 2).toUpperCase()
-                    )}
+                    <ProfileAvatar src={c.studentAvatar} name={c.studentName} />
                   </div>
                   <div className="soc-comment-body">
                     <div className="soc-comment-meta">
@@ -2235,11 +2216,7 @@ function StudentProfileModal({ author, onClose, onOpenProject }) {
         <div className="soc-profile-body">
           <div className="soc-profile-avatar-wrap">
             <div className="soc-avatar large">
-              {author.studentAvatar ? (
-                <img src={author.studentAvatar} alt={author.studentName} onError={e => e.currentTarget.style.display = 'none'} />
-              ) : (
-                (author.studentName || 'S').slice(0, 2).toUpperCase()
-              )}
+              <ProfileAvatar src={author.studentAvatar} name={author.studentName} />
             </div>
           </div>
 
@@ -2781,11 +2758,7 @@ export function AdminProjectsManagementView({ state, setState, session, notify, 
                     <div className="soc-post-header" style={{ padding: '12px 14px', borderBottom: '1px solid #f1f5f9', background: '#fafafa' }}>
                       <div className="soc-author-box">
                         <div className="soc-avatar">
-                          {post.studentAvatar ? (
-                            <img src={post.studentAvatar} alt={post.studentName} onError={e => { e.currentTarget.style.display = 'none'; }} />
-                          ) : (
-                            (post.studentName || 'S').slice(0, 2).toUpperCase()
-                          )}
+                          <ProfileAvatar src={post.studentAvatar} name={post.studentName} />
                         </div>
                         <div className="soc-author-meta">
                           <strong className="soc-author-name">{post.studentName}</strong>
@@ -3131,11 +3104,7 @@ export function AdminProjectsManagementView({ state, setState, session, notify, 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid #f1f5f9' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div className="soc-avatar">
-                    {inspectingProject.studentAvatar ? (
-                      <img src={inspectingProject.studentAvatar} alt={inspectingProject.studentName} />
-                    ) : (
-                      (inspectingProject.studentName || 'S').slice(0, 2).toUpperCase()
-                    )}
+                    <ProfileAvatar src={inspectingProject.studentAvatar} name={inspectingProject.studentName} />
                   </div>
                   <div>
                     <strong style={{ fontSize: '14px', color: '#0f172a' }}>{inspectingProject.studentName}</strong>

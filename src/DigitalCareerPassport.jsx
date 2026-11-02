@@ -1,3 +1,4 @@
+import ProfileAvatar from './ProfileAvatar.jsx';
 import React, { useState } from 'react';
 import './styles.css';
 import {
@@ -111,13 +112,7 @@ export function DigitalCareerPassport({ student, notify, navigate }) {
         <div className="passport-card-body">
           <div className="passport-profile-strip">
             <div className="passport-avatar-wrap">
-              {student?.avatar ? (
-                <img src={student.avatar} alt={studentName} className="passport-avatar-img" />
-              ) : (
-                <div className="passport-avatar-fallback">
-                  {studentName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                </div>
-              )}
+              <ProfileAvatar src={student?.avatar} name={studentName} alt={studentName} className="passport-avatar-img" />
               <span className="passport-avatar-badge" title="Active Student">✓</span>
             </div>
 

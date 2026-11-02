@@ -1,3 +1,4 @@
+import ProfileAvatar from './ProfileAvatar.jsx';
 import { requestJson } from './api.js';
 import { passwordError, profileError, PASSWORD_HINT } from './validation.js';
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -58,41 +59,8 @@ import {
   Briefcase
 } from 'lucide-react';
 
-const INDIAN_STATES_DISTRICTS = {
-  'Rajasthan': [
-    'Jaipur', 'Jodhpur', 'Kota', 'Udaipur', 'Ajmer', 'Bikaner', 'Alwar', 'Sikar',
-    'Bhilwara', 'Bharatpur', 'Sri Ganganagar', 'Pali', 'Chittorgarh', 'Jhunjhunu',
-    'Nagaur', 'Churu', 'Hanumangarh', 'Tonk', 'Dausa', 'Sawai Madhopur', 'Barmer',
-    'Jaisalmer', 'Sirohi', 'Rajsamand', 'Banswara', 'Dungarpur', 'Baran', 'Jhalawar',
-    'Bundi', 'Dholpur', 'Karauli', 'Pratapgarh', 'Beawar', 'Balotra', 'Deeg',
-    'Didwana-Kuchaman', 'Dudu', 'Gangapur City', 'Jaipur Rural', 'Jodhpur Rural',
-    'Kekri', 'Kotputli-Behror', 'Khairthal-Tijara', 'Neem Ka Thana', 'Phalodi',
-    'Salumber', 'Sanchore', 'Shahpura'
-  ],
-  'Delhi NCR': [
-    'Central Delhi', 'East Delhi', 'New Delhi', 'North Delhi', 'North East Delhi',
-    'North West Delhi', 'Shahdara', 'South Delhi', 'South East Delhi', 'South West Delhi',
-    'West Delhi', 'Gautam Buddha Nagar (Noida)', 'Ghaziabad', 'Gurugram', 'Faridabad'
-  ],
-  'Maharashtra': [
-    'Mumbai City', 'Mumbai Suburban', 'Pune', 'Nagpur', 'Thane', 'Nashik', 'Aurangabad',
-    'Solapur', 'Amravati', 'Kolhapur', 'Navi Mumbai', 'Satara', 'Sangli'
-  ],
-  'Gujarat': [
-    'Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Bhavnagar', 'Jamnagar', 'Gandhinagar',
-    'Junagadh', 'Anand', 'Navsari', 'Morbi'
-  ],
-  'Uttar Pradesh': [
-    'Lucknow', 'Kanpur', 'Varanasi', 'Agra', 'Prayagraj', 'Noida', 'Ghaziabad',
-    'Meerut', 'Aligarh', 'Bareilly', 'Gorakhpur', 'Mathura'
-  ],
-  'Madhya Pradesh': [
-    'Bhopal', 'Indore', 'Gwalior', 'Jabalpur', 'Ujjain', 'Sagar', 'Dewas', 'Satna', 'Ratlam'
-  ],
-  'Karnataka': [
-    'Bengaluru Urban', 'Bengaluru Rural', 'Mysuru', 'Hubballi-Dharwad', 'Mangaluru', 'Belagavi', 'Kalaburagi'
-  ]
-};
+import { INDIAN_STATES_DISTRICTS } from './indianStatesDistricts.js';
+export { INDIAN_STATES_DISTRICTS };
 
 const DEFAULT_STUDENT_PROJECTS = [];
 
@@ -789,18 +757,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
             title={isOwnProfile ? "Click to change profile picture" : displayName}
           >
             <div className={`insta-avatar-ring ${isViewingAdmin ? 'admin' : ''}`}>
-              {displayAvatar ? (
-                <img
-                  src={displayAvatar}
-                  alt={displayName}
-                  className="insta-avatar-img"
-                  onError={e => { e.currentTarget.style.display = 'none'; }}
-                />
-              ) : (
-                <div className="insta-avatar-fallback">
-                  {displayName.slice(0, 2).toUpperCase()}
-                </div>
-              )}
+              <ProfileAvatar src={displayAvatar} name={displayName} alt={displayName} className="insta-avatar-img" />
             </div>
           </div>
         </div>
@@ -1301,18 +1258,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
                     >
                       <div className="insta-dir-avatar-wrap">
                         <div className={`insta-dir-avatar-ring ${user.userType === 'admin' ? 'admin' : ''}`}>
-                          {user.avatar ? (
-                            <img
-                              src={user.avatar}
-                              alt={user.name}
-                              className="insta-dir-avatar-img"
-                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                            />
-                          ) : (
-                            <div className="insta-dir-avatar-fallback">
-                              {(user.name || 'User').slice(0, 2).toUpperCase()}
-                            </div>
-                          )}
+                          <ProfileAvatar src={user.avatar} name={user.name} alt={user.name} className="insta-dir-avatar-img" />
                         </div>
                         {user.userType === 'admin' ? (
                           <span className="insta-dir-badge-icon admin" title="College Administration">
@@ -1465,11 +1411,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
             {/* Avatar Row */}
             <div className="insta-edit-avatar-row">
               <div className="insta-avatar-ring small">
-                {formData.avatar ? (
-                  <img src={formData.avatar} alt={studentName} className="insta-avatar-img" />
-                ) : (
-                  <div className="insta-avatar-fallback">{studentName.slice(0, 2).toUpperCase()}</div>
-                )}
+                <ProfileAvatar src={formData.avatar} name={studentName} alt={studentName} className="insta-avatar-img" />
               </div>
               <div className="insta-edit-avatar-actions">
                 <strong>{studentName}</strong>
@@ -1641,6 +1583,9 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
                   className="field-select"
                 >
                   <option value="">Select District</option>
+                  {formData.district && !currentDistricts.includes(formData.district) && (
+                    <option value={formData.district}>{formData.district}</option>
+                  )}
                   {currentDistricts.map(dist => (
                     <option key={dist} value={dist}>{dist}</option>
                   ))}
@@ -1662,7 +1607,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
 
             {/* Social & Professional Links */}
             <h4 className="insta-section-subtitle">Social & Portfolio Links</h4>
-            <div className="form-row-2">
+            {/* <div className="form-row-2">
               <div className="form-group">
                 <label className="field-label">Portfolio / Personal Website</label>
                 <input
@@ -1684,9 +1629,9 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
                   className="field-input"
                 />
               </div>
-            </div>
+            </div> */}
 
-            <div className="form-group">
+            {/* <div className="form-group">
               <label className="field-label">LinkedIn Profile URL</label>
               <input
                 type="text"
@@ -1695,7 +1640,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
                 onChange={e => setFormData({ ...formData, linkedin: e.target.value })}
                 className="field-input"
               />
-            </div>
+            </div> */}
 
             {/* Footer Submit */}
             <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
@@ -1905,11 +1850,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
               <div className="insta-post-info-header">
                 <div className="insta-post-author">
                   <div className="insta-avatar-ring micro">
-                    {formData.avatar ? (
-                      <img src={formData.avatar} alt={studentName} className="insta-avatar-img" />
-                    ) : (
-                      <div className="insta-avatar-fallback micro">{studentName.slice(0, 2).toUpperCase()}</div>
-                    )}
+                    <ProfileAvatar src={formData.avatar} name={studentName} alt={studentName} className="insta-avatar-img" />
                   </div>
                   <div>
                     <strong className="insta-post-author-name">{studentName}</strong>
@@ -2008,13 +1949,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
             {/* Mini Profile Preview */}
             <div className="share-preview-card">
               <div className="insta-avatar-ring small" style={{ width: '52px', height: '52px' }}>
-                {formData.avatar ? (
-                  <img src={formData.avatar} alt={studentName} className="insta-avatar-img" />
-                ) : (
-                  <div className="insta-avatar-fallback" style={{ fontSize: '18px' }}>
-                    {studentName.slice(0, 2).toUpperCase()}
-                  </div>
-                )}
+                <ProfileAvatar src={formData.avatar} name={studentName} alt={studentName} className="insta-avatar-img" />
               </div>
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -2250,7 +2185,8 @@ export function AdminProfileSettings({ session, state, setState, notify, onLogou
         {/* Photo Upload Card */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px', paddingBottom: '20px', borderBottom: '1px solid #f3f4f6', flexWrap: 'wrap' }}>
           <div style={{ position: 'relative' }}>
-            <img
+            <ProfileAvatar
+              name={name}
               src={avatar || DEFAULT_ADMIN_AVATAR}
               alt="Admin Profile"
               style={{
