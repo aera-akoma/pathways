@@ -1,11 +1,21 @@
-# Podar Pathways - Search Engine Discovery & Robots Policy
 User-agent: *
 Allow: /
-Disallow: /admin
-Disallow: /admin/
 Disallow: /api/
+Disallow: /admin
+Disallow: /login
+Disallow: /signup
+Disallow: /dashboard
 Disallow: /profile
-
-# Sitemap Location
+Disallow: /courses
+Disallow: /projects
+Disallow: /certificates
+Disallow: /passport
+Disallow: /roadmap
+Disallow: /score
+Disallow: /resume
+Disallow: /coach
+Disallow: /notifications
+Disallow: /opportunities
+Disallow: /internships
+Disallow: /placements
 Sitemap: https://podarpathways.com/sitemap.xml
-

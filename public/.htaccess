@@ -33,11 +33,17 @@ DirectoryIndex index.html
   RewriteRule ^ index.html [L]
 </IfModule>
 
-# Ensure correct MIME type for XML sitemap and plain text robots.txt
+# Ensure correct MIME type for JavaScript module scripts, XML, and text
+AddType application/javascript .js .mjs .jsx .ts .tsx
 AddType application/xml .xml
 AddType text/plain .txt
 
 <IfModule mod_headers.c>
+  <Files "index.html">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </Files>
   <Files "sitemap.xml">
     Header set Content-Type "application/xml; charset=UTF-8"
     Header set Access-Control-Allow-Origin "*"
@@ -59,3 +65,7 @@ AddType text/plain .txt
   ExpiresByType text/css "access plus 1 month"
   ExpiresByType application/javascript "access plus 1 month"
 </IfModule>
+
+# Organization demo video MIME types.
+AddType video/mp4 .mp4
+AddType video/webm .webm

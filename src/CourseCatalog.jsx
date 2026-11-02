@@ -22,7 +22,9 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { INITIAL_CERTIFICATES, generateCertificateSVG } from './defaultCertificates.js';
-import { CURATED_COURSES } from './curatedCourses.js';
+
+import { recordCourseVisit, selectEnrolledCourses } from './courseEnrollment.js';
+import './enrolled-courses.css';
 
 const CERT_STORAGE_KEY = 'podar-pathways-certificates';
 
@@ -121,7 +123,6 @@ function compressImageFile(file) {
 
 export function CourseCatalog({
   courses = [],
-  studentCourses = [],
   state,
   setState,
   session,
@@ -133,28 +134,15 @@ export function CourseCatalog({
   const isCoursesOnly = pageMode === 'courses';
   const isAdmin = session?.role === 'admin';
 
-  // Merge default courses with state courses and ensure validTill is present
-  const allAvailableCourses = useMemo(() => {
-    const existingMap = new Map((courses || []).map(c => [c.id, c]));
-    const merged = (courses || []).map(c => {
-      const match = CURATED_COURSES.find(cur => cur.id === c.id);
-      return {
-        ...match,
-        ...c,
-        validTill: c.validTill || c.deadline || c.valid_till || match?.validTill || '2026-12-31'
-      };
-    });
-    CURATED_COURSES.forEach(curated => {
-      if (!existingMap.has(curated.id)) {
-        merged.push({
-          ...curated,
-          validTill: curated.validTill || '2026-12-31'
-        });
-      }
-    });
-    return merged;
-  }, [courses]);
+  // The database is the source of truth; never restore bundled sample courses.
+  const allAvailableCourses = useMemo(() => (courses || []).map(course => ({
+    ...course, validTill: course.validTill || course.deadline || course.valid_till || ''
+  })), [courses]);
 
+  const [enrollment, setEnrollment] = useState({ owner: '', courses: [], loading: true, error: '' });
+  const ownerRef = useRef(session?.id || student?.id || '');
+  ownerRef.current = session?.id || student?.id || '';
+  const visitInFlight = useRef(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [openingCourseId, setOpeningCourseId] = useState('');
 
@@ -202,7 +190,7 @@ export function CourseCatalog({
   // Under review info modal state
   const [pendingInfoCert, setPendingInfoCert] = useState(null);
 
-  const currentStudentId = student?.id || session?.id || '';
+  const currentStudentId = session?.id || student?.id || '';
   const currentStudentName = student?.name || session?.name || 'Student';
 
   // Determine API base url dynamically (relative for unified PHP server)
@@ -232,17 +220,25 @@ export function CourseCatalog({
 
   useEffect(() => {
     fetchCertificates();
-    fetchPrograms();
-  }, [apiBase]);
+    const controller = new AbortController();
+    fetchPrograms(controller.signal);
+    return () => controller.abort();
+  }, [apiBase, currentStudentId, session?.role]);
 
-  const fetchPrograms = async () => {
+  const fetchPrograms = async (signal) => {
+    const owner = currentStudentId;
+    setEnrollment({ owner, courses: [], loading: true, error: '' });
     try {
-      const res = await fetch(`${apiBase}/api/programs`);
+      const res = await fetch(`${apiBase}/api/programs`, { credentials: 'same-origin', signal });
+      if (!res.ok) throw new Error('Could not load enrolled courses.');
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0 && setState) {
+        if (!Array.isArray(data)) throw new Error('Could not load enrolled courses.');
+        if (signal?.aborted || ownerRef.current !== owner) return;
+        setEnrollment({ owner, courses: data, loading: false, error: '' });
+        if (Array.isArray(data) && setState) {
           setState(prev => {
-            const map = new Map((prev?.courses || []).map(c => [c.id, c]));
+            const map = new Map();
             data.forEach(p => {
               const item = {
                 id: p.id,
@@ -256,6 +252,8 @@ export function CourseCatalog({
                 bannerImg: p.bannerImg || '',
                 image: p.bannerImg || '',
                 image_url: p.bannerImg || '',
+                studentClicked: p.studentClicked === true,
+                studentClickedAt: p.studentClickedAt || null,
                 createdAt: p.createdAt
               };
               map.set(p.id, { ...(map.get(p.id) || {}), ...item });
@@ -264,7 +262,9 @@ export function CourseCatalog({
           });
         }
       }
-    } catch (err) {}
+    } catch (err) {
+      if (!signal?.aborted && ownerRef.current === owner) setEnrollment({ owner, courses: [], loading: false, error: 'Could not load enrolled courses. Please try again.' });
+    }
   };
 
   const saveCertificates = (newList) => {
@@ -276,105 +276,26 @@ export function CourseCatalog({
     }
   };
 
-  // Open external course link
   const handleOpenCourse = async (course) => {
+    if (visitInFlight.current) return;
+    const owner = currentStudentId;
+    visitInFlight.current = true;
     setOpeningCourseId(course.id);
     try {
-      const studentName = student?.name || session?.student?.name || session?.name || 'Student';
-      const studentPhone = student?.phone || session?.student?.phone || '';
-
-      if (currentStudentId) {
-        const payload = {
-          studentId: currentStudentId,
-          studentName,
-          studentPhone,
-          courseTitle: course.title,
-          programTitle: course.title,
-          url: course.url || course.link || ''
-        };
-        fetch('/api/programs/' + encodeURIComponent(course.id) + '/click', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        }).catch(() => {
-          fetch('/api/courses/' + encodeURIComponent(course.id) + '/click', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          }).catch(() => {});
-        });
-      }
-
-      if (setState) {
-        const enrolledCourse = {
-          ...course,
-          enrolled: true,
-          enrolled_at: new Date().toISOString()
-        };
-
-        setState(prev => {
-          const prevClicks = Array.isArray(prev?.courseClicks) ? prev.courseClicks : [];
-          const existingClick = prevClicks.find(c => c.programId === course.id && c.studentId === currentStudentId);
-          const nowStr = new Date().toISOString();
-
-          return {
-            ...prev,
-            courses: (prev.courses || []).map(c => {
-              if (c.id === course.id) {
-                const clickedStudentIds = Array.isArray(c.clickedStudentIds) ? c.clickedStudentIds : [];
-                const updatedIds = currentStudentId && !clickedStudentIds.includes(currentStudentId)
-                  ? [...clickedStudentIds, currentStudentId]
-                  : clickedStudentIds;
-                return {
-                  ...c,
-                  ...enrolledCourse,
-                  clickCount: updatedIds.length || (c.clickCount ? c.clickCount + 1 : 1),
-                  clickedStudentIds: updatedIds
-                };
-              }
-              return c;
-            }),
-            studentCourses: [
-              ...(prev.studentCourses || []).filter(c => c.id !== course.id),
-              enrolledCourse
-            ],
-            courseClicks: existingClick
-              ? prevClicks.map(c => c.id === existingClick.id ? { ...c, clickedAt: nowStr } : c)
-              : [
-                  ...prevClicks,
-                  {
-                    id: `pclk-${Date.now()}`,
-                    programId: course.id,
-                    studentId: currentStudentId,
-                    studentName,
-                    studentPhone,
-                    clickedAt: nowStr
-                  }
-                ],
-            students: (prev.students || []).map(s =>
-              s.id === currentStudentId
-                ? {
-                    ...s,
-                    enrolledCourses: [
-                      ...(s.enrolledCourses || []).filter(c => c.id !== course.id),
-                      enrolledCourse
-                    ]
-                  }
-                : s
-            )
-          };
-        });
-      }
-
-      const destinationUrl = course.url || course.link || 'https://www.coursera.org';
-      window.open(destinationUrl, '_blank', 'noopener,noreferrer');
+      const data = await recordCourseVisit({ course, studentId: owner, apiBase,
+        studentName: student?.name || session?.name || 'Student',
+        studentPhone: student?.phone || session?.student?.phone || '',
+        openWindow: (...args) => window.open(...args) });
+      if (ownerRef.current !== owner) return;
+      setEnrollment(prev => prev.owner === owner ? { ...prev, loading: false, error: '', courses: [
+        ...prev.courses.filter(c => c.id !== course.id),
+        { ...course, studentClicked: true, studentClickedAt: data.clickedAt }
+      ] } : prev);
     } catch (err) {
-      console.error(err);
-      notify?.('Could not open external course website.');
+      if (ownerRef.current === owner) notify?.(err.message || 'Could not save enrollment. Please try Visit again.');
     } finally {
-      setTimeout(() => setOpeningCourseId(''), 400);
+      visitInFlight.current = false;
+      setOpeningCourseId('');
     }
   };
 
@@ -883,6 +804,19 @@ export function CourseCatalog({
           </div>
         </div>
 
+        {!isAdmin && <section className="enrolled-courses-section" aria-labelledby="enrolled-courses-heading">
+          <h2 id="enrolled-courses-heading">Enrolled courses</h2>
+          <p>Courses you have visited appear here so you can continue learning.</p>
+          {enrollment.owner !== currentStudentId || enrollment.loading ? <p role="status">Loading your enrolled courses…</p> : enrollment.error ?
+            <div role="alert"><p>{enrollment.error}</p><button className="button outline" onClick={() => fetchPrograms()}>Try again</button></div> :
+            selectEnrolledCourses(enrollment.courses, searchQuery).length ? <div className="enrolled-courses-list">
+              {selectEnrolledCourses(enrollment.courses, searchQuery).map(course => <article className="enrolled-course-row" key={course.id}>
+                <div><strong>{course.title}</strong><span>{course.issuer || course.provider || 'Podar Pathways'}</span></div>
+                <button className="button outline" disabled={openingCourseId !== ''} onClick={() => handleOpenCourse(course)}>{openingCourseId === course.id ? 'Opening…' : 'Revisit'} <ExternalLink size={14} /></button>
+              </article>)}
+            </div> : <div className="enrolled-courses-empty"><BookOpen size={28} /><h3>{searchQuery ? 'No enrolled courses match your search' : 'No enrolled courses yet'}</h3><p>{searchQuery ? 'Try another course name.' : 'Click Visit on a course below to add it here.'}</p></div>}
+        </section>}
+        <h2 className="course-catalog-heading">All courses</h2>
         {/* Minimal Course Cards: Banner Img + Course Name + Validity + Two Buttons */}
         <section className="minimal-course-grid">
           {filteredCourses.length > 0 ? (
@@ -918,9 +852,9 @@ export function CourseCatalog({
                       <button
                         className="button primary minimal-btn"
                         onClick={() => handleOpenCourse(course)}
-                        disabled={isOpening}
+                        disabled={openingCourseId !== '' || enrollment.owner !== currentStudentId || enrollment.loading}
                       >
-                        <span>{isOpening ? 'Opening...' : course.enrolled ? 'Continue course' : 'Open course'}</span>
+                        <span>{isOpening ? 'Opening...' : 'Visit'}</span>
                         <ExternalLink size={14} />
                       </button>
 

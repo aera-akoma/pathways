@@ -150,9 +150,9 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
     fetch('/api/programs')
       .then(res => res.ok ? res.json() : null)
       .then(data => {
-        if (Array.isArray(data) && data.length > 0 && setState) {
+        if (Array.isArray(data) && setState) {
           setState(prev => {
-            const map = new Map((prev?.courses || []).map(c => [c.id, c]));
+            const map = new Map();
             data.forEach(p => {
               const item = {
                 id: p.id,

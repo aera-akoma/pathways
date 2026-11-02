@@ -6,6 +6,13 @@
 
 // Route to Title mapping
 const PAGE_TITLES = {
+  home: 'Podar Pathways | Your next chapter starts here',
+  about: 'About | Podar Pathways',
+  contact: 'Contact | Podar Pathways',
+  privacy: 'Privacy Policy | Podar Pathways',
+  'why-us': 'Why Us | Podar Pathways',
+  login: 'Login / Signup | Podar Pathways',
+  signup: 'Create an Account | Podar Pathways',
   dashboard: 'Dashboard | Podar Pathways',
   courses: 'Course Catalog | Podar Pathways',
   projects: 'Student Projects | Podar Pathways',
@@ -43,7 +50,8 @@ export function getBasePath() {
  * Convert an internal page ID and optional role to a clean URL path
  */
 export function pageToPath(page, role = 'student', params = {}) {
-  if (!page) return '/';
+  if (!page || page === 'home') return '/';
+  if (page === 'privacy') return '/privacy-policy';
 
   // Admin routes
   if (role === 'admin') {
@@ -110,7 +118,7 @@ export function parseCurrentLocation(role = 'student') {
   let hash = window.location.hash;
 
   // 1. Check if hash routing is being used (e.g., #/projects or #projects or #/admin/students)
-  if (hash && hash.length > 1) {
+  if (hash && hash.length > 1 && (hash.startsWith('#/') || /^#(?:home|about|contact|privacy|why-us|login|signup|dashboard|projects|courses|certificates|opportunities|internships|placements|passport|roadmap|score|resume|coach|profile|notifications)(?:[?]|$)/.test(hash))) {
     const rawHash = hash.replace(/^#\/?/, '/');
     const hashSplit = rawHash.split('?');
     pathname = hashSplit[0] || '/';
@@ -146,6 +154,9 @@ export function parseCurrentLocation(role = 'student') {
       role
     };
   }
+
+  const publicRoutes = { '/': 'home', '/about': 'about', '/contact': 'contact', '/privacy-policy': 'privacy', '/why-us': 'why-us', '/login': 'login', '/signup': 'signup' };
+  if (publicRoutes[pathname]) return { page: publicRoutes[pathname], params, rawPath: pathname, role };
 
   // 3. Admin routes match
   if (pathname === '/admin' || pathname === '/admin/dashboard') {
@@ -189,7 +200,7 @@ export function parseCurrentLocation(role = 'student') {
   }
 
   // 4. Student & General routes
-  if (pathname === '/' || pathname === '/dashboard') {
+  if (pathname === '/dashboard') {
     return { page: 'dashboard', params, rawPath: pathname, role };
   }
   if (pathname === '/projects') {

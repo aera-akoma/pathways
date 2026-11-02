@@ -929,15 +929,7 @@ try {
             $prog = Database::fetchOne("SELECT id, title FROM programs WHERE id = ?", [$progId]);
             $now = nowIso();
 
-            if (!$prog) {
-                $progTitle = cleanString($body['courseTitle'] ?? $body['programTitle'] ?? 'Curated Course');
-                $progLink  = cleanString($body['url'] ?? $body['link'] ?? 'https://www.coursera.org');
-                Database::execute(
-                    "INSERT INTO programs (id, title, issuer, description, link, targetCourse, targetSemester, deadline, rewardPoints, status, createdAt, updatedAt)
-                     VALUES (?, ?, 'Podar Pathways', 'Curated career preparation course', ?, 'All', 'All', '2026-12-31', 15, 'active', ?, ?)",
-                    [$progId, $progTitle, $progLink, $now, $now]
-                );
-            }
+            if (!$prog) jsonError('This course is no longer available.', 404);
 
             $existing = Database::fetchOne("SELECT id FROM program_clicks WHERE programId = ? AND studentId = ?", [$progId, $studentId]);
 

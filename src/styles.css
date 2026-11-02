@@ -20331,3 +20331,19 @@ select:disabled {
 .profile-save-message { margin:0 0 20px; padding:12px 16px; border-radius:8px; font-size:14px; line-height:1.5; }
 .profile-save-message.error { color:#b91c1c; background:#fff1f2; border:1px solid #fecaca; }
 .profile-save-message.success { color:#065f46; background:#ecfdf5; border:1px solid #a7f3d0; }
+
+/* Navigation toggle is available at every screen size. */
+.menu-toggle { display:grid; flex-shrink:0; }
+@media(min-width:1101px) {
+ .desktop-sidebar-collapsed .sidebar { transform:translateX(-100%); }
+ .desktop-sidebar-collapsed .main-shell { margin-left:0; }
+ .sidebar { transition:transform .2s ease; }
+ .main-shell { transition:margin-left .2s ease; }
+}
+@media(max-width:1100px) {
+ .sidebar-backdrop.active { display:block; position:fixed; inset:0; background:rgba(11,25,44,.55); z-index:99; }
+ .sidebar { z-index:100!important; }
+}
+@media(prefers-reduced-motion:reduce) { .sidebar,.main-shell { transition:none; } }
+.auth-return-home { position:absolute; top:14px; right:24px; z-index:20; padding:8px 12px; border-radius:8px; color:#0b3286; background:#ffffffed; font-size:13px; text-decoration:none; }
+.auth-return-home:hover { background:#edf6f6; }

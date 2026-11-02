@@ -1,0 +1,13 @@
+.enrolled-courses-section { margin: 0 0 30px; padding: 24px; border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; }
+.enrolled-courses-section h2, .course-catalog-heading { margin: 0 0 8px; font-size: 20px; color: #0f172a; }
+.enrolled-courses-section > p { margin: 0 0 18px; color: #64748b; font-size: 14px; }
+.enrolled-courses-list { display: grid; gap: 10px; }
+.enrolled-courses-list .enrolled-course-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px; border: 1px solid #e2e8f0; border-radius: 10px; }
+.enrolled-courses-list .enrolled-course-row > div { display: grid; gap: 5px; min-width: 0; }
+.enrolled-courses-list strong { overflow-wrap: anywhere; }
+.enrolled-courses-list span { color: #64748b; font-size: 13px; }
+.enrolled-courses-list button { flex-shrink: 0; }
+.enrolled-courses-empty { padding: 20px; text-align: center; color: #64748b; background: #f8fafc; border-radius: 10px; }
+.enrolled-courses-empty h3 { color: #334155; font-size: 16px; }
+.course-catalog-heading { margin-bottom: 18px; }
+@media (max-width: 540px) { .enrolled-courses-section { padding: 18px; } .enrolled-courses-list .enrolled-course-row { align-items: flex-start; flex-direction: column; } }
