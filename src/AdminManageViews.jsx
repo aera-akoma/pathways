@@ -2027,6 +2027,9 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
     ? state.admins.filter(a => !a.email?.includes('neha.kulkarni') && !a.email?.includes('rajesh.mehra') && a.id !== 'admin-super' && a.id !== 'admin-podar-com')
     : defaultAdmins;
 
+  const [formError, setFormError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const savingRef = useRef(false);
   const [search, setSearch] = useState('');
   const [modalMode, setModalMode] = useState(null); // 'add' | 'edit' | null
   const [activeAdmin, setActiveAdmin] = useState(null);
@@ -2038,7 +2041,7 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
   const [phone, setPhone] = useState('');
   const [department, setDepartment] = useState('Career & Placement Cell');
   const [role, setRole] = useState('Placement Officer');
-  const [password, setPassword] = useState('Admin@123');
+  const [password, setPassword] = useState('');
   const [permissions, setPermissions] = useState(['manage_students', 'manage_internships', 'manage_placements']);
 
   useEffect(() => {
@@ -2064,12 +2067,14 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
     setPhone('');
     setDepartment('Career & Placement Cell');
     setRole('Placement Officer');
-    setPassword('Admin@123');
+    setPassword('');
+    setFormError('');
     setPermissions(['manage_students', 'manage_internships', 'manage_placements']);
     setModalMode('add');
   };
 
   const openEditModal = (admin) => {
+    setFormError('');
     setActiveAdmin(admin);
     setName(admin.name || '');
     setEmail(admin.email || '');
@@ -2082,6 +2087,8 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
   };
 
   const closeModal = () => {
+    if (savingRef.current) return;
+    setFormError('');
     setModalMode(null);
     setActiveAdmin(null);
   };
@@ -2119,16 +2126,17 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
     );
   };
 
-  const handleSave = async (e) => {
+  const saveAdmin = async (e) => {
+    setFormError('');
     e.preventDefault();
     if (!name.trim() || !email.trim()) {
-      notify?.('Name and email are required.');
+      setFormError('Name and email are required.');
       return;
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { notify?.('Enter a valid email address.'); return; }
-    if (!/^[0-9]{10}$/.test(phone.replace(/\D/g, ''))) { notify?.('Enter a valid 10-digit mobile number.'); return; }
-    if (modalMode === 'add' && passwordError(password)) { notify?.(PASSWORD_HINT); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setFormError('Enter a valid email address.'); return; }
+    if (!/^[0-9]{10}$/.test(phone.replace(/\D/g, ''))) { setFormError('Enter a valid 10-digit mobile number.'); return; }
+    if (modalMode === 'add' && passwordError(password)) { setFormError(PASSWORD_HINT); return; }
     if (modalMode === 'add') {
       const cleanPhone = phone.replace(/\D/g, '');
       try {
@@ -2149,7 +2157,7 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
         const saved = requireRecord(data, 'admin');
         setState(prev => ({ ...prev, admins: [...(prev.admins || []), { ...saved, isMain: false }] }));
       } catch (error) {
-        notify?.(error.message || 'Could not create administrator.');
+        setFormError(error.message || 'Could not create administrator.');
         return;
       }
 
@@ -2176,14 +2184,22 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
         const saved = requireRecord(data, 'admin');
         setState(prev => ({ ...prev, admins: (prev.admins || []).map(a => a.id === activeAdmin.id ? { ...a, ...saved } : a) }));
       } catch (error) {
-        notify?.(error.message || 'Could not update administrator.');
+        setFormError(error.message || 'Could not update administrator.');
         return;
       }
 
       notify?.(`Administrator "${updated.name}" updated!`);
     }
 
-    closeModal();
+    setModalMode(null);
+    setActiveAdmin(null);
+  };
+
+  const handleSave = async (event) => {
+    event.preventDefault();
+    if (savingRef.current) return;
+    savingRef.current = true; setIsSaving(true);
+    try { await saveAdmin(event); } finally { savingRef.current = false; setIsSaving(false); }
   };
 
   const confirmDelete = async () => {
@@ -2249,7 +2265,7 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
             />
             {search && <button onClick={() => setSearch('')}><X size={12} /></button>}
           </div>
-          <button onClick={openAddModal} className="minimal-admin-btn-primary">
+          <button type="button" onClick={openAddModal} className="minimal-admin-btn-primary">
             <UserPlus size={15} /> Add Administrator
           </button>
         </div>
@@ -2360,12 +2376,13 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
       {/* Modal: Add / Edit Administrator */}
       {modalMode && (
         <div className="minimal-modal-backdrop" onClick={closeModal}>
-          <div className="minimal-modal-dialog" onClick={e => e.stopPropagation()}>
+          <div className="minimal-modal-dialog" role="dialog" aria-modal="true" aria-label="Administrator details" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <h3>{modalMode === 'add' ? 'Add Administrator' : 'Edit Administrator'}</h3>
               <button className="minimal-close-btn" onClick={closeModal}><X size={16} /></button>
             </div>
             <form onSubmit={handleSave}>
+              {formError && <p role="alert" className="admin-form-error">{formError}</p>}
               <div className="minimal-modal-body">
                 <div className="minimal-form-group">
                   <label>Full Name *</label>
@@ -2388,7 +2405,7 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
                   />
                 </div>
                 <div className="minimal-form-group">
-                  <label>Mobile Number (10 Digits)</label>
+                  <label>Mobile Number (10 Digits) *</label>
                   <input
                     type="tel"
                     placeholder="e.g. 9812345678"
@@ -2417,13 +2434,14 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
                 </div>
                 {modalMode === 'add' && (
                   <div className="minimal-form-group">
-                    <label>Password</label>
+                    <label>Password *</label>
                     <input
-                      type="text"
-                      placeholder="Admin@123"
+                      type="password" required autoComplete="new-password"
+                      placeholder="Create a strong password"
                       value={password}
                       onChange={e => setPassword(e.target.value)}
                     />
+                    <small>{PASSWORD_HINT}</small>
                   </div>
                 )}
 
@@ -2455,8 +2473,8 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
                 <button type="button" className="minimal-btn-secondary" onClick={closeModal}>
                   Cancel
                 </button>
-                <button type="submit" className="minimal-btn-primary">
-                  {modalMode === 'add' ? 'Add Administrator' : 'Save Changes'}
+                <button type="submit" disabled={isSaving} className="minimal-btn-primary">
+                  {isSaving ? 'Saving…' : modalMode === 'add' ? 'Add Administrator' : 'Save Changes'}
                 </button>
               </div>
             </form>

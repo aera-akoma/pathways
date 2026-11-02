@@ -4,6 +4,7 @@ import vm from 'node:vm';
 const source = fs.readFileSync(new URL('../src/AdminManageViews.jsx', import.meta.url), 'utf8');
 const helper = fs.readFileSync(new URL('../src/api.js', import.meta.url), 'utf8').replaceAll('export ', '');
 function handler(component, name) {
+  if(component === 'AdminUserManagementView' && name === 'handleSave') name = 'saveAdmin';
   const start = source.indexOf('  const ' + name + ' = ', source.indexOf('export function ' + component));
   assert.ok(start >= 0);
   const end = source.indexOf('\n  };', start) + 5;
@@ -21,7 +22,7 @@ function harness(component, name, mode, extra = {}) {
     isCurrentUserMainAdmin: true, currentEmail: 'root@example.com', isMainAdminAccount: () => false, passwordError: () => null, PASSWORD_HINT: 'hint',
     certificates: [record], session: {}, rejectModalCert: record, rejectRemarks: '', selectedCert: null,
     newStudent: { ...record, fathersName: '', email: 'student@example.com', course: 'BCA', semester: 'V', goal: '', score: 0 }, editStudent: record,
-    setState: fn => { state = fn(state); changes++; }, notify: msg => messages.push(msg), closeModal: () => closes++, setDeleteTarget: () => closes++,
+    setFormError: msg => { if(msg) messages.push(msg); }, setModalMode: () => closes++, setActiveAdmin: () => {}, setState: fn => { state = fn(state); changes++; }, notify: msg => messages.push(msg), closeModal: () => closes++, setDeleteTarget: () => closes++,
     setRejectModalCert: () => closes++, setRejectRemarks: () => {}, saveCertificates: () => certWrites++, setSelectedCert: () => {}, setShowAddModal: () => closes++, setNewStudent: () => {}, setEditStudent: () => closes++,
     fetch: async (...args) => {
       calls.push(args);

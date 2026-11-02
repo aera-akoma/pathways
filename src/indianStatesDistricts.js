@@ -874,3 +874,4 @@ export function getDistrictsForState(stateName) {
   if (!stateName) return [];
   return INDIAN_STATES_DISTRICTS[stateName] || [];
 }
+
