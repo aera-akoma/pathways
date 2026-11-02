@@ -165,7 +165,7 @@ export function OpportunitiesView({ student, state, notify, navigate }) {
       </div>
 
       {selectedOpp && (
-        <div className="minimal-modal-backdrop" onClick={() => setSelectedOpp(null)}>
+        <div className="minimal-modal-backdrop">
           <div className="minimal-modal-dialog" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <h3>{selectedOpp.title}</h3>
@@ -333,7 +333,7 @@ export function InternshipsView({ student, state, notify, navigate }) {
       </div>
 
       {selectedIntern && (
-        <div className="minimal-modal-backdrop" onClick={() => setSelectedIntern(null)}>
+        <div className="minimal-modal-backdrop">
           <div className="minimal-modal-dialog" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <h3>{selectedIntern.role}</h3>
@@ -497,7 +497,7 @@ export function PlacementsView({ student, state, notify, navigate }) {
       </div>
 
       {selectedDrive && (
-        <div className="minimal-modal-backdrop" onClick={() => setSelectedDrive(null)}>
+        <div className="minimal-modal-backdrop">
           <div className="minimal-modal-dialog" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <h3>{selectedDrive.company}</h3>

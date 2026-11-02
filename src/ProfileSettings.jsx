@@ -1,5 +1,5 @@
 import ProfileAvatar from './ProfileAvatar.jsx';
-import { requestJson } from './api.js';
+import { requestJson, requireRecord } from './api.js';
 import { passwordError, profileError, PASSWORD_HINT } from './validation.js';
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { DEFAULT_STUDENT_AVATAR, DEFAULT_ADMIN_AVATAR } from './defaultAvatar.js';
@@ -222,6 +222,8 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const profileSaveInFlight = useRef(false);
+  const [profileSaveStatus, setProfileSaveStatus] = useState(null);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [copiedShare, setCopiedShare] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -326,64 +328,37 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
 
   // Save Profile Form
   const handleSaveProfile = async (e) => {
-    if (e) e.preventDefault();
-
+    e?.preventDefault();
+    if (profileSaveInFlight.current) return;
+    setProfileSaveStatus(null);
     const error = profileError(formData);
-    if (error) { notify?.(error); return; }
-    if (formData.phone && !/^[0-9]{10}$/.test(formData.phone.replace(/\D/g, ''))) {
-      notify?.('Please enter a valid 10-digit mobile number.');
-      return;
-    }
-
-    if (formData.pinCode && formData.pinCode.length !== 6) {
-      notify?.('Please enter a valid 6-digit PIN code.');
-      return;
-    }
-
+    if (error) { setProfileSaveStatus({ type: 'error', text: error }); return; }
+    if (!student?.id) { setProfileSaveStatus({ type: 'error', text: 'Please sign in again to save your profile.' }); return; }
+    profileSaveInFlight.current = true;
     setIsSavingProfile(true);
-
     try {
-      if (student?.id) {
-        try {
-          const response = await fetch(`/api/students/${student.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              ...formData,
-              portfolio: formData.portfolioUrl,
-              name: student.name,
-              email: student.email
-            })
-          });
-          const saved = await response.json();
-          if (!response.ok) throw new Error(saved.error || 'Could not save your profile.');
-          if (setState) setState(prev => ({...prev, students: (prev.students || []).map(item => item.id === student.id ? {...item, ...saved} : item)}));
-        } catch (serverErr) { throw serverErr; }
-      } else { throw new Error('Please sign in again to save your profile.'); }
-
-      if (setState) {
-        setState(prev => {
-          const updatedStudents = (prev.students || []).map(s =>
-            s.id === student?.id ? { ...s, ...formData, name: student.name, email: student.email } : s
-          );
-          return { ...prev, students: updatedStudents };
-        });
-      }
-
+      const saved = requireRecord(await requestJson('/api/students/' + encodeURIComponent(student.id), {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formData, goal: formData.goal.trim(), portfolio: formData.portfolioUrl, name: student.name, email: student.email })
+      }), 'student');
+      if (saved.id !== student.id) throw new Error('The server returned a different profile. Please refresh and try again.');
+      setFormData(prev => ({ ...prev, ...saved, portfolioUrl: saved.portfolio ?? prev.portfolioUrl }));
+      if (setState) setState(prev => ({ ...prev, students: (prev.students || []).some(item => item.id === saved.id)
+        ? prev.students.map(item => item.id === saved.id ? { ...item, ...saved } : item)
+        : [...(prev.students || []), saved] }));
       try {
-        const cur = JSON.parse(localStorage.getItem('podar-pathways-session') || 'null');
-        if (cur && cur.student) {
-          cur.student = { ...cur.student, ...formData, name: student.name, email: student.email };
-          localStorage.setItem('podar-pathways-session', JSON.stringify(cur));
+        const current = JSON.parse(localStorage.getItem('podar-pathways-session') || 'null');
+        if (current?.id === saved.id || current?.student?.id === saved.id) {
+          current.student = { ...(current.student || {}), ...saved };
+          current.avatar = saved.avatar || '';
+          localStorage.setItem('podar-pathways-session', JSON.stringify(current));
         }
-      } catch (sessErr) {}
-
-      notify?.('Profile details saved successfully!');
-    } catch (err) {
-      notify?.(err.message || 'Error saving profile.');
-    } finally {
-      setIsSavingProfile(false);
-    }
+      } catch {}
+      setProfileSaveStatus({ type: 'success', text: 'Profile saved successfully.' });
+      notify?.('Profile saved successfully.');
+    } catch (error) {
+      setProfileSaveStatus({ type: 'error', text: error.message || 'Could not save your profile. Please try again.' });
+    } finally { profileSaveInFlight.current = false; setIsSavingProfile(false); }
   };
 
   // Update Password
@@ -1397,17 +1372,18 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
             <div className="insta-panel-header">
               <div>
                 <h3>Edit Student Profile</h3>
-                <p>Keep your profile details, career aspirations, and contact records updated.</p>
+                <p>Keep your profile details, career aspirations, and contact records updated. Fields marked * are required.</p>
               </div>
               <button
                 type="submit"
                 className="button primary"
                 disabled={isSavingProfile}
               >
-                {isSavingProfile ? 'Saving...' : 'Save Changes'}
+                {isSavingProfile ? 'Saving...' : 'Save Profile'}
               </button>
             </div>
 
+            {profileSaveStatus && <p role={profileSaveStatus.type === 'error' ? 'alert' : 'status'} className={'profile-save-message ' + profileSaveStatus.type}>{profileSaveStatus.text}</p>}
             {/* Avatar Row */}
             <div className="insta-edit-avatar-row">
               <div className="insta-avatar-ring small">
@@ -1461,11 +1437,11 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
 
             {/* Career Goal */}
             <div className="form-group">
-              <label className="field-label">Target Career Goal</label>
+              <label className="field-label" htmlFor="student-career-goal">Target Career Goal <span aria-hidden="true">*</span></label>
               <input
                 type="text"
                 placeholder="e.g. Cloud Solutions Architect, Full-Stack Developer"
-                required maxLength={200}
+                id="student-career-goal" required maxLength={200}
                 value={formData.goal}
                 onChange={e => setFormData({ ...formData, goal: e.target.value })}
                 className="field-input"
@@ -1517,11 +1493,11 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
 
             <div className="form-row-2">
               <div className="form-group">
-                <label className="field-label">Registered Mobile (10-Digit)</label>
+                <label className="field-label" htmlFor="student-mobile">Registered Mobile (10-Digit) <span aria-hidden="true">*</span></label>
                 <input
                   type="tel"
                   placeholder="Enter your 10-digit mobile number"
-                  required pattern="[0-9]{10}"
+                  id="student-mobile" required pattern="[0-9]{10}"
                   value={formData.phone}
                   onChange={e => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
                   className="field-input"
@@ -1574,8 +1550,9 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
               </div>
 
               <div className="form-group">
-                <label className="field-label">District</label>
+                <label className="field-label" htmlFor="student-district">District {formData.state && <span aria-hidden="true">*</span>}</label>
                 <select
+                  id="student-district" required={Boolean(formData.state)}
                   value={formData.district}
                   disabled={!formData.state}
                   aria-label="District"
@@ -1656,7 +1633,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
                 className="button primary"
                 disabled={isSavingProfile}
               >
-                {isSavingProfile ? 'Saving...' : 'Save Profile Details'}
+                {isSavingProfile ? 'Saving...' : 'Save Profile'}
               </button>
             </div>
           </form>
@@ -1832,7 +1809,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
       {/* 11. PROJECT QUICK VIEW MODAL (INSTAGRAM POST LIGHTBOX)       */}
       {/* ============================================================ */}
       {selectedProject && (
-        <div className="insta-post-backdrop" onClick={() => setSelectedProject(null)}>
+        <div className="insta-post-backdrop">
           <div className="insta-post-modal" onClick={e => e.stopPropagation()}>
             {/* Modal Image Section */}
             <div className="insta-post-img-side">
@@ -1927,7 +1904,7 @@ export function ProfileSettings({ student, studentId, courses, state, setState, 
       {/* 12. SHARE PROFILE MODAL                                     */}
       {/* ============================================================ */}
       {showShareModal && (
-        <div className="share-modal-backdrop" onClick={() => setShowShareModal(false)}>
+        <div className="share-modal-backdrop">
           <div className="share-modal-card" onClick={e => e.stopPropagation()}>
             <div className="share-modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

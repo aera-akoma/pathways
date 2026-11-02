@@ -656,7 +656,7 @@ export function CourseCatalog({
   const renderUploadModal = () => {
     if (!uploadModalOpen) return null;
     return (
-      <div className="modal-backdrop" onClick={() => setUploadModalOpen(false)}>
+      <div className="modal-backdrop">
         <div className="modal-card minimal-modal" onClick={e => e.stopPropagation()}>
           <div className="modal-header">
             <div>
@@ -796,7 +796,7 @@ export function CourseCatalog({
   const renderPendingInfoModal = () => {
     if (!pendingInfoCert) return null;
     return (
-      <div className="modal-backdrop" onClick={() => setPendingInfoCert(null)}>
+      <div className="modal-backdrop">
         <div className="modal-card minimal-modal" onClick={e => e.stopPropagation()}>
           <div className="modal-header">
             <div>

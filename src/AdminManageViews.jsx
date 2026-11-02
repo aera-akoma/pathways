@@ -636,7 +636,7 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
 
       {/* Modal: Add or Edit Course */}
       {modalMode && (
-        <div className="minimal-modal-backdrop" onClick={closeModal}>
+        <div className="minimal-modal-backdrop">
           <div className="minimal-modal-dialog" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <h3>{modalMode === 'add' ? 'Add Course' : 'Edit Course'}</h3>
@@ -826,7 +826,7 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
 
       {/* Delete Confirmation Modal */}
       {deleteTarget && (
-        <div className="minimal-modal-backdrop" onClick={() => setDeleteTarget(null)}>
+        <div className="minimal-modal-backdrop">
           <div className="minimal-modal-dialog small" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <h3>Delete Course</h3>
@@ -849,7 +849,7 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
 
       {/* Student Course Engagement Analytics Modal */}
       {clicksModalCourse && (
-        <div className="minimal-modal-backdrop" onClick={closeClicksModal}>
+        <div className="minimal-modal-backdrop">
           <div
             className="minimal-modal-dialog course-engagement-modal-dialog"
             onClick={e => e.stopPropagation()}
@@ -1284,7 +1284,7 @@ export function AdminOpportunitiesView({ state, setState, notify, navigate }) {
       </div>
 
       {modalMode && (
-        <div className="minimal-modal-backdrop" onClick={closeModal}>
+        <div className="minimal-modal-backdrop">
           <div className="minimal-modal-dialog" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <h3>{modalMode === 'add' ? 'Add Opportunity' : 'Edit Opportunity'}</h3>
@@ -1380,7 +1380,7 @@ export function AdminOpportunitiesView({ state, setState, notify, navigate }) {
       )}
 
       {deleteTarget && (
-        <div className="minimal-modal-backdrop" onClick={() => setDeleteTarget(null)}>
+        <div className="minimal-modal-backdrop">
           <div className="minimal-modal-dialog small" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <h3>Delete Opportunity</h3>
@@ -1587,7 +1587,7 @@ export function AdminInternshipsView({ state, setState, notify, navigate }) {
       </div>
 
       {modalMode && (
-        <div className="minimal-modal-backdrop" onClick={closeModal}>
+        <div className="minimal-modal-backdrop">
           <div className="minimal-modal-dialog" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <h3>{modalMode === 'add' ? 'Add Internship' : 'Edit Internship'}</h3>
@@ -1675,7 +1675,7 @@ export function AdminInternshipsView({ state, setState, notify, navigate }) {
       )}
 
       {deleteTarget && (
-        <div className="minimal-modal-backdrop" onClick={() => setDeleteTarget(null)}>
+        <div className="minimal-modal-backdrop">
           <div className="minimal-modal-dialog small" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <h3>Delete Internship</h3>
@@ -1880,7 +1880,7 @@ export function AdminPlacementsView({ state, setState, notify, navigate }) {
       </div>
 
       {modalMode && (
-        <div className="minimal-modal-backdrop" onClick={closeModal}>
+        <div className="minimal-modal-backdrop">
           <div className="minimal-modal-dialog" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <h3>{modalMode === 'add' ? 'Add Placement Drive' : 'Edit Placement Drive'}</h3>
@@ -1968,7 +1968,7 @@ export function AdminPlacementsView({ state, setState, notify, navigate }) {
       )}
 
       {deleteTarget && (
-        <div className="minimal-modal-backdrop" onClick={() => setDeleteTarget(null)}>
+        <div className="minimal-modal-backdrop">
           <div className="minimal-modal-dialog small" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <h3>Delete Placement Drive</h3>
@@ -2375,7 +2375,7 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
 
       {/* Modal: Add / Edit Administrator */}
       {modalMode && (
-        <div className="minimal-modal-backdrop" onClick={closeModal}>
+        <div className="minimal-modal-backdrop">
           <div className="minimal-modal-dialog" role="dialog" aria-modal="true" aria-label="Administrator details" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <h3>{modalMode === 'add' ? 'Add Administrator' : 'Edit Administrator'}</h3>
@@ -2484,7 +2484,7 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
 
       {/* Delete Admin Confirmation Modal */}
       {deleteTarget && (
-        <div className="minimal-modal-backdrop" onClick={() => setDeleteTarget(null)}>
+        <div className="minimal-modal-backdrop">
           <div className="minimal-modal-dialog small" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <h3>Delete Administrator</h3>
@@ -3077,7 +3077,7 @@ export function AdminCertificatesView({ state, setState, session, notify, naviga
 
       {/* 5. Full Certificate Lightbox & Inspect Modal */}
       {selectedCert && (
-        <div className="minimal-modal-backdrop" onClick={() => setSelectedCert(null)}>
+        <div className="minimal-modal-backdrop">
           <div className="minimal-modal-dialog large admin-cert-inspect-modal" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <div>
@@ -3216,7 +3216,7 @@ export function AdminCertificatesView({ state, setState, session, notify, naviga
 
       {/* 7. Reject Remarks Modal */}
       {rejectModalCert && (
-        <div className="minimal-modal-backdrop" onClick={() => setRejectModalCert(null)}>
+        <div className="minimal-modal-backdrop">
           <div className="minimal-modal-dialog small" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <h3>Decline Certificate</h3>
@@ -3277,7 +3277,7 @@ export function AdminCertificatesView({ state, setState, session, notify, naviga
 
       {/* 8. Delete Confirmation Modal */}
       {deleteTarget && (
-        <div className="minimal-modal-backdrop" onClick={() => setDeleteTarget(null)}>
+        <div className="minimal-modal-backdrop">
           <div className="minimal-modal-dialog small" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <h3>Delete Certificate</h3>
@@ -3943,7 +3943,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
       {/* MODAL 1: ADD STUDENT                                     */}
       {/* ======================================================== */}
       {showAddModal && (
-        <div className="minimal-modal-backdrop" onClick={() => setShowAddModal(false)}>
+        <div className="minimal-modal-backdrop">
           <div className="minimal-modal-dialog" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <h3>Enroll New Student</h3>
@@ -4058,7 +4058,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
       {/* MODAL 2: EDIT STUDENT                                    */}
       {/* ======================================================== */}
       {editStudent && (
-        <div className="minimal-modal-backdrop" onClick={() => setEditStudent(null)}>
+        <div className="minimal-modal-backdrop">
           <div className="minimal-modal-dialog" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <h3>Edit Student Profile</h3>
@@ -4154,7 +4154,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
       {/* MODAL 3: DELETE CONFIRMATION                             */}
       {/* ======================================================== */}
       {deleteTarget && (
-        <div className="minimal-modal-backdrop" onClick={() => setDeleteTarget(null)}>
+        <div className="minimal-modal-backdrop">
           <div className="minimal-modal-dialog small" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <h3>Delete Student Account</h3>

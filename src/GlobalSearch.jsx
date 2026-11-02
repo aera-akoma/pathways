@@ -865,7 +865,7 @@ export function GlobalSearch({ session, state, navigate, notify }) {
 
         {/* Full-screen Voice Listening Modal Backdrop */}
         {isListening && (
-          <div className="yt-voice-modal-backdrop" onClick={toggleVoiceSearch}>
+          <div className="yt-voice-modal-backdrop">
             <div className="yt-voice-modal-card" onClick={(e) => e.stopPropagation()}>
               <button
                 type="button"

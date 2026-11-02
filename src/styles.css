@@ -20328,3 +20328,6 @@ select:disabled {
     max-width: none;
   }
 }
+.profile-save-message { margin:0 0 20px; padding:12px 16px; border-radius:8px; font-size:14px; line-height:1.5; }
+.profile-save-message.error { color:#b91c1c; background:#fff1f2; border:1px solid #fecaca; }
+.profile-save-message.success { color:#065f46; background:#ecfdf5; border:1px solid #a7f3d0; }

@@ -1120,7 +1120,7 @@ export function ProjectsPlatform({ session, student, state, setState, notify, na
       {/* MODAL 4: REPORT INAPPROPRIATE POST */}
       {/* ========================================================================= */}
       {reportingPost && (
-        <div className="soc-modal-backdrop" onClick={() => setReportingPost(null)}>
+        <div className="soc-modal-backdrop">
           <div className="soc-modal-card small" onClick={e => e.stopPropagation()}>
             <div className="soc-modal-header">
               <h3>Report Project Post</h3>
@@ -1167,7 +1167,7 @@ export function ProjectsPlatform({ session, student, state, setState, notify, na
       {/* DRAWER: PROJECT NOTIFICATIONS */}
       {/* ========================================================================= */}
       {notifDrawerOpen && (
-        <div className="soc-modal-backdrop" onClick={() => setNotifDrawerOpen(false)}>
+        <div className="soc-modal-backdrop">
           <div className="soc-drawer-panel" onClick={e => e.stopPropagation()}>
             <div className="soc-drawer-header">
               <div className="soc-drawer-title-row">
@@ -1927,7 +1927,7 @@ function ProjectComposerModal({
   };
 
   return (
-    <div className="soc-modal-backdrop" onClick={onClose}>
+    <div className="soc-modal-backdrop">
       <div className="soc-modal-card large" onClick={e => e.stopPropagation()}>
         <div className="soc-modal-header">
           <div>
@@ -2207,7 +2207,7 @@ function StudentProfileModal({ author, onClose, onOpenProject }) {
   }, [author.studentId]);
 
   return (
-    <div className="soc-modal-backdrop" onClick={onClose}>
+    <div className="soc-modal-backdrop">
       <div className="soc-modal-card author-profile-card" onClick={e => e.stopPropagation()}>
         <div className="soc-profile-header-banner">
           <button className="soc-close-btn light" onClick={onClose}><X size={16} /></button>
@@ -3079,7 +3079,7 @@ export function AdminProjectsManagementView({ state, setState, session, notify, 
 
       {/* 4. Project Full Inspection & Comments Moderation Modal */}
       {inspectingProject && (
-        <div className="minimal-modal-backdrop" onClick={() => setInspectingProject(null)}>
+        <div className="minimal-modal-backdrop">
           <div
             className="minimal-modal-dialog"
             style={{ maxWidth: '720px', width: '95%' }}
@@ -3282,7 +3282,7 @@ export function AdminProjectsManagementView({ state, setState, session, notify, 
 
       {/* 5. Delete Confirmation Modal */}
       {deleteTarget && (
-        <div className="minimal-modal-backdrop" onClick={() => setDeleteTarget(null)}>
+        <div className="minimal-modal-backdrop">
           <div className="minimal-modal-dialog small" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <h3>Delete Student Project</h3>

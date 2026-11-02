@@ -831,7 +831,6 @@ export function LearningRoadmap({ student, session, state, setState, notify, nav
       {goalModalOpen && (
         <div
           className="soc-roadmap-modal-backdrop"
-          onClick={() => setGoalModalOpen(false)}
         >
           <div
             className="soc-roadmap-modal-card"
