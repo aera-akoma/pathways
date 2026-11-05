@@ -31,10 +31,18 @@ if (existsSync(resolve(root, '.env.example'))) {
   console.log('   ✓ Copied .env.example');
 }
 
-// Copy database.sql
+// Copy SQL database scripts
 if (existsSync(resolve(root, 'database.sql'))) {
   copyFileSync(resolve(root, 'database.sql'), resolve(distDir, 'database.sql'));
   console.log('   ✓ Copied database.sql');
+}
+if (existsSync(resolve(root, 'certificates_database.sql'))) {
+  copyFileSync(resolve(root, 'certificates_database.sql'), resolve(distDir, 'certificates_database.sql'));
+  console.log('   ✓ Copied certificates_database.sql');
+}
+if (existsSync(resolve(root, 'projects_database.sql'))) {
+  copyFileSync(resolve(root, 'projects_database.sql'), resolve(distDir, 'projects_database.sql'));
+  console.log('   ✓ Copied projects_database.sql');
 }
 
 // Copy DEPLOYMENT_GUIDE.txt
@@ -84,7 +92,7 @@ console.log(`  2. ${publicZip} (${sizeMB} MB)`);
 console.log(`======================================================`);
 console.log(`\nVerification of Archive Contents:`);
 const archiveList = execSync(`tar.exe -tf "${prodZip}"`, { encoding: 'utf8' });
-const sampleFiles = ['.htaccess', 'index.html', 'assets', 'api', 'database.sql', '.env', 'favicon.svg', 'images', 'media'];
+const sampleFiles = ['.htaccess', 'index.html', 'assets', 'api', 'database.sql', 'certificates_database.sql', 'projects_database.sql', '.env', 'favicon.svg', 'images', 'media'];
 for (const req of sampleFiles) {
   const found = archiveList.split('\n').some(line => line.includes(req));
   console.log(`  ${found ? '✓' : '✗'} Contains ${req}`);
