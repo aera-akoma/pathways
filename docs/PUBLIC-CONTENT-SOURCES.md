@@ -1,4 +1,12 @@
-# Public homepage content and demo media
+# Public website media
+
+The site media is stored in `public/images`. The homepage uses WebP versions of the campus photos and a 720p version of the uploaded College Tour in `campus/`. The originals are in `media-source/campus/`, outside the published folder. The developer credits page uses editable example illustrations in `developer-team/`. Branding lives in `brand/`, and the original stock assets are retained in `demo/`.
+
+The campus photographs and poster were downloaded from Podar College's website.
+
+Change the campus paths in `src/publicMedia.js` or the developer portraits and group photo in `src/developerCredits.js` when replacing assets.
+
+## Archived demo media notes
 
 Reviewed November 2, 2026. All included imagery is stock demonstration content, not documentation of Podar Pathways, its students, or its premises. Keep a visible “Demo imagery” label until approved organization photographs and footage replace it. The campus image depicts Guggenheim Hall at the University of Washington, Seattle; do not identify it as a Podar campus.
 
@@ -6,12 +14,12 @@ Reviewed November 2, 2026. All included imagery is stock demonstration content, 
 
 | Local file | Source and creator | Details |
 | --- | --- | --- |
-| `public/media/demo-student-collaboration.jpg` | [Vitaly Gariev / Unsplash](https://unsplash.com/photos/diverse-group-of-students-gathered-around-a-laptop-8gAbl776pc0) | Students gathered around a laptop. 202,252 bytes. |
-| `public/media/demo-campus.jpg` | [Zoshua Colah / Unsplash](https://unsplash.com/photos/a-large-brick-university-building-at-dusk-MrH3_S3QMeE) | University of Washington building. 218,543 bytes. |
-| `public/media/demo-campus-life.mp4` | [Keira Burton / Pexels](https://www.pexels.com/video/a-group-of-students-studying-6145947/) | Students studying on campus steps. 10 seconds, portrait 720 × 1280, 24 fps. 3,670,265 bytes. |
-| `public/media/demo-campus-life-poster.jpg` | Same Pexels video | Matching preview. 266,198 bytes. |
+| `public/images/demo/demo-student-collaboration.jpg` | [Vitaly Gariev / Unsplash](https://unsplash.com/photos/diverse-group-of-students-gathered-around-a-laptop-8gAbl776pc0) | Students gathered around a laptop. 202,252 bytes. |
+| `public/images/demo/demo-campus.jpg` | [Zoshua Colah / Unsplash](https://unsplash.com/photos/a-large-brick-university-building-at-dusk-MrH3_S3QMeE) | University of Washington building. 218,543 bytes. |
+| `public/images/demo/demo-campus-life.mp4` | [Keira Burton / Pexels](https://www.pexels.com/video/a-group-of-students-studying-6145947/) | Students studying on campus steps. 10 seconds, portrait 720 × 1280, 24 fps. 3,670,265 bytes. |
+| `public/images/demo/demo-campus-life-poster.jpg` | Same Pexels video | Matching preview. 266,198 bytes. |
 
-The original source pages identify these assets as free to use. See the [Unsplash license](https://unsplash.com/license) and [Pexels license](https://www.pexels.com/license/). These allow website use; do not imply that the depicted people or institutions endorse this product. Credits are exported from `src/publicMedia.js`. All asset endpoints returned HTTP 200 and the expected image/jpeg or video/mp4 content type before download. Assets are self-hosted to avoid third-party image requests at page load.
+The original source pages identify these assets as free to use. See the [Unsplash license](https://unsplash.com/license) and [Pexels license](https://www.pexels.com/license/). These allow website use; do not imply that the depicted people or institutions endorse this product. All asset endpoints returned HTTP 200 and the expected image/jpeg or video/mp4 content type before download.
 
 Verified original download endpoints:
 
@@ -27,7 +35,3 @@ Use the existing product name “Podar Pathways”. Repository references mix Po
 Feature descriptions can be grounded in the existing routes and views: course catalog, learning roadmap, projects, credentials, opportunities, internships, placements, career passport, resume builder, and career coach. Describe their purpose rather than promising measured outcomes or validated scoring accuracy. AI coaching responses and sample resume statistics are not sources for public claims.
 
 The [National Association of Colleges and Employers' official career readiness framework](https://www.naceweb.org/career-readiness/competencies/career-readiness-defined) supports general educational themes including career development, communication, critical thinking, professionalism, teamwork, and technology. This is background context, not an endorsement, certification, or proof of this platform's outcomes. No numerical or placement performance claims were derived from it.
-
-## Replacing media
-
-Replace the four files or update `PUBLIC_MEDIA` in `src/publicMedia.js`; keep the same named fields. Supply approved photos and a web-optimized MP4 with its matching poster. Update credits and remove demo labels only after the organization confirms ownership/usage permission and the images' relationship to the organization. The video should use controls, `preload="none"`, a poster, and no automatic sound.

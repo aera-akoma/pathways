@@ -35,6 +35,11 @@ function authenticatedSession(): array {
     return $auth;
 }
 
+function isMainAdministrator(array $account): bool {
+    return in_array($account['id'] ?? '', ['admin-jatp-main', 'admin-root', 'admin-podar-root'], true)
+        || in_array(strtolower(trim($account['email'] ?? '')), ['jatp22316@gmail.com', 'admin@podar.edu'], true);
+}
+
 // Deny by default; student access is explicitly scoped to their own records.
 function authorizeRoute(string $route, string $method, array &$body): ?array {
     if (str_starts_with($route, '/auth/') || ($method === 'GET' && in_array($route, ['/health', '/settings'], true)) || ($method === 'POST' && preg_match('#^/(programs|courses)/[^/]+/click$#', $route))) return null;
@@ -42,7 +47,17 @@ function authorizeRoute(string $route, string $method, array &$body): ?array {
     $isAdmin = $auth['role'] === 'admin';
     $body['isAdmin'] = $isAdmin;
     $_GET['isAdmin'] = $isAdmin;
-    if ($isAdmin) return $auth;
+    if ($isAdmin) {
+        if ($method !== 'GET' && ($route === '/admins' || str_starts_with($route, '/admins/'))
+            && !isMainAdministrator($auth['admin'])) {
+            $profileFields = ['name', 'phone', 'department', 'avatar', 'isAdmin'];
+            $isOwnProfile = $method === 'PUT' && $route === '/admins/' . $auth['id'];
+            if (!$isOwnProfile || array_diff(array_keys($body), $profileFields)) {
+                jsonError('Only the main administrator can manage administrator accounts.', 403);
+            }
+        }
+        return $auth;
+    }
     $id = $auth['id'];
     foreach (['studentId', 'currentStudentId', 'reporterId'] as $key) {
         if ((isset($body[$key]) && $body[$key] !== $id) || (isset($_GET[$key]) && $_GET[$key] !== $id)) jsonError('You can only access your own student records.', 403);

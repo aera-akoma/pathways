@@ -92,7 +92,7 @@ export function DigitalCareerPassport({ student, notify, navigate }) {
         {/* Card Header: College Brand */}
         <div className="passport-card-header">
           <div className="passport-header-brand">
-            <img src="/pathways-logo.jpeg" alt="College Crest" className="passport-college-crest" />
+            <img src="/images/brand/pathways-logo.jpeg" alt="College Crest" className="passport-college-crest" />
             <div>
               <h3>SHETH L.U.J. &amp; SIR M.V. COLLEGE</h3>
               <p>OF ARTS, SCIENCE &amp; COMMERCE &bull; ANDHERI (E), MUMBAI</p>

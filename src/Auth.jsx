@@ -447,7 +447,7 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
       <section className="auth-brand-panel">
         <div className="brand-mark">
           <div className="brand-logo-wrap">
-            <img className="brand-logo" src="/pathways-logo.jpeg" alt="Podar Pathways" />
+            <img className="brand-logo" src="/images/brand/pathways-logo.jpeg" alt="Podar Pathways" />
           </div>
           <span className="brand-name">Podar Pathways</span>
         </div>
@@ -479,7 +479,7 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
           <div className="mobile-brand">
             <div className="brand-mark">
               <div className="brand-logo-wrap">
-                <img className="brand-logo" src="/pathways-logo.jpeg" alt="Podar Pathways" />
+                <img className="brand-logo" src="/images/brand/pathways-logo.jpeg" alt="Podar Pathways" />
               </div>
               <span className="brand-name">Podar Pathways</span>
             </div>
@@ -535,7 +535,7 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
               <p className="eyebrow">STUDENT PORTAL</p>
               <h2>Student Registration</h2>
               <p className="form-intro">
-                Enter your college-enrolled student email to verify with an OTP and set your password.
+                Use the email listed on your college roster. If it is missing or incorrect, ask your college administrator to update your record.
               </p>
 
               {notice && (

@@ -45,6 +45,20 @@ function sendVerificationCode(string $email, string $name, string $otp, string $
     }
 }
 
+function registrationStudent(string $email): array {
+    $student = Database::fetchOne("SELECT * FROM students WHERE LOWER(email) = ? AND addedByAdmin = 1", [$email]);
+    if (!$student) {
+        jsonError('This email is not on the college roster. Ask your college administrator to add or update your record.', 403);
+    }
+    if ($student['status'] === 'suspended') {
+        jsonError('Your student account has been suspended. Contact your college administrator.', 403);
+    }
+    if (!empty($student['isRegistered']) || !empty($student['passwordHash'])) {
+        jsonError('This student account is already registered. Please sign in or use Forgot Password.', 409);
+    }
+    return $student;
+}
+
 // Helper to generate MySQL-compatible datetime timestamps
 function nowIso(): string {
     return date('Y-m-d H:i:s');
@@ -169,28 +183,14 @@ try {
     // 3. STUDENT REGISTRATION & AUTH
     // ----------------------------------------------------
     // Send OTP for student registration
-    if ($route === '/auth/student/send-otp' && $method === 'POST') {
+    if ($method === 'POST' && ($route === '/auth/student/send-otp' ||
+        ($route === '/auth/resend-otp' && ($body['purpose'] ?? 'registration') === 'registration'))) {
         $email = cleanEmail($body['email'] ?? '');
         if (!$email) jsonError('Please enter a valid email address.');
 
-        $student = Database::fetchOne("SELECT * FROM students WHERE LOWER(email) = ?", [$email]);
-        $studentName = 'Student';
-        $studentCourse = 'BCA';
-        $studentSemester = 'Semester I';
-        $studentId = '';
-
-        if ($student) {
-            if (($student['status'] ?? '') === 'suspended') {
-                jsonError('Access Denied: Your student account has been suspended by the administrator.', 403);
-            }
-            if (!empty($student['isRegistered']) && !empty($student['passwordHash'])) {
-                jsonError('An account with this email is already registered. Please sign in with your email and password, or use Forgot Password.');
-            }
-            $studentName = $student['name'] ?? 'Student';
-            $studentCourse = $student['course'] ?? 'BCA';
-            $studentSemester = $student['semester'] ?? 'Semester I';
-            $studentId = $student['id'];
-        }
+        $student = registrationStudent($email);
+        $studentId = $student['id'];
+        $studentName = $student['name'];
 
         if (!isDevEnvironment()) {
             $recentOtp = Database::fetchOne(
@@ -218,7 +218,7 @@ try {
         jsonResponse([
             'success' => true,
             'message' => isDevEnvironment() ? "Verification code sent to {$email}. (Dev OTP: 123456)" : "Verification code sent to {$email}.",
-            'student' => ['id' => $studentId, 'name' => $studentName, 'course' => $studentCourse, 'semester' => $studentSemester]
+            'student' => ['id' => $studentId, 'name' => $studentName, 'course' => $student['course'], 'semester' => $student['semester']]
         ]);
     }
 
@@ -231,60 +231,38 @@ try {
         if (!$email || !$otp || empty($password)) jsonError('Email, OTP, and password are required.');
         if (strlen($password) < 6) jsonError('Password must be at least 6 characters long.');
 
-        $isDev = isDevEnvironment();
+        $student = registrationStudent($email);
         $otpRecord = Database::fetchOne(
-            "SELECT * FROM email_otps WHERE email = ? AND purpose = 'registration' AND isUsed = 0 ORDER BY id DESC LIMIT 1",
+            "SELECT * FROM email_otps WHERE email = ? AND role = 'student' AND purpose = 'registration' AND isUsed = 0 ORDER BY id DESC LIMIT 1",
             [$email]
         );
-        $isCodeMatch = ($isDev && $otp === '123456') || ($otpRecord && hash_equals((string)$otpRecord['code'], $otp));
-
-        if (!$otpRecord && !($isDev && $otp === '123456')) {
-            jsonError('No active OTP found. Please request a new verification code.');
+        $payload = safeJsonDecode($otpRecord['payload'] ?? '');
+        if (!$otpRecord || ($payload['studentId'] ?? null) !== $student['id']) {
+            jsonError('Please request a new verification code for this student record.');
         }
-        if ($otpRecord && ($otpRecord['attempts'] ?? 0) >= OTP_MAX_ATTEMPTS && !($isDev && $otp === '123456')) {
+        if ((int)($otpRecord['attempts'] ?? 0) >= OTP_MAX_ATTEMPTS) {
             jsonError('Too many incorrect codes. Request a new code.', 429);
         }
-        if ($otpRecord && time() > $otpRecord['expiresAt'] && !($isDev && $otp === '123456')) {
-            Database::execute("DELETE FROM email_otps WHERE id = ?", [$otpRecord['id']]);
+        if (time() > $otpRecord['expiresAt']) {
             jsonError('This OTP has expired. Please request a new verification code.');
         }
-        if (!$isCodeMatch) {
-            if ($otpRecord) Database::execute("UPDATE email_otps SET attempts = attempts + 1 WHERE id = ?", [$otpRecord['id']]);
+        if (!hash_equals((string)$otpRecord['code'], $otp)) {
+            Database::execute("UPDATE email_otps SET attempts = attempts + 1 WHERE id = ?", [$otpRecord['id']]);
             jsonError('Invalid verification code. Please check your email and try again.');
         }
 
-        if ($otpRecord) Database::execute("UPDATE email_otps SET isUsed = 1 WHERE id = ?", [$otpRecord['id']]);
-
-        $student = Database::fetchOne("SELECT * FROM students WHERE LOWER(email) = ?", [$email]);
-        $passwordHash = password_hash($password, PASSWORD_BCRYPT);
-        $now = nowIso();
-
-        if ($student) {
-            Database::execute(
-                "UPDATE students SET passwordHash = ?, isRegistered = 1, updatedAt = ? WHERE id = ?",
-                [$passwordHash, $now, $student['id']]
-            );
-        } else {
-            // Auto-create and store student record in database upon successful verification
-            $studentId = 'student-' . time() . '-' . random_int(100, 999);
-            $name = cleanString($body['name'] ?? '');
-            if (!$name) {
-                $prefix = explode('@', $email)[0];
-                $name = ucwords(str_replace(['.', '_', '-'], ' ', $prefix));
-            }
-            $phone = cleanPhone($body['phone'] ?? '');
-            if (empty($phone) || strlen($phone) !== 10) {
-                $phone = '9' . str_pad((string)random_int(100000000, 999999999), 9, '0', STR_PAD_LEFT);
-            }
-            $course = cleanString($body['course'] ?? 'BCA');
-            $semester = cleanString($body['semester'] ?? 'Semester I');
-
-            Database::execute(
-                "INSERT INTO students (id, name, phone, course, semester, email, passwordHash, goal, score, completion, applications, projects, certificates, addedByAdmin, isRegistered, status, createdAt, updatedAt)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 'Software Engineer', 0, 0, 0, 0, 0, 0, 1, 'active', ?, ?)",
-                [$studentId, $name, $phone, $course, $semester, $email, $passwordHash, $now, $now]
-            );
-            $student = Database::fetchOne("SELECT * FROM students WHERE id = ?", [$studentId]);
+        // Claim the roster record and consume the OTP in the same database statement.
+        $changed = Database::execute(
+            "UPDATE students s JOIN email_otps o ON o.id = ? AND o.email = ?
+             SET s.passwordHash = ?, s.isRegistered = 1, s.updatedAt = ?, o.isUsed = 1
+             WHERE s.id = ? AND LOWER(s.email) = ? AND s.addedByAdmin = 1 AND s.status <> 'suspended'
+             AND COALESCE(s.isRegistered, 0) = 0 AND COALESCE(s.passwordHash, '') = ''
+             AND o.role = 'student' AND o.purpose = 'registration' AND o.isUsed = 0
+             AND o.expiresAt >= ? AND COALESCE(o.attempts, 0) < ?",
+            [$otpRecord['id'], $email, password_hash($password, PASSWORD_BCRYPT), nowIso(), $student['id'], $email, time(), OTP_MAX_ATTEMPTS]
+        );
+        if ($changed === 0) {
+            jsonError('Registration could not be completed. Please request a new verification code or sign in.', 409);
         }
 
         $updated = Database::fetchOne("SELECT * FROM students WHERE id = ?", [$student['id']]);
@@ -525,7 +503,7 @@ try {
     if ($route === '/auth/resend-otp' && $method === 'POST') {
         $email   = cleanEmail($body['email'] ?? '');
         $purpose = cleanString($body['purpose'] ?? 'registration');
-        if (!in_array($purpose, ['registration', 'reset-password', 'admin-login'], true)) jsonError('Repeat administrator sign-in to request a new security code.', 400);
+        if (!in_array($purpose, ['reset-password', 'admin-login'], true)) jsonError('Repeat administrator sign-in to request a new security code.', 400);
         if (!$email) jsonError('Valid email address is required.');
 
         $otp = isDevEnvironment() ? '123456' : sprintf('%06d', random_int(100000, 999999));
@@ -567,26 +545,21 @@ try {
         $semester    = cleanString($body['semester'] ?? 'V');
         $rawEmail    = trim((string)($body['email'] ?? ''));
         $email       = cleanEmail($rawEmail);
-        $dbEmail     = !empty($email) ? $email : null;
+        $dbPhone     = $phone !== '' ? $phone : null;
         $goal        = cleanString($body['goal'] ?? 'Software Engineer');
         $score       = (isset($body['score']) && is_numeric($body['score'])) ? (int)$body['score'] : 0;
         $completion  = (isset($body['completion']) && is_numeric($body['completion'])) ? (int)$body['completion'] : 0;
         $avatar      = $body['avatar'] ?? null;
 
-        if (!$name || !$phone) {
-            jsonError('Student name and 10-digit mobile number are required.');
+        if (!$name || !$email) {
+            jsonError('Student name and a valid email address are required.');
         }
 
-        $existingPhone = Database::fetchOne("SELECT id, name FROM students WHERE phone = ?", [$phone]);
-        if ($existingPhone) {
-            jsonError("A student with mobile number {$phone} already exists ({$existingPhone['name']}).");
+        if ($dbPhone !== null && Database::fetchOne("SELECT id FROM students WHERE phone = ?", [$dbPhone])) {
+            jsonError('A student with this mobile number already exists.', 409);
         }
-
-        if ($dbEmail !== null) {
-            $existingEmail = Database::fetchOne("SELECT id, name FROM students WHERE LOWER(email) = ?", [$dbEmail]);
-            if ($existingEmail) {
-                jsonError("A student with email {$dbEmail} already exists ({$existingEmail['name']}).");
-            }
+        if (Database::fetchOne("SELECT id FROM students WHERE LOWER(email) = ?", [$email])) {
+            jsonError('A student with this email address already exists.', 409);
         }
 
         $now = nowIso();
@@ -594,7 +567,7 @@ try {
         Database::execute(
             "INSERT INTO students (id, name, fathersName, phone, course, semester, email, goal, score, completion, applications, projects, certificates, avatar, addedByAdmin, isRegistered, status, createdAt, updatedAt)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, 1, 0, 'active', ?, ?)",
-            [$id, $name, $fathersName, $phone, $course, $semester, $dbEmail, $goal, $score, $completion, $avatar, $now, $now]
+            [$id, $name, $fathersName, $dbPhone, $course, $semester, $email, $goal, $score, $completion, $avatar, $now, $now]
         );
 
         $created = Database::fetchOne("SELECT * FROM students WHERE id = ?", [$id]);
@@ -613,9 +586,13 @@ try {
         $importedCount = 0;
         $skipped = [];
         $inserted = [];
-        $seenPhones = [];
+        $seenEmails = [];
 
         foreach ($rows as $row) {
+            if (!is_array($row)) {
+                $skipped[] = ['reason' => 'Invalid student row'];
+                continue;
+            }
             $name        = cleanString($row['student_name'] ?? $row['studentName'] ?? $row['name'] ?? '');
             $fathersName = cleanString($row['fathers_name'] ?? $row['father_name'] ?? $row['fathersName'] ?? '');
             $phone       = cleanPhone($row['mobile_no'] ?? $row['mobileNo'] ?? $row['phone'] ?? '');
@@ -623,41 +600,31 @@ try {
             $semester    = cleanString($row['semester'] ?? 'V');
             $rawEmail    = trim((string)($row['email'] ?? $row['email_id'] ?? ''));
             $email       = cleanEmail($rawEmail);
-            $dbEmail     = !empty($email) ? $email : null;
+            $dbPhone     = $phone !== '' ? $phone : null;
             $goal        = cleanString($row['goal'] ?? 'Software Engineer');
 
-            if (!$name || strlen($phone) !== 10) {
-                $skipped[] = ['name' => $name, 'phone' => $phone, 'reason' => 'Invalid name or 10-digit mobile'];
+            if (!$name || !$email) {
+                $skipped[] = ['name' => $name, 'email' => $rawEmail, 'reason' => 'Student name and a valid email are required'];
                 continue;
             }
-
-            if (isset($seenPhones[$phone])) {
-                $skipped[] = ['name' => $name, 'phone' => $phone, 'reason' => 'Duplicate in upload batch'];
+            if (isset($seenEmails[$email]) || Database::fetchOne("SELECT id FROM students WHERE LOWER(email) = ?", [$email])) {
+                $skipped[] = ['name' => $name, 'email' => $email, 'reason' => 'Email already exists'];
                 continue;
             }
-            $seenPhones[$phone] = true;
-
-            $existing = Database::fetchOne("SELECT id, name FROM students WHERE phone = ?", [$phone]);
-            if ($existing) {
-                $skipped[] = ['name' => $name, 'phone' => $phone, 'reason' => "Mobile already registered ({$existing['name']})"];
+            if ($dbPhone !== null && (strlen($phone) !== 10 || Database::fetchOne("SELECT id FROM students WHERE phone = ?", [$dbPhone]))) {
+                $skipped[] = ['name' => $name, 'email' => $email, 'reason' => 'Invalid or duplicate optional mobile number'];
                 continue;
-            }
-
-            if ($dbEmail !== null) {
-                $existingEmail = Database::fetchOne("SELECT id FROM students WHERE LOWER(email) = ?", [$dbEmail]);
-                if ($existingEmail) {
-                    $dbEmail = null;
-                }
             }
 
             $id = 'st-' . time() . '-' . random_int(1000, 9999);
             Database::execute(
                 "INSERT INTO students (id, name, fathersName, phone, course, semester, email, goal, score, completion, applications, projects, certificates, addedByAdmin, status, createdAt, updatedAt)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 1, 'active', ?, ?)",
-                [$id, $name, $fathersName, $phone, $course, $semester, $dbEmail, $goal, $now, $now]
+                [$id, $name, $fathersName, $dbPhone, $course, $semester, $email, $goal, $now, $now]
             );
 
-            $inserted[] = ['id' => $id, 'name' => $name, 'phone' => $phone, 'course' => $course, 'semester' => $semester, 'email' => $dbEmail];
+            $seenEmails[$email] = true;
+            $inserted[] = ['id' => $id, 'name' => $name, 'phone' => $dbPhone, 'course' => $course, 'semester' => $semester, 'email' => $email, 'goal' => $goal, 'addedByAdmin' => 1, 'isRegistered' => 0];
             $importedCount++;
         }
 
@@ -754,14 +721,14 @@ try {
                         $val = cleanEmail($val);
                         $val = !empty($val) ? $val : null;
                     } elseif ($field === 'phone') {
-                        $val = cleanPhone($val);
+                        $val = cleanPhone($val) ?: null;
                     }
                     $updates[] = "{$field} = ?";
                     $params[] = $val;
                 }
             }
 
-            if (array_key_exists('goal', $body)) {
+            if (($auth['role'] ?? '') === 'student' && array_key_exists('goal', $body)) {
                 $profilePhone = cleanPhone($body['phone'] ?? $student['phone'] ?? '');
                 if (trim((string)$body['goal']) === '' || !preg_match('/^[0-9]{10}$/', $profilePhone)) jsonError('Add your career goal and a valid mobile number to complete your profile.');
                 $updates[] = 'profileCompletedAt = ?';

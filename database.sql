@@ -32,7 +32,7 @@ CREATE TABLE `students` (
   `id` VARCHAR(64) NOT NULL,
   `name` VARCHAR(150) NOT NULL,
   `fathersName` VARCHAR(150) DEFAULT NULL,
-  `phone` VARCHAR(20) NOT NULL,
+  `phone` VARCHAR(20) DEFAULT NULL,
   `course` VARCHAR(100) NOT NULL,
   `semester` VARCHAR(20) NOT NULL,
   `email` VARCHAR(150) DEFAULT NULL,

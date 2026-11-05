@@ -1,7 +1,7 @@
+import { ACADEMIC_COURSES, academicCourseOption } from './academicCourses.js';
 import { requestJson, requireRecord } from './api.js';
 import { passwordError, PASSWORD_HINT } from './validation.js';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import * as XLSX from 'xlsx';
 import { DEFAULT_ADMIN_AVATAR, DEFAULT_STUDENT_AVATAR } from './defaultAvatar.js';
 import { INITIAL_CERTIFICATES, generateCertificateSVG } from './defaultCertificates.js';
 import './styles.css';
@@ -80,16 +80,12 @@ export function isMainAdminAccount(account) {
   if (!account) return false;
   const email = (account.email || '').trim().toLowerCase();
   const id = (account.id || '').trim().toLowerCase();
-  const phone = String(account.phone || '').replace(/\D/g, '');
   return (
-    account.isMain === true ||
     email === 'jatp22316@gmail.com' ||
     email === 'admin@podar.edu' ||
     id === 'admin-jatp-main' ||
     id === 'admin-podar-root' ||
-    id === 'admin-root' ||
-    phone === '9000000000' ||
-    phone === '9999988888'
+    id === 'admin-root'
   );
 }
 
@@ -418,12 +414,6 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
     setClicksData({ clicks: [], notClicked: [], totalClicked: 0, totalStudents: 0 });
   };
 
-  const availableDepartments = useMemo(() => {
-    const depts = new Set();
-    (clicksData.clicks || []).forEach(s => { if (s.course && s.course !== '—') depts.add(s.course); });
-    (clicksData.notClicked || []).forEach(s => { if (s.course && s.course !== '—') depts.add(s.course); });
-    return Array.from(depts).sort();
-  }, [clicksData]);
 
   const modalStudentList = useMemo(() => {
     if (!clicksModalCourse) return [];
@@ -467,8 +457,7 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
     // Department / Academic Program Filter
     if (clicksDeptFilter !== 'all') {
       combined = combined.filter(s => {
-        const dept = (s.course || '').trim().toLowerCase();
-        return dept === clicksDeptFilter.toLowerCase();
+        return academicCourseOption(s.course) === clicksDeptFilter;
       });
     }
 
@@ -487,8 +476,9 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
     return combined;
   }, [clicksModalCourse, clicksData, clicksStatusFilter, clicksDeptFilter, clicksSearch]);
 
-  const handleExportClicks = (course, studentList) => {
+  const handleExportClicks = async (course, studentList) => {
     try {
+      const XLSX = await import('xlsx');
       const rows = studentList.map((s, idx) => ({
         'Sr. No': idx + 1,
         'Roll No': s.rollNo || 'N/A',
@@ -666,13 +656,9 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
                 </div>
                 <div className="minimal-form-group">
                   <label>Target Academic Program</label>
-                  <select value={targetCourse} onChange={e => setTargetCourse(e.target.value)}>
+                  <select value={targetCourse === 'All' ? 'All' : academicCourseOption(targetCourse)} onChange={e => setTargetCourse(e.target.value)}>
                     <option value="All">All Programs</option>
-                    <option value="">Select course</option>
-                      <option value="BCA">BCA</option>
-                    <option value="BSc IT">BSc IT</option>
-                    <option value="MCA">MCA</option>
-                    <option value="BBA">BBA</option>
+                    {ACADEMIC_COURSES.map(course => <option key={course} value={course}>{course}</option>)}
                   </select>
                 </div>
                 <div className="minimal-form-group">
@@ -949,8 +935,7 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
               </div>
 
               <div className="course-engagement-filters">
-                {/* Department Filter */}
-                {availableDepartments.length > 0 && (
+                {/* Academic course filter */}
                   <select
                     value={clicksDeptFilter}
                     onChange={e => setClicksDeptFilter(e.target.value)}
@@ -963,12 +948,9 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
                       background: '#fff'
                     }}
                   >
-                    <option value="all">All Departments</option>
-                    {availableDepartments.map(dept => (
-                      <option key={dept} value={dept}>{dept}</option>
-                    ))}
+                    <option value="all">All Courses</option>
+                    {ACADEMIC_COURSES.map(course => <option key={course} value={course}>{course}</option>)}
                   </select>
-                )}
 
                 {/* Search box */}
                 <div className="minimal-search-box" style={{ maxWidth: '220px' }}>
@@ -1996,7 +1978,7 @@ export function AdminPlacementsView({ state, setState, notify, navigate }) {
 // =========================================================================
 export function AdminUserManagementView({ state, setState, session, notify, navigate }) {
   const currentEmail = (session?.email || '').trim().toLowerCase();
-  const isCurrentUserMainAdmin = isMainAdminAccount(session) || currentEmail === 'jatp22316@gmail.com' || currentEmail === 'admin@podar.edu';
+  const isCurrentUserMainAdmin = isMainAdminAccount(session?.admin || session);
 
   const defaultAdmins = [
     {
@@ -2296,9 +2278,9 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
             />
             {search && <button onClick={() => setSearch('')}><X size={12} /></button>}
           </div>
-          <button type="button" onClick={openAddModal} className="minimal-admin-btn-primary">
+          {isCurrentUserMainAdmin && <button type="button" onClick={openAddModal} className="minimal-admin-btn-primary">
             <UserPlus size={15} /> Add Administrator
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -2352,8 +2334,8 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
                           type="button"
                           className={`minimal-perm-chip ${isOn ? 'is-active' : ''}`}
                           onClick={() => togglePermission(admin.id, pm.key)}
-                          disabled={isMain}
-                          title={isMain ? 'Locked for Main Admin' : `Toggle ${pm.label}`}
+                          disabled={isMain || !isCurrentUserMainAdmin}
+                          title={isMain || !isCurrentUserMainAdmin ? pm.label : `Toggle ${pm.label}`}
                         >
                           <span className="minimal-perm-dot" />
                           <span>{pm.label}</span>
@@ -2364,8 +2346,7 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
                   </div>
                 </div>
 
-                {/* ONLY Edit and Delete Buttons */}
-                <div className="minimal-item-actions">
+                {isCurrentUserMainAdmin && <div className="minimal-item-actions">
                   <button
                     onClick={() => openEditModal(admin)}
                     className="minimal-btn-action edit"
@@ -2380,7 +2361,7 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
                       <Lock size={13} />
                       <span>Protected</span>
                     </span>
-                  ) : isCurrentUserMainAdmin ? (
+                  ) : (
                     <button
                       onClick={() => setDeleteTarget(admin)}
                       className="minimal-btn-action delete"
@@ -2389,13 +2370,8 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
                       <Trash2 size={14} />
                       <span>Delete</span>
                     </button>
-                  ) : (
-                    <span className="minimal-btn-locked" title="Only Main Administrator can delete administrators">
-                      <Lock size={13} />
-                      <span>Locked</span>
-                    </span>
                   )}
-                </div>
+                </div>}
               </div>
             );
           })
@@ -2623,19 +2599,6 @@ export function AdminCertificatesView({ state, setState, session, notify, naviga
     certificates.filter(c => c.status === 'verified').map(c => c.studentId || c.studentName)
   ).size;
 
-  // Available unique courses
-  const availableCourses = useMemo(() => {
-    const set = new Set(['BCA', 'MCA', 'B.Sc IT', 'BBA', 'B.Com']);
-    certificates.forEach(c => {
-      const crs = c.course || c.studentCourse || c.studentDepartment;
-      if (crs) set.add(crs);
-    });
-    (state?.students || []).forEach(s => {
-      if (s.course) set.add(s.course);
-    });
-    return Array.from(set).filter(Boolean);
-  }, [certificates, state?.students]);
-
   // Filtered & Sorted List
   const filteredCertificates = useMemo(() => {
     const list = certificates.filter(cert => {
@@ -2644,8 +2607,8 @@ export function AdminCertificatesView({ state, setState, session, notify, naviga
 
       // Course filter
       if (courseFilter !== 'all') {
-        const certCourse = (cert.course || cert.studentCourse || cert.studentDepartment || '').toLowerCase();
-        if (certCourse !== courseFilter.toLowerCase()) return false;
+        const certCourse = academicCourseOption(cert.course || cert.studentCourse || cert.studentDepartment);
+        if (certCourse !== courseFilter) return false;
       }
 
       // Search query
@@ -2914,9 +2877,7 @@ export function AdminCertificatesView({ state, setState, session, notify, naviga
               style={{ minWidth: '130px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12.5px', background: '#ffffff' }}
             >
               <option value="all">All Courses</option>
-              {availableCourses.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
+              {ACADEMIC_COURSES.map(course => <option key={course} value={course}>{course}</option>)}
             </select>
 
             <select
@@ -3372,7 +3333,7 @@ export function AdminCertificatesView({ state, setState, session, notify, naviga
 // ========================================================
 export function AdminStudentDirectoryView({ state, setState, session, notify, navigate }) {
   const students = state?.students || [];
-  const roster = state?.roster || [];
+  const roster = students.filter(student => Number(student.addedByAdmin) === 1 && student.email);
 
   const [activeTab, setActiveTab] = useState('students'); // 'students' | 'roster'
   const [search, setSearch] = useState('');
@@ -3392,8 +3353,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
         if (Array.isArray(list)) {
           setState?.(prev => ({
             ...prev,
-            students: list,
-            roster: list.map(s => ({ name: s.name, phone: s.phone }))
+            students: list
           }));
         }
       })
@@ -3416,12 +3376,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
 
   // 1. Download .CSV Template
   const handleDownloadCsvTemplate = () => {
-    const csvContent =
-      "Student Name,Father Name,Mobile Number,Course,Semester,Email,Career Goal\n" +
-      "Aarav Sharma,Rajesh Sharma,9876543210,BCA,Semester V,aarav.sharma@example.com,Full-Stack Web Developer\n" +
-      "Rohan Deshmukh,Sanjay Deshmukh,9876543211,B.Sc IT,Semester III,rohan.deshmukh@example.com,Cybersecurity Analyst\n" +
-      "Priya Verma,Anil Verma,9876543212,MCA,Semester I,priya.verma@example.com,Data Scientist & Machine Learning\n" +
-      "Sneha Patel,Mahesh Patel,9876543213,BCA,Semester IV,sneha.patel@example.com,Cloud & DevOps Engineer\n";
+    const csvContent = "Student Name,Email\nAarav Sharma,aarav.sharma@example.com\nPriya Verma,priya.verma@example.com\n";
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -3476,6 +3431,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
 
     try {
       setImporting(true);
+      const XLSX = await import('xlsx');
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data, { type: 'array' });
       const sheetName = workbook.SheetNames[0];
@@ -3487,19 +3443,14 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
       }
 
       const parsedStudents = jsonRows.map(row => {
-        const name = (row['Student Name'] || row['Name'] || row['student_name'] || row['studentName'] || '').trim();
-        const fathersName = (row['Father Name'] || row["Father's Name"] || row['father_name'] || row['fathersName'] || '').trim();
-        const phone = String(row['Mobile Number'] || row['Mobile'] || row['Phone'] || row['phone'] || row['mobile_no'] || '').replace(/\D/g, '').slice(-10);
-        const course = (row['Course'] || row['course'] || 'BCA').trim();
-        const semester = (row['Semester'] || row['semester'] || 'Semester V').trim();
-        const email = (row['Email'] || row['email'] || '').trim();
-        const goal = (row['Career Goal'] || row['Goal'] || row['goal'] || '').trim();
-        return { name, fathersName, phone, course, semester, email, goal };
-      }).filter(s => s.name && s.phone && s.phone.length === 10);
-
-      if (parsedStudents.length === 0) {
-        throw new Error('No valid students found. Ensure your columns include Name and a 10-digit Mobile Number.');
-      }
+        const fields = Object.fromEntries(Object.entries(row).map(([key, value]) => [
+          key.toLowerCase().replace(/[^a-z]/g, ''), String(value ?? '').trim()
+        ]));
+        return {
+          name: fields.studentname || fields.fullname || fields.name || '',
+          email: fields.email || fields.emailaddress || fields.studentemail || fields.emailid || ''
+        };
+      });
 
       // Send to server
       const resData = await requestJson('/api/students/import-csv', {
@@ -3509,20 +3460,12 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
       });
 
 
-      // Refresh student list from database
-      const freshRes = await fetch('/api/students');
-      if (freshRes.ok) {
-        const freshList = await freshRes.json();
-        if (Array.isArray(freshList)) {
-          setState?.(prev => ({
-            ...prev,
-            students: freshList,
-            roster: freshList.map(s => ({ name: s.name, phone: s.phone }))
-          }));
-        }
+      if (Array.isArray(resData.students) && resData.students.length) {
+        setState?.(prev => ({ ...prev, students: [...resData.students, ...(prev.students || [])] }));
       }
-
-      notify?.(resData.message || `Successfully stored ${parsedStudents.length} student records in database.`);
+      const skipped = resData.skippedCount ? ` Skipped ${resData.skippedCount} row(s).` : '';
+      const reason = resData.skipped?.[0]?.reason;
+      notify?.(`Imported ${resData.importedCount} student(s).${skipped}${reason ? ' ' + reason + '.' : ''}`);
     } catch (err) {
       notify?.(err.message || 'Could not parse uploaded file.');
     } finally {
@@ -3534,12 +3477,12 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
   // 4. Create Single Student
   const handleCreateStudent = async (e) => {
     e.preventDefault();
-    if (!newStudent.name.trim() || !newStudent.phone.trim()) {
-      notify?.('Name and mobile number are required.');
+    if (!newStudent.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newStudent.email.trim())) {
+      notify?.('Student name and a valid email address are required.');
       return;
     }
     const cleanPhone = newStudent.phone.replace(/\D/g, '').slice(-10);
-    if (cleanPhone.length !== 10) {
+    if (newStudent.phone.trim() && cleanPhone.length !== 10) {
       notify?.('Please enter a valid 10-digit mobile number.');
       return;
     }
@@ -3548,7 +3491,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
       id: `student-${Date.now()}`,
       name: newStudent.name.trim(),
       fathersName: newStudent.fathersName.trim(),
-      phone: cleanPhone,
+      phone: cleanPhone || null,
       email: newStudent.email.trim(),
       course: newStudent.course,
       semester: newStudent.semester,
@@ -3572,8 +3515,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
 
       setState?.(prev => ({
         ...prev,
-        students: [finalRecord, ...(prev.students || []).filter(s => s.id !== finalRecord.id)],
-        roster: [{ name: finalRecord.name, phone: finalRecord.phone }, ...(prev.roster || []).filter(r => r.phone !== finalRecord.phone)]
+        students: [finalRecord, ...(prev.students || []).filter(s => s.id !== finalRecord.id)]
       }));
 
       setShowAddModal(false);
@@ -3628,8 +3570,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
 
       setState?.(prev => ({
         ...prev,
-        students: (prev.students || []).filter(s => s.id !== deleteTarget.id),
-        roster: (prev.roster || []).filter(r => r.phone !== deleteTarget.phone)
+        students: (prev.students || []).filter(s => s.id !== deleteTarget.id)
       }));
 
       setDeleteTarget(null);
@@ -3651,7 +3592,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
         (s.course && s.course.toLowerCase().includes(q)) ||
         (s.goal && s.goal.toLowerCase().includes(q));
 
-      const matchCourse = courseFilter === 'all' || s.course === courseFilter;
+      const matchCourse = courseFilter === 'all' || academicCourseOption(s.course) === courseFilter;
       return matchSearch && matchCourse;
     });
   }, [students, search, courseFilter]);
@@ -3662,7 +3603,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
       return (
         !q ||
         (r.name && r.name.toLowerCase().includes(q)) ||
-        (r.phone && r.phone.includes(q))
+        (r.email && r.email.toLowerCase().includes(q))
       );
     });
   }, [roster, search]);
@@ -3672,7 +3613,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
     : 0;
 
   return (
-    <div className="minimal-admin-container">
+    <div className="minimal-admin-container student-directory">
       {/* Hidden file input for CSV/Excel upload */}
       <input
         type="file"
@@ -3688,11 +3629,11 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
           <p className="minimal-admin-eyebrow">ACADEMIC GOVERNANCE</p>
           <h1 className="minimal-admin-title">Student Directory</h1>
           <p className="minimal-admin-subtitle">
-            Manage enrolled student accounts, upload bulk CSV rosters, and download standard intake templates.
+            Add students individually or upload a CSV or Excel roster with Student Name and Email columns.
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <div className="student-directory-actions">
           <button
             className="minimal-btn-secondary"
             onClick={handleDownloadCsvTemplate}
@@ -3780,8 +3721,8 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
       </div>
 
       {/* 3. Controls & Filter Bar */}
-      <div className="minimal-controls-bar" style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+      <div className="student-directory-controls">
+        <div className="student-directory-tabs">
           <div className="admin-cert-tabs">
             <button
               type="button"
@@ -3802,7 +3743,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1, maxWidth: '440px', justifyContent: 'flex-end' }}>
+        <div className="student-directory-filters">
           <div className="minimal-search-box" style={{ flex: 1 }}>
             <Search size={14} className="minimal-search-icon" />
             <input
@@ -3821,16 +3762,11 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
             <select
               value={courseFilter}
               onChange={e => setCourseFilter(e.target.value)}
-              className="minimal-select"
-              style={{ width: 'auto', minWidth: '110px' }}
+              className="student-course-filter"
+              aria-label="Filter students by course"
             >
               <option value="all">All Courses</option>
-              <option value="">Select course</option>
-                      <option value="BCA">BCA</option>
-              <option value="MCA">MCA</option>
-              <option value="B.Sc IT">B.Sc IT</option>
-              <option value="BBA">BBA</option>
-              <option value="B.Com">B.Com</option>
+              {ACADEMIC_COURSES.map(course => <option key={course} value={course}>{course}</option>)}
             </select>
           )}
         </div>
@@ -3838,22 +3774,22 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
 
       {/* 4. CONTENT TAB 1: ENROLLED STUDENT ACCOUNTS */}
       {activeTab === 'students' && (
-        <div className="minimal-table-wrap">
+        <div className="minimal-table-wrap" role="region" aria-label="Enrolled student accounts" tabIndex={0}>
           {filteredStudents.length > 0 ? (
-            <table className="minimal-data-table">
-              <thead>
-                <tr>
-                  <th style={{ width: '28%' }}>STUDENT</th>
-                  <th style={{ width: '22%' }}>CONTACT</th>
-                  <th style={{ width: '16%' }}>COURSE & SEM</th>
-                  <th style={{ width: '16%' }}>READINESS</th>
-                  <th style={{ width: '18%', textAlign: 'right' }}>ACTIONS</th>
+            <table className="minimal-data-table student-directory-table" role="table">
+              <thead role="rowgroup">
+                <tr role="row">
+                  <th role="columnheader" style={{ width: '28%' }}>STUDENT</th>
+                  <th role="columnheader" style={{ width: '22%' }}>CONTACT</th>
+                  <th role="columnheader" style={{ width: '16%' }}>COURSE & SEM</th>
+                  <th role="columnheader" style={{ width: '16%' }}>READINESS</th>
+                  <th role="columnheader" style={{ width: '18%', textAlign: 'right' }}>ACTIONS</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody role="rowgroup">
                 {filteredStudents.map((st) => (
-                  <tr key={st.id}>
-                    <td>
+                  <tr role="row" key={st.id}>
+                    <td role="cell" data-label="Student">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div className="avatar small" style={{ width: '34px', height: '34px', flexShrink: 0 }}>
                           {st?.avatar && typeof st.avatar === 'string' ? (
@@ -3878,20 +3814,20 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
                       </div>
                     </td>
 
-                    <td>
+                    <td role="cell" data-label="Contact">
                       <div style={{ fontSize: '12.5px', color: '#334155' }}>
                         <strong style={{ display: 'block', color: '#0f172a' }}>{st.phone}</strong>
                         <span style={{ color: '#64748b' }}>{st.email || 'No email registered'}</span>
                       </div>
                     </td>
 
-                    <td>
+                    <td role="cell" data-label="Course & semester">
                       <span className="minimal-badge blue">
                         {st.course || 'Course not added'} • {st.semester || 'Semester not added'}
                       </span>
                     </td>
 
-                    <td>
+                    <td role="cell" data-label="Readiness">
                       <div style={{ width: '110px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', marginBottom: '4px' }}>
                           <strong style={{ color: '#0f172a' }}>{st.score || 0}/100</strong>
@@ -3903,8 +3839,8 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
                       </div>
                     </td>
 
-                    <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', gap: '6px' }}>
+                    <td role="cell" data-label="Actions" style={{ textAlign: 'right' }}>
+                      <div className="student-row-actions">
                         <button
                           type="button"
                           className="minimal-btn-table"
@@ -3949,31 +3885,31 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
 
       {/* 5. CONTENT TAB 2: COLLEGE SIGNUP ROSTER */}
       {activeTab === 'roster' && (
-        <div className="minimal-table-wrap">
+        <div className="minimal-table-wrap" role="region" aria-label="College signup roster" tabIndex={0}>
           {filteredRoster.length > 0 ? (
-            <table className="minimal-data-table">
-              <thead>
-                <tr>
-                  <th style={{ width: '45%' }}>STUDENT NAME</th>
-                  <th style={{ width: '35%' }}>ELIGIBLE MOBILE NUMBER</th>
-                  <th style={{ width: '20%', textAlign: 'right' }}>STATUS</th>
+            <table className="minimal-data-table student-directory-table" role="table">
+              <thead role="rowgroup">
+                <tr role="row">
+                  <th role="columnheader" style={{ width: '45%' }}>STUDENT NAME</th>
+                  <th role="columnheader" style={{ width: '35%' }}>ELIGIBLE EMAIL</th>
+                  <th role="columnheader" style={{ width: '20%', textAlign: 'right' }}>STATUS</th>
                 </tr>
               </thead>
-              <tbody>
-                {filteredRoster.map((item, idx) => {
-                  const isRegistered = students.some(s => s.phone === item.phone);
+              <tbody role="rowgroup">
+                {filteredRoster.map(item => {
+                  const isRegistered = Number(item.isRegistered) === 1;
                   return (
-                    <tr key={`${item.phone}-${idx}`}>
-                      <td>
+                    <tr role="row" key={item.id}>
+                      <td role="cell" data-label="Student">
                         <strong style={{ fontSize: '13.5px', color: '#0f172a' }}>{item.name}</strong>
                       </td>
-                      <td>
+                      <td role="cell" data-label="Eligible email">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#334155' }}>
-                          <Phone size={13} color="#64748b" />
-                          <span>{item.phone}</span>
+                          <Mail size={13} color="#64748b" />
+                          <span>{item.email}</span>
                         </div>
                       </td>
-                      <td style={{ textAlign: 'right' }}>
+                      <td role="cell" data-label="Status" style={{ textAlign: 'right' }}>
                         {isRegistered ? (
                           <span className="minimal-badge green">
                             <CheckCircle2 size={11} />
@@ -4005,7 +3941,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
       {/* ======================================================== */}
       {showAddModal && (
         <div className="minimal-modal-backdrop">
-          <div className="minimal-modal-dialog" onClick={e => e.stopPropagation()}>
+          <div className="minimal-modal-dialog student-directory-dialog" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <h3>Enroll New Student</h3>
               <button className="minimal-close-btn" onClick={() => setShowAddModal(false)} type="button">
@@ -4014,8 +3950,8 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
             </div>
             <form onSubmit={handleCreateStudent}>
               <div className="minimal-modal-body">
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-                  <div className="minimal-form-field">
+                <div className="student-form-grid">
+                  <div className="minimal-form-group">
                     <label>Full Name *</label>
                     <input
                       type="text"
@@ -4025,7 +3961,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
                       onChange={e => setNewStudent({ ...newStudent, name: e.target.value })}
                     />
                   </div>
-                  <div className="minimal-form-field">
+                  <div className="minimal-form-group">
                     <label>Father's Name</label>
                     <input
                       type="text"
@@ -4036,22 +3972,23 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginTop: '10px' }}>
-                  <div className="minimal-form-field">
-                    <label>10-Digit Mobile *</label>
+                <div className="student-form-grid">
+                  <div className="minimal-form-group">
+                    <label>10-Digit Mobile</label>
                     <input
                       type="tel"
-                      required
+                      pattern="[0-9]{10}"
                       placeholder="e.g. 9876543210"
                       maxLength={10}
                       value={newStudent.phone}
                       onChange={e => setNewStudent({ ...newStudent, phone: e.target.value.replace(/\D/g, '') })}
                     />
                   </div>
-                  <div className="minimal-form-field">
-                    <label>Email Address</label>
+                  <div className="minimal-form-group">
+                    <label>Email Address *</label>
                     <input
                       type="email"
+                      required
                       placeholder="student@example.com"
                       value={newStudent.email}
                       onChange={e => setNewStudent({ ...newStudent, email: e.target.value })}
@@ -4059,22 +3996,17 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginTop: '10px' }}>
-                  <div className="minimal-form-field">
+                <div className="student-form-grid">
+                  <div className="minimal-form-group">
                     <label>Course</label>
                     <select
-                      value={newStudent.course}
+                      value={academicCourseOption(newStudent.course)}
                       onChange={e => setNewStudent({ ...newStudent, course: e.target.value })}
                     >
-                      <option value="">Select course</option>
-                      <option value="BCA">BCA</option>
-                      <option value="MCA">MCA</option>
-                      <option value="B.Sc IT">B.Sc IT</option>
-                      <option value="BBA">BBA</option>
-                      <option value="B.Com">B.Com</option>
+                      {ACADEMIC_COURSES.map(course => <option key={course} value={course}>{course}</option>)}
                     </select>
                   </div>
-                  <div className="minimal-form-field">
+                  <div className="minimal-form-group">
                     <label>Semester</label>
                     <select
                       value={newStudent.semester}
@@ -4090,7 +4022,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
                   </div>
                 </div>
 
-                <div className="minimal-form-field" style={{ marginTop: '10px' }}>
+                <div className="minimal-form-group" style={{ marginTop: '10px' }}>
                   <label>Career Ambition / Target Track</label>
                   <input
                     type="text"
@@ -4120,7 +4052,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
       {/* ======================================================== */}
       {editStudent && (
         <div className="minimal-modal-backdrop">
-          <div className="minimal-modal-dialog" onClick={e => e.stopPropagation()}>
+          <div className="minimal-modal-dialog student-directory-dialog" onClick={e => e.stopPropagation()}>
             <div className="minimal-modal-header">
               <h3>Edit Student Profile</h3>
               <button className="minimal-close-btn" onClick={() => setEditStudent(null)} type="button">
@@ -4129,8 +4061,8 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
             </div>
             <form onSubmit={handleSaveEdit}>
               <div className="minimal-modal-body">
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-                  <div className="minimal-form-field">
+                <div className="student-form-grid">
+                  <div className="minimal-form-group">
                     <label>Full Name</label>
                     <input
                       type="text"
@@ -4139,33 +4071,28 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
                       onChange={e => setEditStudent({ ...editStudent, name: e.target.value })}
                     />
                   </div>
-                  <div className="minimal-form-field">
+                  <div className="minimal-form-group">
                     <label>Mobile Number</label>
                     <input
                       type="tel"
-                      required
-                      value={editStudent.phone}
+                      pattern="[0-9]{10}"
+                      value={editStudent.phone || ''}
                       onChange={e => setEditStudent({ ...editStudent, phone: e.target.value })}
                     />
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginTop: '10px' }}>
-                  <div className="minimal-form-field">
+                <div className="student-form-grid">
+                  <div className="minimal-form-group">
                     <label>Course</label>
                     <select
-                      value={editStudent.course || ''}
+                      value={academicCourseOption(editStudent.course)}
                       onChange={e => setEditStudent({ ...editStudent, course: e.target.value })}
                     >
-                      <option value="">Select course</option>
-                      <option value="BCA">BCA</option>
-                      <option value="MCA">MCA</option>
-                      <option value="B.Sc IT">B.Sc IT</option>
-                      <option value="BBA">BBA</option>
-                      <option value="B.Com">B.Com</option>
+                      {ACADEMIC_COURSES.map(course => <option key={course} value={course}>{course}</option>)}
                     </select>
                   </div>
-                  <div className="minimal-form-field">
+                  <div className="minimal-form-group">
                     <label>Semester</label>
                     <input
                       type="text"
@@ -4176,7 +4103,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
                   </div>
                 </div>
 
-                <div className="minimal-form-field" style={{ marginTop: '10px' }}>
+                <div className="minimal-form-group" style={{ marginTop: '10px' }}>
                   <label>Career Goal</label>
                   <input
                     type="text"
@@ -4185,7 +4112,7 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
                   />
                 </div>
 
-                <div className="minimal-form-field" style={{ marginTop: '10px' }}>
+                <div className="minimal-form-group" style={{ marginTop: '10px' }}>
                   <label>P-CARE Employability Score (0-100)</label>
                   <input
                     type="number"

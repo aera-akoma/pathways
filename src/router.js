@@ -11,6 +11,7 @@ const PAGE_TITLES = {
   contact: 'Contact | Podar Pathways',
   privacy: 'Privacy Policy | Podar Pathways',
   'why-us': 'Why Us | Podar Pathways',
+  'developer-credits': 'Developer Credits | Podar Pathways',
   login: 'Login / Signup | Podar Pathways',
   signup: 'Create an Account | Podar Pathways',
   dashboard: 'Dashboard | Podar Pathways',
@@ -155,7 +156,7 @@ export function parseCurrentLocation(role = 'student') {
     };
   }
 
-  const publicRoutes = { '/': 'home', '/about': 'about', '/contact': 'contact', '/privacy-policy': 'privacy', '/why-us': 'why-us', '/login': 'login', '/signup': 'signup' };
+  const publicRoutes = { '/': 'home', '/about': 'about', '/contact': 'contact', '/privacy-policy': 'privacy', '/why-us': 'why-us', '/developer-credits': 'developer-credits', '/login': 'login', '/signup': 'signup' };
   if (publicRoutes[pathname]) return { page: publicRoutes[pathname], params, rawPath: pathname, role };
 
   // 3. Admin routes match

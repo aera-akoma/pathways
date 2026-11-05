@@ -11529,7 +11529,7 @@ to {
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-  overflow: hidden;
+  overflow-x: auto;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   margin-bottom: 24px;
 }
@@ -15606,7 +15606,8 @@ to {
   color: #0f172a;
 }
 
-.admin-cert-tab-btn.is-active {
+.admin-cert-tab-btn.is-active,
+.admin-cert-tab-btn.active {
   background: #ffffff;
   color: #0f172a;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
@@ -20340,10 +20341,280 @@ select:disabled {
  .sidebar { transition:transform .2s ease; }
  .main-shell { transition:margin-left .2s ease; }
 }
-@media(max-width:1100px) {
- .sidebar-backdrop.active { display:block; position:fixed; inset:0; background:rgba(11,25,44,.55); z-index:99; }
- .sidebar { z-index:100!important; }
+@media (max-width: 1100px) {
+  .main-shell { margin-left: 0; }
+  .sidebar {
+    width: min(272px, calc(100% - 32px));
+    height: 100dvh;
+    min-height: 0;
+    overflow-y: auto;
+    transform: translateX(-100%);
+    visibility: hidden;
+    z-index: 100 !important;
+  }
+  .sidebar.open {
+    transform: translateX(0);
+    visibility: visible;
+  }
+  .icon-button.close-nav {
+    display: grid !important;
+    margin-left: auto;
+  }
+  .sidebar-backdrop.active {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(11, 25, 44, .55);
+    z-index: 99;
+  }
 }
 @media(prefers-reduced-motion:reduce) { .sidebar,.main-shell { transition:none; } }
 .auth-return-home { position:absolute; top:14px; right:24px; z-index:20; padding:8px 12px; border-radius:8px; color:#0b3286; background:#ffffffed; font-size:13px; text-decoration:none; }
 .auth-return-home:hover { background:#edf6f6; }
+
+.student-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 16px;
+}
+
+.student-course-filter {
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: #111827;
+  font-size: 13px;
+}
+
+@media (max-width: 480px) {
+  .student-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Keep directory controls and wide tables usable in a narrow workspace. */
+.student-directory-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.student-directory-tabs,
+.student-directory-filters,
+.student-directory-filters .minimal-search-box {
+  min-width: 0;
+}
+
+.student-directory-filters {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 1 1 260px;
+  max-width: 440px;
+}
+
+.minimal-table-wrap:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .student-directory-tabs,
+  .student-directory-filters {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .student-directory-tabs .admin-cert-tabs {
+    flex-wrap: wrap;
+  }
+
+  .student-directory-tabs .admin-cert-tab-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .student-directory-filters {
+    flex-basis: 100%;
+  }
+
+  .minimal-data-table th,
+  .minimal-data-table td {
+    padding-inline: 12px;
+  }
+
+  .modal-card {
+    max-height: calc(100dvh - 32px) !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .student-directory-filters {
+    flex-wrap: wrap;
+  }
+
+  .student-directory-filters .minimal-search-box,
+  .student-directory-filters .student-course-filter {
+    flex: 1 1 100% !important;
+  }
+}
+
+.student-directory {
+  container: student-directory / inline-size;
+}
+
+.student-directory-actions,
+.student-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.student-directory-actions {
+  justify-content: flex-end;
+}
+
+.student-row-actions {
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.student-directory-table td {
+  overflow-wrap: anywhere;
+}
+
+.student-directory-table .minimal-badge {
+  white-space: normal;
+}
+
+@container student-directory (max-width: 740px) {
+  .student-directory .minimal-admin-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .student-directory-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .student-directory-actions button {
+    justify-content: center;
+    min-height: 44px;
+    white-space: normal;
+  }
+
+  .student-directory-tabs,
+  .student-directory-filters {
+    width: 100%;
+    max-width: none;
+  }
+
+  .student-directory-tabs .admin-cert-tabs {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .student-directory-tabs .admin-cert-tab-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+    min-height: 44px;
+    white-space: normal;
+  }
+
+  .student-directory-filters {
+    flex-wrap: wrap;
+  }
+
+  .student-directory-filters .minimal-search-box {
+    flex: 1 1 180px !important;
+  }
+
+  .student-directory-filters .student-course-filter {
+    flex: 1 1 130px;
+  }
+
+  .student-directory-table,
+  .student-directory-table tbody {
+    display: block;
+  }
+
+  .student-directory-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .student-directory-table tbody tr {
+    display: grid;
+    padding: 10px 14px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .student-directory-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .student-directory-table tbody td {
+    display: grid;
+    grid-template-columns: minmax(74px, 28%) minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    padding: 8px 0;
+    border: 0;
+    text-align: left !important;
+  }
+
+  .student-directory-table tbody td::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .student-directory-table td:first-child {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .student-directory-table td:first-child::before {
+    content: none;
+  }
+
+  .student-directory-table .minimal-badge {
+    justify-self: start;
+  }
+
+  .student-row-actions {
+    justify-content: flex-start;
+  }
+
+  .student-row-actions button {
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 480px) {
+  .student-directory-dialog input,
+  .student-directory-dialog select {
+    font-size: 16px;
+  }
+
+  .student-directory-dialog .minimal-modal-footer {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .student-directory-dialog .minimal-modal-footer button {
+    flex: 1 1 auto;
+    justify-content: center;
+    min-height: 44px;
+  }
+}

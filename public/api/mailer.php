@@ -579,10 +579,10 @@ HTML;
         }
 
         $candidates = [
-            dirname(__DIR__) . '/pathways-logo-email.jpeg',
-            dirname(__DIR__, 2) . '/public/pathways-logo-email.jpeg',
-            dirname(__DIR__) . '/pathways-logo.jpeg',
-            dirname(__DIR__, 2) . '/public/pathways-logo.jpeg'
+            dirname(__DIR__) . '/images/brand/pathways-logo-email.jpeg',
+            dirname(__DIR__, 2) . '/public/images/brand/pathways-logo-email.jpeg',
+            dirname(__DIR__) . '/images/brand/pathways-logo.jpeg',
+            dirname(__DIR__, 2) . '/public/images/brand/pathways-logo.jpeg'
         ];
 
         foreach ($candidates as $filePath) {

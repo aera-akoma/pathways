@@ -43,6 +43,20 @@ if (existsSync(resolve(root, 'DEPLOYMENT_GUIDE.txt'))) {
   console.log('   ✓ Copied DEPLOYMENT_GUIDE.txt');
 }
 
+// Ensure root favicon and logo fallbacks exist for legacy URLs
+const brandFavicon = resolve(root, 'public/images/brand/favicon.svg');
+if (existsSync(brandFavicon)) {
+  copyFileSync(brandFavicon, resolve(distDir, 'favicon.svg'));
+}
+const brandLogo = resolve(root, 'public/images/brand/pathways-logo.jpeg');
+if (existsSync(brandLogo)) {
+  copyFileSync(brandLogo, resolve(distDir, 'pathways-logo.jpeg'));
+}
+const brandEmailLogo = resolve(root, 'public/images/brand/pathways-logo-email.jpeg');
+if (existsSync(brandEmailLogo)) {
+  copyFileSync(brandEmailLogo, resolve(distDir, 'pathways-logo-email.jpeg'));
+}
+
 // Ensure api/logs exists with protection
 const distLogsDir = resolve(distDir, 'api/logs');
 mkdirSync(distLogsDir, { recursive: true });
@@ -70,7 +84,7 @@ console.log(`  2. ${publicZip} (${sizeMB} MB)`);
 console.log(`======================================================`);
 console.log(`\nVerification of Archive Contents:`);
 const archiveList = execSync(`tar.exe -tf "${prodZip}"`, { encoding: 'utf8' });
-const sampleFiles = ['.htaccess', 'index.html', 'assets', 'api', 'database.sql', '.env', 'favicon.svg', 'media'];
+const sampleFiles = ['.htaccess', 'index.html', 'assets', 'api', 'database.sql', '.env', 'favicon.svg', 'images', 'media'];
 for (const req of sampleFiles) {
   const found = archiveList.split('\n').some(line => line.includes(req));
   console.log(`  ${found ? '✓' : '✗'} Contains ${req}`);

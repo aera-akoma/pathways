@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540">
+  <rect width="960" height="540" fill="#e7f2f2"/>
+  <rect x="73" y="52" width="814" height="318" rx="24" fill="#f7fafb"/>
+  <g transform="translate(150 131)" fill="#287579"><circle cy="-19" r="16"/><path d="M-30 39v-9a30 30 0 0 1 60 0v9z"/></g>
+  <g transform="translate(222 131)" fill="#47699d"><circle cy="-19" r="16"/><path d="M-30 39v-9a30 30 0 0 1 60 0v9z"/></g>
+  <g transform="translate(294 131)" fill="#68588c"><circle cy="-19" r="16"/><path d="M-30 39v-9a30 30 0 0 1 60 0v9z"/></g>
+  <g transform="translate(366 131)" fill="#387361"><circle cy="-19" r="16"/><path d="M-30 39v-9a30 30 0 0 1 60 0v9z"/></g>
+  <g transform="translate(438 131)" fill="#287579"><circle cy="-19" r="16"/><path d="M-30 39v-9a30 30 0 0 1 60 0v9z"/></g>
+  <g transform="translate(510 131)" fill="#47699d"><circle cy="-19" r="16"/><path d="M-30 39v-9a30 30 0 0 1 60 0v9z"/></g>
+  <g transform="translate(582 131)" fill="#68588c"><circle cy="-19" r="16"/><path d="M-30 39v-9a30 30 0 0 1 60 0v9z"/></g>
+  <g transform="translate(654 131)" fill="#387361"><circle cy="-19" r="16"/><path d="M-30 39v-9a30 30 0 0 1 60 0v9z"/></g>
+  <g transform="translate(726 131)" fill="#287579"><circle cy="-19" r="16"/><path d="M-30 39v-9a30 30 0 0 1 60 0v9z"/></g>
+  <g transform="translate(798 131)" fill="#47699d"><circle cy="-19" r="16"/><path d="M-30 39v-9a30 30 0 0 1 60 0v9z"/></g>
+  <g transform="translate(150 277)" fill="#47699d"><circle cy="-19" r="16"/><path d="M-30 39v-9a30 30 0 0 1 60 0v9z"/></g>
+  <g transform="translate(222 277)" fill="#68588c"><circle cy="-19" r="16"/><path d="M-30 39v-9a30 30 0 0 1 60 0v9z"/></g>
+  <g transform="translate(294 277)" fill="#387361"><circle cy="-19" r="16"/><path d="M-30 39v-9a30 30 0 0 1 60 0v9z"/></g>
+  <g transform="translate(366 277)" fill="#287579"><circle cy="-19" r="16"/><path d="M-30 39v-9a30 30 0 0 1 60 0v9z"/></g>
+  <g transform="translate(438 277)" fill="#47699d"><circle cy="-19" r="16"/><path d="M-30 39v-9a30 30 0 0 1 60 0v9z"/></g>
+  <g transform="translate(510 277)" fill="#68588c"><circle cy="-19" r="16"/><path d="M-30 39v-9a30 30 0 0 1 60 0v9z"/></g>
+  <g transform="translate(582 277)" fill="#387361"><circle cy="-19" r="16"/><path d="M-30 39v-9a30 30 0 0 1 60 0v9z"/></g>
+  <g transform="translate(654 277)" fill="#287579"><circle cy="-19" r="16"/><path d="M-30 39v-9a30 30 0 0 1 60 0v9z"/></g>
+  <g transform="translate(726 277)" fill="#47699d"><circle cy="-19" r="16"/><path d="M-30 39v-9a30 30 0 0 1 60 0v9z"/></g>
+  <g transform="translate(798 277)" fill="#68588c"><circle cy="-19" r="16"/><path d="M-30 39v-9a30 30 0 0 1 60 0v9z"/></g>
+  <text x="480" y="445" text-anchor="middle" font-family="Arial, sans-serif" font-size="32" fill="#112b4a">Example team photo</text>
+</svg>

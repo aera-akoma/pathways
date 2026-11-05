@@ -1,3 +1,4 @@
+import { ACADEMIC_COURSES, academicCourseOption } from './academicCourses.js';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   BookOpen,
@@ -450,16 +451,6 @@ export function CourseCatalog({
     };
   }, [certificates]);
 
-  // Unique Courses for Certificates Filter
-  const certAvailableCourses = useMemo(() => {
-    const set = new Set(['BCA', 'MCA', 'B.Sc IT', 'BBA', 'B.Com']);
-    certificates.forEach(c => {
-      const crs = c.course || c.studentCourse || c.studentDepartment;
-      if (crs) set.add(crs);
-    });
-    return Array.from(set).filter(Boolean);
-  }, [certificates]);
-
   // Filtered and Sorted Certificates
   const displayedGalleryCertificates = useMemo(() => {
     const list = certificates.filter(cert => {
@@ -468,8 +459,8 @@ export function CourseCatalog({
 
       // Course filter
       if (certCourseFilter !== 'all') {
-        const crs = (cert.course || cert.studentCourse || cert.studentDepartment || '').toLowerCase();
-        if (crs !== certCourseFilter.toLowerCase()) return false;
+        const crs = academicCourseOption(cert.course || cert.studentCourse || cert.studentDepartment);
+        if (crs !== certCourseFilter) return false;
       }
 
       // Search query
@@ -1034,9 +1025,7 @@ export function CourseCatalog({
               style={{ minWidth: '130px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12.5px', background: '#ffffff' }}
             >
               <option value="all">All Courses</option>
-              {certAvailableCourses.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
+              {ACADEMIC_COURSES.map(course => <option key={course} value={course}>{course}</option>)}
             </select>
 
             <select

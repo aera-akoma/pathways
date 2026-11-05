@@ -9,6 +9,7 @@ app-debug.apk
 *.db-wal
 *.zip
 scratch/
+media-source/
 .gsd/
 .agents/
 outputs/

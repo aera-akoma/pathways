@@ -1,3 +1,4 @@
+import { ACADEMIC_COURSES, academicCourseOption } from './academicCourses.js';
 import { ProfileAvatar } from './ProfileAvatar.jsx';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { getProjectShareUrl, pushRoute, parseCurrentLocation } from './router.js';
@@ -311,7 +312,7 @@ export function ProjectsPlatform({ session, student, state, setState, notify, na
       if (studentCourseFilter === 'Creators') {
         matchCourse = (studentProjectCounts[s.id] || 0) > 0;
       } else if (studentCourseFilter !== 'All') {
-        matchCourse = s.course === studentCourseFilter;
+        matchCourse = academicCourseOption(s.course) === studentCourseFilter;
       }
 
       return matchSearch && matchCourse;
@@ -651,7 +652,7 @@ export function ProjectsPlatform({ session, student, state, setState, notify, na
 
               {/* Course & Role Filter Chips */}
               <div className="soc-insta-cat-scroll" style={{ marginTop: '12px', paddingBottom: '4px' }}>
-                {['All', 'Creators', 'BCA', 'B.Tech', 'MCA', 'BBA', 'MBA'].map(chip => (
+                {['All', 'Creators', ...ACADEMIC_COURSES].map(chip => (
                   <button
                     key={chip}
                     type="button"
@@ -2488,15 +2489,6 @@ export function AdminProjectsManagementView({ state, setState, session, notify, 
     }
   };
 
-  // Unique Courses for Filter
-  const availableCourses = useMemo(() => {
-    const set = new Set(['BCA', 'MCA', 'B.Sc IT', 'BBA', 'B.Com']);
-    projects.forEach(p => {
-      if (p.studentCourse) set.add(p.studentCourse);
-    });
-    return Array.from(set).filter(Boolean);
-  }, [projects]);
-
   // Set of reported post IDs for flagging cards
   const reportedPostIds = useMemo(() => {
     return new Set(reports.map(r => r.postId));
@@ -2511,7 +2503,7 @@ export function AdminProjectsManagementView({ state, setState, session, notify, 
       }
       // Course filter
       if (courseFilter !== 'All') {
-        if ((p.studentCourse || '').toLowerCase() !== courseFilter.toLowerCase()) return false;
+        if (academicCourseOption(p.studentCourse) !== courseFilter) return false;
       }
       // Search
       if (search.trim()) {
@@ -2659,9 +2651,7 @@ export function AdminProjectsManagementView({ state, setState, session, notify, 
                 style={{ minWidth: '130px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12.5px', background: '#ffffff' }}
               >
                 <option value="All">All Courses</option>
-                {availableCourses.map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
+                {ACADEMIC_COURSES.map(course => <option key={course} value={course}>{course}</option>)}
               </select>
 
               <select
