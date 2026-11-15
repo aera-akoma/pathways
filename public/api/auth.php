@@ -42,7 +42,7 @@ function isMainAdministrator(array $account): bool {
 
 // Deny by default; student access is explicitly scoped to their own records.
 function authorizeRoute(string $route, string $method, array &$body): ?array {
-    if (str_starts_with($route, '/auth/') || ($method === 'GET' && in_array($route, ['/health', '/settings'], true)) || ($method === 'POST' && preg_match('#^/(programs|courses)/[^/]+/click$#', $route))) return null;
+    if (str_starts_with($route, '/auth/') || ($method === 'GET' && (in_array($route, ['/health', '/settings', '/settings/start-page'], true))) || ($method === 'POST' && preg_match('#^/(programs|courses)/[^/]+/click$#', $route))) return null;
     $auth = authenticatedSession();
     $isAdmin = $auth['role'] === 'admin';
     $body['isAdmin'] = $isAdmin;

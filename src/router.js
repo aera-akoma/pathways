@@ -69,6 +69,7 @@ export function pageToPath(page, role = 'student', params = {}) {
     if (page === 'internships') return '/admin/internships';
     if (page === 'placements') return '/admin/placements';
     if (page === 'admins') return '/admin/admins';
+    if (page === 'startup-page') return '/admin/start-page';
     if (page === 'admin-profile') return '/admin/profile';
   }
 
@@ -195,6 +196,9 @@ export function parseCurrentLocation(role = 'student') {
   }
   if (pathname === '/admin/admins') {
     return { page: 'admins', params, rawPath: pathname, role: 'admin' };
+  }
+  if (pathname === '/admin/start-page') {
+    return { page: 'startup-page', params, rawPath: pathname, role: 'admin' };
   }
   if (pathname === '/admin/profile') {
     return { page: 'admin-profile', params, rawPath: pathname, role: 'admin' };

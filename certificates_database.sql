@@ -46,3 +46,4 @@ ON DUPLICATE KEY UPDATE `programTitle` = VALUES(`programTitle`);
 
 SET FOREIGN_KEY_CHECKS = 1;
 COMMIT;
+

@@ -43,6 +43,20 @@ export function PublicApplication({ Workspace }) {
     };
   }, [publicPage]);
   useEffect(() => {
+    if (route.page !== 'home') return;
+    let cancelled = false;
+    fetch('/api/settings/start-page', { credentials: 'same-origin', cache: 'no-store' })
+      .then(response => response.ok ? response.json() : null)
+      .then(settings => {
+        if (!cancelled && settings?.startupPage === 'login') {
+          pushRoute('login', 'student', { replace: true });
+          setRoute(parseCurrentLocation());
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [route.page]);
+  useEffect(() => {
     const sync = () => setRoute(parseCurrentLocation());
     window.addEventListener('popstate', sync);
     window.addEventListener('hashchange', sync);

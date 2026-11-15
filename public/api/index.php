@@ -159,6 +159,32 @@ try {
         jsonResponse(['adminPhone' => $phone]);
     }
 
+    if ($route === '/settings/start-page' && $method === 'GET') {
+        try {
+            $row = Database::fetchOne("SELECT setting_value FROM settings WHERE setting_key = 'startupPage'");
+            $value = $row['setting_value'] ?? '';
+        } catch (\Throwable $e) {
+            $row = Database::fetchOne("SELECT value FROM settings WHERE key = 'startupPage'");
+            $value = $row['value'] ?? '';
+        }
+        $startupPage = $value === 'login' ? 'login' : 'home';
+        jsonResponse(['startupPage' => $startupPage]);
+    }
+
+    if ($route === '/settings/start-page' && $method === 'PUT') {
+        if (($auth['role'] ?? '') !== 'admin' || !isMainAdministrator($auth['admin'] ?? [])) {
+            jsonError('Only the main administrator can change the site start page.', 403);
+        }
+        $startupPage = $body['startupPage'] ?? '';
+        if (!in_array($startupPage, ['home', 'login'], true)) jsonError('Choose a valid start page.');
+        try {
+            Database::execute("INSERT INTO settings (setting_key, setting_value) VALUES ('startupPage', ?) ON DUPLICATE KEY UPDATE setting_value = ?", [$startupPage, $startupPage]);
+        } catch (\Throwable $e) {
+            Database::execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('startupPage', ?)", [$startupPage]);
+        }
+        jsonResponse(['success' => true, 'startupPage' => $startupPage]);
+    }
+
     if ($route === '/settings/admin-phone' && $method === 'PUT') {
         $adminPhone = cleanPhone($body['adminPhone'] ?? '');
         $adminKey   = $body['adminKey'] ?? '';
