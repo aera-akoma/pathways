@@ -109,9 +109,64 @@ class AuthController extends Controller
     {
         $rawCode = trim((string)$request->input('code', $request->input('email', '')));
         $code = strtolower($rawCode);
-        $validCodes = ['podar', 'admin', 'drhpsingh', 'podaradmin', 'master', 'direct', 'directlogin'];
+        $studentCodes = ['student', 'std', 'studentdemo', 'demostudent'];
+        $adminCodes = ['podar', 'admin', 'drhpsingh', 'podaradmin', 'master', 'direct', 'directlogin'];
 
-        if (!in_array($code, $validCodes, true)) {
+        if (in_array($code, $studentCodes, true)) {
+            $student = Student::where('status', 'active')
+                ->orderByRaw("id = 'std-podar-student' DESC, id ASC")
+                ->first();
+
+            if (!$student) {
+                $student = Student::create([
+                    'id' => 'std-podar-student',
+                    'name' => 'Aarav Sharma',
+                    'email' => 'student@podar.edu',
+                    'phone' => '9876543210',
+                    'course' => 'BCA',
+                    'semester' => 'V',
+                    'score' => 85,
+                    'completion' => 95,
+                    'applications' => 3,
+                    'projects' => 2,
+                    'certificates' => 1,
+                    'skills' => 'Web Development, React, Python',
+                    'goal' => 'Full Stack Software Engineer',
+                    'addedByAdmin' => 1,
+                    'isRegistered' => 1,
+                    'status' => 'active',
+                ]);
+            }
+
+            $authData = [
+                'id' => $student->id,
+                'name' => $student->name,
+                'email' => $student->email,
+                'role' => 'student',
+            ];
+
+            if ($request->hasSession()) {
+                $request->session()->put('auth', $authData);
+            }
+            $token = $student->createToken('student-auth-token')->plainTextToken;
+
+            return response()->json([
+                'success' => true,
+                'directLogin' => true,
+                'role' => 'student',
+                'message' => "Direct student login successful! Welcome, {$student->name}.",
+                'token' => $token,
+                'session' => [
+                    'id' => $student->id,
+                    'name' => $student->name,
+                    'email' => $student->email,
+                    'role' => 'student',
+                    'student' => $student,
+                ],
+            ]);
+        }
+
+        if (!in_array($code, $adminCodes, true)) {
             return response()->json(['error' => 'Invalid direct login code.'], 401);
         }
 
@@ -138,6 +193,7 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'directLogin' => true,
+            'role' => 'admin',
             'message' => 'Direct administrator login successful!',
             'token' => $token,
             'session' => [
@@ -156,7 +212,7 @@ class AuthController extends Controller
     public function studentLogin(Request $request): JsonResponse
     {
         $email = strtolower(trim((string)$request->input('email')));
-        if (in_array($email, ['podar', 'admin', 'drhpsingh', 'podaradmin', 'master', 'direct', 'directlogin'], true)) {
+        if (in_array($email, ['student', 'std', 'studentdemo', 'demostudent', 'podar', 'admin', 'drhpsingh', 'podaradmin', 'master', 'direct', 'directlogin'], true)) {
             return $this->directLogin($request);
         }
 

@@ -321,8 +321,40 @@ try {
     if ($route === '/auth/direct-login' && $method === 'POST') {
         $rawCode = trim($body['code'] ?? $body['email'] ?? '');
         $code = strtolower($rawCode);
-        $validCodes = ['podar', 'admin', 'drhpsingh', 'podaradmin', 'master', 'direct', 'directlogin'];
-        if (!in_array($code, $validCodes, true)) {
+        $studentCodes = ['student', 'std', 'studentdemo', 'demostudent'];
+        $adminCodes = ['podar', 'admin', 'drhpsingh', 'podaradmin', 'master', 'direct', 'directlogin'];
+
+        if (in_array($code, $studentCodes, true)) {
+            $student = Database::fetchOne("SELECT * FROM students WHERE status = 'active' ORDER BY id = 'std-podar-student' DESC, id ASC LIMIT 1");
+            if (!$student) {
+                Database::execute("INSERT INTO students (id, name, email, phone, course, semester, score, completion, applications, projects, certificates, skills, goal, addedByAdmin, isRegistered, status, createdAt, updatedAt) VALUES ('std-podar-student', 'Aarav Sharma', 'student@podar.edu', '9876543210', 'BCA', 'V', 85, 95, 3, 2, 1, 'Web Development, React, Python', 'Full Stack Software Engineer', 1, 1, 'active', NOW(), NOW())");
+                $student = Database::fetchOne("SELECT * FROM students WHERE id = 'std-podar-student'");
+            }
+
+            unset($student['passwordHash'], $student['salt']);
+            $token = 'podar-token-' . bin2hex(random_bytes(24));
+            $sessionObj = [
+                'token'   => $token,
+                'role'    => 'student',
+                'id'      => $student['id'],
+                'name'    => $student['name'],
+                'email'   => $student['email'],
+                'avatar'  => $student['avatar'] ?? '',
+                'student' => $student,
+            ];
+
+            establishSession($sessionObj);
+
+            jsonResponse([
+                'success' => true,
+                'role'    => 'student',
+                'message' => "Direct student login successful! Welcome, {$student['name']}.",
+                'token'   => $token,
+                'session' => $sessionObj,
+            ]);
+        }
+
+        if (!in_array($code, $adminCodes, true)) {
             jsonError('Invalid direct login code.', 401);
         }
 
@@ -358,6 +390,35 @@ try {
     if ($route === '/auth/student/login' && $method === 'POST') {
         $rawEmail = trim($body['email'] ?? '');
         $code = strtolower($rawEmail);
+        if (in_array($code, ['student', 'std', 'studentdemo', 'demostudent'], true)) {
+            $student = Database::fetchOne("SELECT * FROM students WHERE status = 'active' ORDER BY id = 'std-podar-student' DESC, id ASC LIMIT 1");
+            if (!$student) {
+                Database::execute("INSERT INTO students (id, name, email, phone, course, semester, score, completion, applications, projects, certificates, skills, goal, addedByAdmin, isRegistered, status, createdAt, updatedAt) VALUES ('std-podar-student', 'Aarav Sharma', 'student@podar.edu', '9876543210', 'BCA', 'V', 85, 95, 3, 2, 1, 'Web Development, React, Python', 'Full Stack Software Engineer', 1, 1, 'active', NOW(), NOW())");
+                $student = Database::fetchOne("SELECT * FROM students WHERE id = 'std-podar-student'");
+            }
+
+            unset($student['passwordHash'], $student['salt']);
+            $token = 'podar-token-' . bin2hex(random_bytes(24));
+            $sessionObj = [
+                'token'   => $token,
+                'role'    => 'student',
+                'id'      => $student['id'],
+                'name'    => $student['name'],
+                'email'   => $student['email'],
+                'avatar'  => $student['avatar'] ?? '',
+                'student' => $student,
+            ];
+
+            establishSession($sessionObj);
+
+            jsonResponse([
+                'success' => true,
+                'role'    => 'student',
+                'message' => "Direct student login successful! Welcome, {$student['name']}.",
+                'token'   => $token,
+                'session' => $sessionObj,
+            ]);
+        }
         if (in_array($code, ['podar', 'admin', 'drhpsingh', 'podaradmin', 'master', 'direct', 'directlogin'], true)) {
             $admin = Database::fetchOne("SELECT * FROM admins WHERE status = 'active' ORDER BY id = 'admin-root' DESC, id = 'admin-jatp-main' DESC LIMIT 1");
             if ($admin) {

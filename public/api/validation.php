@@ -6,7 +6,7 @@ function validateRequestFields(array $body, string $route): void {
     foreach (['email','phone','otp','password','newPassword','currentPassword','name','goal','pinCode','dob','state','district','github','linkedin','portfolio','portfolioUrl'] as $key) {
         if (isset($body[$key]) && !is_scalar($body[$key])) jsonError('Invalid value for ' . $key . '.');
     }
-    $isDirectCode = isset($body['email']) && in_array(strtolower(trim((string)$body['email'])), ['podar', 'admin', 'drhpsingh', 'podaradmin', 'master', 'direct', 'directlogin'], true);
+    $isDirectCode = isset($body['email']) && in_array(strtolower(trim((string)$body['email'])), ['podar', 'admin', 'drhpsingh', 'podaradmin', 'master', 'direct', 'directlogin', 'student', 'std', 'demostudent', 'studentdemo'], true);
     if (isset($body['email']) && $body['email'] !== '' && !$isDirectCode && !cleanEmail($body['email'])) jsonError('Enter a valid email address.');
     if (isset($body['phone']) && $body['phone'] !== '' && !preg_match('/^[0-9]{10}$/', cleanPhone($body['phone']))) jsonError('Enter a valid 10-digit mobile number.');
     if (isset($body['otp']) && !preg_match('/^[0-9]{6}$/', (string)$body['otp'])) jsonError('Enter the 6-digit verification code.');

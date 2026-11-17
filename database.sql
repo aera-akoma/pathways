@@ -476,6 +476,11 @@ INSERT INTO `admins` (`id`, `name`, `phone`, `email`, `passwordHash`, `role`, `d
 ('admin-root', 'Podar Administrator', '9999988888', 'admin@podar.edu', '$2y$10$CKdJkUO1NCx31f/10GhlvOfoHzgSxkFLgcmcjNLFdvRAi4bmjxsX6', 'Super Admin', 'Career & Placement Cell', '["all","manage_students","manage_courses","manage_certificates","manage_opportunities","manage_internships","manage_placements","manage_admins"]', 'active', NOW(), NOW())
 ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `passwordHash` = VALUES(`passwordHash`);
 
+-- Default Student (Direct Login: student)
+INSERT INTO `students` (`id`, `name`, `email`, `phone`, `course`, `semester`, `score`, `completion`, `applications`, `projects`, `certificates`, `skills`, `goal`, `addedByAdmin`, `isRegistered`, `status`, `createdAt`, `updatedAt`) VALUES
+('std-podar-student', 'Aarav Sharma', 'student@podar.edu', '9876543210', 'BCA', 'V', 85, 95, 3, 2, 1, 'Web Development, React, Python', 'Full Stack Software Engineer', 1, 1, 'active', NOW(), NOW())
+ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `status` = 'active';
+
 -- Sample Programs / Recommended Courses
 INSERT INTO `programs` (`id`, `title`, `issuer`, `description`, `link`, `bannerImg`, `targetCourse`, `targetSemester`, `deadline`, `rewardPoints`, `status`, `createdAt`, `updatedAt`) VALUES
 ('prog-aws-01', 'AWS Cloud Practitioner Certification Program', 'Amazon Web Services (AWS)', 'Comprehensive foundation covering cloud compute, AWS Lambda, S3, IAM security protocols, and architecture best practices.', 'https://aws.amazon.com/certification/certified-cloud-practitioner/', 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1000&auto=format&fit=crop', 'All', 'All', '2026-12-31', 25, 'active', NOW(), NOW()),

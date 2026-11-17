@@ -122,8 +122,14 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Direct login code recognition
-  const DIRECT_LOGIN_CODES = ['podar', 'admin', 'drhpsingh', 'podaradmin', 'master', 'direct', 'directlogin'];
-  const isDirectCode = DIRECT_LOGIN_CODES.includes(email.trim().toLowerCase());
+  const DIRECT_ADMIN_CODES = ['admin', 'podar', 'drhpsingh', 'podaradmin', 'master', 'direct', 'directlogin'];
+  const DIRECT_STUDENT_CODES = ['student', 'std', 'studentdemo', 'demostudent'];
+  const DIRECT_LOGIN_CODES = [...DIRECT_ADMIN_CODES, ...DIRECT_STUDENT_CODES];
+
+  const cleanEmail = email.trim().toLowerCase();
+  const isDirectAdmin = DIRECT_ADMIN_CODES.includes(cleanEmail);
+  const isDirectStudent = DIRECT_STUDENT_CODES.includes(cleanEmail);
+  const isDirectCode = isDirectAdmin || isDirectStudent;
 
   // Flow and status states
   const [otpSent, setOtpSent] = useState(false);
@@ -229,6 +235,18 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
       const sessionData = res.session || res;
       if (!sessionData?.id || !['student', 'admin'].includes(sessionData.role)) {
         throw new Error('The server did not return a valid session. Please sign in again.');
+      }
+      if (sessionData?.student) {
+        setState(prev => {
+          const list = prev.students || [];
+          const exists = list.find(s => s.id === sessionData.student.id || s.email === sessionData.student.email);
+          return {
+            ...prev,
+            students: exists
+              ? list.map(s => s.id === exists.id ? { ...exists, ...sessionData.student } : s)
+              : [sessionData.student, ...list]
+          };
+        });
       }
       notify(res.message || 'Direct login successful!');
       onLogin(sessionData);
@@ -722,14 +740,19 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
                       autoCapitalize="none"
                       value={email}
                       onChange={e => setEmail(e.target.value)}
-                      placeholder="e.g. student@podar.edu or enter code 'podar'"
+                      placeholder="e.g. student@podar.edu or enter 'student'"
                       autoFocus
                       required
                     />
                   </div>
-                  {isDirectCode && (
+                  {isDirectStudent && (
                     <div style={{ marginTop: '6px', padding: '6px 10px', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '6px', color: '#047857', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <ShieldCheck size={14} /> Direct login code recognized. Click <strong>Direct Sign In</strong> or press Enter to login immediately without password or OTP.
+                      <ShieldCheck size={14} /> Direct Student code recognized. Click <strong>Direct Sign In as Student</strong> or press Enter to login immediately without password.
+                    </div>
+                  )}
+                  {isDirectAdmin && (
+                    <div style={{ marginTop: '6px', padding: '6px 10px', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '6px', color: '#047857', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <ShieldCheck size={14} /> Direct Admin code recognized. Click <strong>Direct Sign In as Admin</strong> or press Enter to login immediately without password.
                     </div>
                   )}
                 </label>
@@ -772,7 +795,7 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
                 )}
 
                 <button className="button primary full" type="submit" disabled={loading}>
-                  {loading ? 'Signing in…' : (isDirectCode ? 'Direct Sign In as Admin' : 'Sign In to Dashboard')} <ArrowRight size={17} />
+                  {loading ? 'Signing in…' : (isDirectStudent ? 'Direct Sign In as Student' : (isDirectAdmin ? 'Direct Sign In as Admin' : 'Sign In to Dashboard'))} <ArrowRight size={17} />
                 </button>
               </form>
 
@@ -964,9 +987,14 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
                           required
                         />
                       </div>
-                      {isDirectCode && (
+                      {isDirectStudent && (
                         <div style={{ marginTop: '6px', padding: '6px 10px', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '6px', color: '#047857', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <ShieldCheck size={14} /> Direct login code recognized. Click <strong>Direct Sign In</strong> or press Enter to login immediately without password or OTP.
+                          <ShieldCheck size={14} /> Direct Student code recognized. Click <strong>Direct Sign In as Student</strong> or press Enter to login immediately without password.
+                        </div>
+                      )}
+                      {isDirectAdmin && (
+                        <div style={{ marginTop: '6px', padding: '6px 10px', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '6px', color: '#047857', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <ShieldCheck size={14} /> Direct Admin code recognized. Click <strong>Direct Sign In as Admin</strong> or press Enter to login immediately without password.
                         </div>
                       )}
                     </label>
@@ -997,7 +1025,7 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
                     )}
 
                     <button className="button primary full" type="submit" disabled={loading}>
-                      {loading ? 'Signing in…' : (isDirectCode ? 'Direct Sign In as Admin' : 'Continue')} <ArrowRight size={17} />
+                      {loading ? 'Signing in…' : (isDirectStudent ? 'Direct Sign In as Student' : (isDirectAdmin ? 'Direct Sign In as Admin' : 'Continue'))} <ArrowRight size={17} />
                     </button>
                   </>
                 ) : (
