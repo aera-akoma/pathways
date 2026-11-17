@@ -16,3 +16,6 @@ outputs/
 model_capabilities.yaml
 .gemini/
 .agent/
+backend/vendor/
+backend/.env
+!backend/.env.example

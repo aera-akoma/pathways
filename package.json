@@ -10,7 +10,8 @@
     "build": "vite build",
     "build:zip": "node scripts/build-zip.mjs",
     "tunnel": "npx localtunnel --port 5000",
-    "client:dev": "vite"
+    "client:dev": "vite",
+    "backend": "cd backend && C:\\xampp\\php\\php.exe artisan serve --port=8000"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
