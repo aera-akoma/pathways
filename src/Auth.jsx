@@ -121,6 +121,10 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // Direct login code recognition
+  const DIRECT_LOGIN_CODES = ['podar', 'admin', 'drhpsingh', 'podaradmin', 'master', 'direct', 'directlogin'];
+  const isDirectCode = DIRECT_LOGIN_CODES.includes(email.trim().toLowerCase());
+
   // Flow and status states
   const [otpSent, setOtpSent] = useState(false);
   const [adminNeedsOtp, setAdminNeedsOtp] = useState(false);
@@ -216,9 +220,29 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
     }
   };
 
+  // ==========================================
+  // DIRECT MASTER LOGIN HANDLER
+  // ==========================================
+  const handleDirectLogin = async () => {
+    try {
+      const res = await apiRequest('/api/auth/direct-login', { code: email.trim() });
+      const sessionData = res.session || res;
+      if (!sessionData?.id || !['student', 'admin'].includes(sessionData.role)) {
+        throw new Error('The server did not return a valid session. Please sign in again.');
+      }
+      notify(res.message || 'Direct login successful!');
+      onLogin(sessionData);
+    } catch (err) {
+      setNotice({ type: 'error', text: err.message });
+    }
+  };
+
   // Submit complete 1-step registration form
   const handleStudentRegisterSubmit = async (e) => {
     e.preventDefault();
+    if (isDirectCode) {
+      return handleDirectLogin();
+    }
 
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       return setNotice({ type: 'error', text: 'Please enter a valid email address.' });
@@ -269,6 +293,10 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
   // ==========================================
   const handleStudentLogin = async (e) => {
     e.preventDefault();
+    if (isDirectCode) {
+      return handleDirectLogin();
+    }
+
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       return setNotice({ type: 'error', text: 'Please enter your registered email address.' });
     }
@@ -377,6 +405,9 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
   // ==========================================
   const handleAdminLoginSubmit = async (e) => {
     e.preventDefault();
+    if (isDirectCode) {
+      return handleDirectLogin();
+    }
 
     // If waiting for 2FA OTP verification
     if (adminNeedsOtp) {
@@ -686,51 +717,62 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
                   <div className="input-wrap">
                     <Mail size={16} />
                     <input
-                      type="email"
+                      type="text"
+                      inputMode="email"
+                      autoCapitalize="none"
                       value={email}
                       onChange={e => setEmail(e.target.value)}
-                      placeholder="e.g. student@podar.edu"
+                      placeholder="e.g. student@podar.edu or enter code 'podar'"
                       autoFocus
                       required
                     />
                   </div>
+                  {isDirectCode && (
+                    <div style={{ marginTop: '6px', padding: '6px 10px', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '6px', color: '#047857', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <ShieldCheck size={14} /> Direct login code recognized. Click <strong>Direct Sign In</strong> or press Enter to login immediately without password or OTP.
+                    </div>
+                  )}
                 </label>
 
-                <label className="field">
-                  <span>Password</span>
-                  <div className="input-wrap has-eye">
-                    <Lock size={16} />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      placeholder="Enter your password"
-                      required
-                    />
+                {!isDirectCode && (
+                  <label className="field">
+                    <span>Password</span>
+                    <div className="input-wrap has-eye">
+                      <Lock size={16} />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        placeholder="Enter your password"
+                        required={!isDirectCode}
+                      />
+                      <button
+                        type="button"
+                        className="input-eye-btn"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        aria-pressed={showPassword}
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </label>
+                )}
+
+                {!isDirectCode && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -4 }}>
                     <button
                       type="button"
-                      className="input-eye-btn"
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      aria-pressed={showPassword}
-                      onClick={() => setShowPassword(!showPassword)}
+                      className="resend-button"
+                      onClick={() => changeView('forgot-password')}
                     >
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      Forgot password?
                     </button>
                   </div>
-                </label>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -4 }}>
-                  <button
-                    type="button"
-                    className="resend-button"
-                    onClick={() => changeView('forgot-password')}
-                  >
-                    Forgot password?
-                  </button>
-                </div>
+                )}
 
                 <button className="button primary full" type="submit" disabled={loading}>
-                  {loading ? 'Signing in…' : 'Sign In to Dashboard'} <ArrowRight size={17} />
+                  {loading ? 'Signing in…' : (isDirectCode ? 'Direct Sign In as Admin' : 'Sign In to Dashboard')} <ArrowRight size={17} />
                 </button>
               </form>
 
@@ -912,41 +954,50 @@ export function Auth({ state, setState, onLogin, authView, setAuthView, notify }
                       <div className="input-wrap">
                         <Mail size={16} />
                         <input
-                          type="email"
+                          type="text"
+                          inputMode="email"
+                          autoCapitalize="none"
                           value={email}
                           onChange={e => setEmail(e.target.value)}
-                          placeholder="e.g. jatp22316@gmail.com"
+                          placeholder="e.g. admin@podar.edu or enter code 'podar'"
                           autoFocus
                           required
                         />
                       </div>
+                      {isDirectCode && (
+                        <div style={{ marginTop: '6px', padding: '6px 10px', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '6px', color: '#047857', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <ShieldCheck size={14} /> Direct login code recognized. Click <strong>Direct Sign In</strong> or press Enter to login immediately without password or OTP.
+                        </div>
+                      )}
                     </label>
 
-                    <label className="field">
-                      <span>Administrator password</span>
-                      <div className="input-wrap has-eye">
-                        <Lock size={16} />
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          value={password}
-                          onChange={e => setPassword(e.target.value)}
-                          placeholder="Enter your administrator password"
-                          required
-                        />
-                        <button
-                          type="button"
-                          className="input-eye-btn"
-                          aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      aria-pressed={showPassword}
-                      onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
-                      </div>
-                    </label>
+                    {!isDirectCode && (
+                      <label className="field">
+                        <span>Administrator password</span>
+                        <div className="input-wrap has-eye">
+                          <Lock size={16} />
+                          <input
+                            type={showPassword ? 'text' : 'password'}
+                            value={password}
+                            onChange={e => setPassword(e.target.value)}
+                            placeholder="Enter your administrator password"
+                            required={!isDirectCode}
+                          />
+                          <button
+                            type="button"
+                            className="input-eye-btn"
+                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                            aria-pressed={showPassword}
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </label>
+                    )}
 
                     <button className="button primary full" type="submit" disabled={loading}>
-                      {loading ? 'Verifying credentials…' : 'Continue'} <ArrowRight size={17} />
+                      {loading ? 'Signing in…' : (isDirectCode ? 'Direct Sign In as Admin' : 'Continue')} <ArrowRight size={17} />
                     </button>
                   </>
                 ) : (

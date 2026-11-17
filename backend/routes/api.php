@@ -31,6 +31,7 @@ Route::prefix('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/session', [AuthController::class, 'session']);
     Route::post('/resend-otp', [AuthController::class, 'resendOtp']);
+    Route::post('/direct-login', [AuthController::class, 'directLogin']);
 
     // Student Authentication
     Route::post('/student/send-otp', [AuthController::class, 'studentSendOtp']);

