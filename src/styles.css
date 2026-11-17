@@ -335,7 +335,32 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   display:inline-flex
 }
 
-.button:hover {
+.button.outline {
+  border: 1px solid #cbd5e1;
+  color: #1e3a8a;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .06);
+}
+
+.button.outline:hover:not(:disabled) {
+  border-color: #93c5fd;
+  color: #1d4ed8;
+  background: #eff6ff;
+  box-shadow: 0 3px 8px rgba(37, 99, 235, .12);
+}
+
+.button:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, .32);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: .58;
+  transform: none;
+}
+
+.button:hover:not(:disabled) {
   transform:translateY(-1px)
 }
 
@@ -735,57 +760,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 .yt-search-box.is-focused .yt-search-btn {
   border-color: #065fd4;
-}
-
-/* Circular Voice Search Button (YouTube Mic) */
-.yt-voice-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: none;
-  background: #f1f5f9;
-  color: #334155;
-  margin-left: 10px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-  position: relative;
-}
-
-.yt-voice-btn:hover {
-  background: #e2e8f0;
-  color: #0f172a;
-  transform: scale(1.05);
-}
-
-.yt-voice-btn.listening {
-  background: #ef4444;
-  color: #ffffff;
-}
-
-.yt-voice-ripple {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  border-radius: 50%;
-  border: 2px solid #ef4444;
-  animation: ytVoicePulse 1.4s ease-out infinite;
-}
-
-@keyframes ytVoicePulse {
-  0% {
-    transform: scale(1);
-    opacity: 0.9;
-  }
-  100% {
-    transform: scale(1.6);
-    opacity: 0;
-  }
 }
 
 /* ========================================================
@@ -1355,117 +1329,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   font-size: 11px;
   font-weight: 600;
   color: #94a3b8;
-}
-
-/* ========================================================
-   YOUTUBE VOICE SEARCH POPUP MODAL
-   ======================================================== */
-.yt-voice-modal-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(15, 23, 42, 0.4);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10000;
-  animation: fadeIn 0.15s ease-out;
-}
-
-.yt-voice-modal-card {
-  background: #ffffff;
-  border-radius: 20px;
-  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
-  padding: 36px 32px;
-  width: 90%;
-  max-width: 440px;
-  text-align: center;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.yt-voice-modal-close {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  background: none;
-  border: none;
-  color: #64748b;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 50%;
-}
-
-.yt-voice-modal-close:hover {
-  background: #f1f5f9;
-  color: #0f172a;
-}
-
-.yt-voice-pulsing-ring {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: #ef4444;
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 20px;
-  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-  animation: ytMicRipple 1.6s infinite cubic-bezier(0.66, 0, 0, 1);
-}
-
-@keyframes ytMicRipple {
-  0% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-  }
-  70% {
-    box-shadow: 0 0 0 24px rgba(239, 68, 68, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-  }
-}
-
-.yt-voice-modal-mic {
-  color: #ffffff;
-}
-
-.yt-voice-modal-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: #0f172a;
-  margin: 0 0 8px;
-}
-
-.yt-voice-modal-prompt {
-  font-size: 13.5px;
-  color: #64748b;
-  margin: 0 0 24px;
-  line-height: 1.4;
-}
-
-.yt-voice-cancel-btn {
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  border-radius: 20px;
-  padding: 8px 24px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #475569;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.yt-voice-cancel-btn:hover {
-  background: #e2e8f0;
-  color: #0f172a;
 }
 
 .yt-mobile-back-btn {
@@ -2457,12 +2320,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .yt-search-container.mobile-active .yt-search-btn {
   height: 38px;
   width: 48px;
-}
-
-.yt-search-container.mobile-active .yt-voice-btn {
-  width: 38px;
-  height: 38px;
-  margin-left: 6px;
 }
 
 .yt-search-container.mobile-active .yt-search-dropdown {

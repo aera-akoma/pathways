@@ -74,6 +74,139 @@
   transition: all 0.2s ease-in-out;
 }
 
+/* Give the profile controls a consistent appearance even when utility styles load late. */
+.student-profile-tabs {
+  align-items: center;
+  gap: 8px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.student-profile-portal .profile-tab {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 9px 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: #64748b;
+  font: 500 14px/1.2 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  transition: color .18s ease, background-color .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.student-profile-portal .profile-tab:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.student-profile-portal .profile-tab[aria-current='page'] {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #2b36b8;
+  box-shadow: 0 1px 2px rgba(30, 41, 59, .05);
+}
+
+.student-profile-portal.dark .profile-tab:hover {
+  background: #1e293b;
+  color: #e2e8f0;
+}
+
+.student-profile-portal.dark .profile-tab[aria-current='page'] {
+  background: rgba(99, 102, 241, .16);
+  border-color: rgba(129, 140, 248, .35);
+  color: #c7d2fe;
+}
+
+.student-profile-portal .profile-edit-btn {
+  appearance: none;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  background: #eef2ff;
+  color: #3730a3;
+  padding: 6px 11px;
+  font: 600 12px/1.2 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  transition: background-color .18s ease, border-color .18s ease, transform .18s ease;
+}
+
+.student-profile-portal .profile-edit-btn:hover {
+  background: #e0e7ff;
+  border-color: #a5b4fc;
+  transform: translateY(-1px);
+}
+
+.student-profile-portal.dark .profile-edit-btn {
+  border-color: #4338ca;
+  background: rgba(99, 102, 241, .16);
+  color: #c7d2fe;
+}
+
+.student-profile-portal.dark .profile-edit-btn:hover {
+  background: rgba(99, 102, 241, .26);
+}
+
+.student-profile-portal input:not([type='file']):not([type='checkbox']):not([type='radio']),
+.student-profile-portal select,
+.student-profile-portal textarea {
+  min-height: 42px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background-color: #f8fafc;
+  color: #0f172a;
+  font: 400 14px/1.45 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease;
+}
+
+.student-profile-portal textarea {
+  min-height: 100px;
+  padding: 11px 13px;
+}
+
+.student-profile-portal input:not([type='file']):not([type='checkbox']):not([type='radio']):focus,
+.student-profile-portal select:focus,
+.student-profile-portal textarea:focus {
+  border-color: #6366f1;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, .16);
+}
+
+.student-profile-portal input::placeholder,
+.student-profile-portal textarea::placeholder {
+  color: #94a3b8;
+}
+
+.student-profile-portal.dark input:not([type='file']):not([type='checkbox']):not([type='radio']),
+.student-profile-portal.dark select,
+.student-profile-portal.dark textarea {
+  border-color: #475569;
+  background-color: #1e293b;
+  color: #f1f5f9;
+}
+
+.student-profile-portal.dark input:not([type='file']):not([type='checkbox']):not([type='radio']):focus,
+.student-profile-portal.dark select:focus,
+.student-profile-portal.dark textarea:focus {
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, .2);
+}
+
+@media (max-width: 640px) {
+  .student-profile-tabs {
+    gap: 6px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .student-profile-portal .profile-tab {
+    min-height: 40px;
+    padding: 8px 11px;
+    font-size: 13px;
+  }
+}
+
 /* Custom modal backdrop animation */
 @keyframes fadeInModal {
   from {

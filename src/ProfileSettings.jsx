@@ -659,11 +659,14 @@ export function ProfileSettings({
           </div>
 
           {/* Interactive Navigation Tabs */}
-          <div className="border-t border-slate-200 dark:border-slate-800 px-6 sm:px-8 flex gap-6 sm:gap-8 overflow-x-auto no-scrollbar">
+          <div className="student-profile-tabs border-t border-slate-200 dark:border-slate-800 px-6 sm:px-8 flex gap-6 sm:gap-8 overflow-x-auto no-scrollbar" role="tablist" aria-label="Profile sections">
             <button
               type="button"
+              role="tab"
+              aria-selected={activeTab === 'overview'}
+              aria-current={activeTab === 'overview' ? 'page' : undefined}
               onClick={() => switchTab('overview')}
-              className={`tab-btn py-4 text-sm whitespace-nowrap transition-colors flex items-center gap-2 border-b-2 ${
+              className={`tab-btn profile-tab py-4 text-sm whitespace-nowrap transition-colors flex items-center gap-2 border-b-2 ${
                 activeTab === 'overview'
                   ? 'border-navy-600 text-navy-600 dark:text-indigo-400 dark:border-indigo-400 font-semibold'
                   : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-medium'
@@ -675,8 +678,11 @@ export function ProfileSettings({
 
             <button
               type="button"
+              role="tab"
+              aria-selected={activeTab === 'projects'}
+              aria-current={activeTab === 'projects' ? 'page' : undefined}
               onClick={() => switchTab('projects')}
-              className={`tab-btn py-4 text-sm whitespace-nowrap transition-colors flex items-center gap-2 border-b-2 ${
+              className={`tab-btn profile-tab py-4 text-sm whitespace-nowrap transition-colors flex items-center gap-2 border-b-2 ${
                 activeTab === 'projects'
                   ? 'border-navy-600 text-navy-600 dark:text-indigo-400 dark:border-indigo-400 font-semibold'
                   : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-medium'
@@ -691,8 +697,11 @@ export function ProfileSettings({
 
             <button
               type="button"
+              role="tab"
+              aria-selected={activeTab === 'settings'}
+              aria-current={activeTab === 'settings' ? 'page' : undefined}
               onClick={() => switchTab('settings')}
-              className={`tab-btn py-4 text-sm whitespace-nowrap transition-colors flex items-center gap-2 border-b-2 ${
+              className={`tab-btn profile-tab py-4 text-sm whitespace-nowrap transition-colors flex items-center gap-2 border-b-2 ${
                 activeTab === 'settings'
                   ? 'border-navy-600 text-navy-600 dark:text-indigo-400 dark:border-indigo-400 font-semibold'
                   : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-medium'
@@ -760,7 +769,7 @@ export function ProfileSettings({
                     <button
                       type="button"
                       onClick={() => switchTab('settings')}
-                      className="text-xs font-medium text-navy-600 dark:text-indigo-400 hover:underline"
+                      className="profile-edit-btn text-xs font-medium text-navy-600 dark:text-indigo-400"
                     >
                       Edit
                     </button>
@@ -819,7 +828,7 @@ export function ProfileSettings({
                     <button
                       type="button"
                       onClick={() => switchTab('settings')}
-                      className="text-xs font-medium text-navy-600 dark:text-indigo-400 hover:underline"
+                      className="profile-edit-btn text-xs font-medium text-navy-600 dark:text-indigo-400"
                     >
                       Edit
                     </button>

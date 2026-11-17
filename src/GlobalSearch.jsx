@@ -2,8 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Search,
   X,
-  Mic,
-  MicOff,
   Clock,
   History,
   TrendingUp,
@@ -90,8 +88,6 @@ export function GlobalSearch({ session, state, navigate, notify }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const [isMobileSearchActive, setIsMobileSearchActive] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [speechSupported, setSpeechSupported] = useState(false);
   const [history, setHistory] = useState(() => {
     try {
       const saved = localStorage.getItem(SEARCH_HISTORY_STORAGE_KEY);
@@ -107,50 +103,6 @@ export function GlobalSearch({ session, state, navigate, notify }) {
   const containerRef = useRef(null);
   const inputRef = useRef(null);
   const mobileInputRef = useRef(null);
-  const recognitionRef = useRef(null);
-
-  // Initialize Speech Recognition
-  useEffect(() => {
-    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRec) {
-      setSpeechSupported(true);
-      try {
-        const rec = new SpeechRec();
-        rec.continuous = false;
-        rec.interimResults = false;
-        rec.lang = 'en-US';
-
-        rec.onresult = (event) => {
-          const transcript = event.results[0]?.[0]?.transcript;
-          if (transcript) {
-            setQuery(transcript);
-            setIsOpen(true);
-            saveHistory(transcript);
-            notify?.(`Voice recognized: "${transcript}"`);
-          }
-          setIsListening(false);
-        };
-
-        rec.onerror = (e) => {
-          setIsListening(false);
-          if (e.error === 'not-allowed') {
-            notify?.('Microphone permission denied. Allow microphone access in your browser.');
-          } else if (e.error !== 'no-speech') {
-            notify?.('Voice could not be recognized. Please try again.');
-          }
-        };
-
-        rec.onend = () => {
-          setIsListening(false);
-        };
-
-        recognitionRef.current = rec;
-      } catch (err) {
-        console.warn('SpeechRecognition init error:', err);
-      }
-    }
-  }, [notify]);
-
   // Fetch live projects from PHP API
   useEffect(() => {
     fetch('/api/projects')
@@ -207,25 +159,6 @@ export function GlobalSearch({ session, state, navigate, notify }) {
       localStorage.removeItem(SEARCH_HISTORY_STORAGE_KEY);
     } catch {}
     notify?.('Search history cleared.');
-  };
-
-  const toggleVoiceSearch = () => {
-    if (!speechSupported) {
-      notify?.('Voice search requires Google Chrome, Edge or Safari with speech permission enabled.');
-      return;
-    }
-    if (isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
-    } else {
-      try {
-        recognitionRef.current?.start();
-        setIsListening(true);
-        notify?.('Listening... Speak your search query.');
-      } catch (err) {
-        console.warn('Speech recognition start error:', err);
-      }
-    }
   };
 
   // Keyboard shortcut: Ctrl+K or Cmd+K to focus, Esc to close
@@ -624,18 +557,6 @@ export function GlobalSearch({ session, state, navigate, notify }) {
           </button>
         </form>
 
-        {/* Circular Voice Search Button (YouTube Mic) */}
-        <button
-          type="button"
-          className={`yt-voice-btn ${isListening ? 'listening' : ''}`}
-          onClick={toggleVoiceSearch}
-          title={isListening ? 'Listening... click to stop' : 'Search with your voice'}
-          aria-label="Voice search"
-        >
-          {isListening ? <MicOff size={18} /> : <Mic size={18} />}
-          {isListening && <span className="yt-voice-ripple" />}
-        </button>
-
         {/* YouTube Autocomplete Dropdown Popup */}
         {isOpen && (
           <div className="yt-search-dropdown" role="listbox">
@@ -863,35 +784,6 @@ export function GlobalSearch({ session, state, navigate, notify }) {
           </div>
         )}
 
-        {/* Full-screen Voice Listening Modal Backdrop */}
-        {isListening && (
-          <div className="yt-voice-modal-backdrop">
-            <div className="yt-voice-modal-card" onClick={(e) => e.stopPropagation()}>
-              <button
-                type="button"
-                className="yt-voice-modal-close"
-                onClick={toggleVoiceSearch}
-                aria-label="Close voice search"
-              >
-                <X size={20} />
-              </button>
-              <div className="yt-voice-pulsing-ring">
-                <Mic size={38} className="yt-voice-modal-mic" />
-              </div>
-              <h3 className="yt-voice-modal-title">Listening...</h3>
-              <p className="yt-voice-modal-prompt">
-                Say something like <em>"Meta Front-End"</em>, <em>"AWS Cloud"</em>, or <em>"AI Career Coach"</em>
-              </p>
-              <button
-                type="button"
-                className="yt-voice-cancel-btn"
-                onClick={toggleVoiceSearch}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </>
   );
