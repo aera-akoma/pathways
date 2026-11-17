@@ -9,6 +9,39 @@
     <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />
     <meta name="description" content="Podar Pathways helps students build career readiness through trusted learning pathways." />
     <title>Podar Pathways</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS with disabled preflight to preserve app styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      if (window.tailwind) {
+        tailwind.config = {
+          darkMode: 'class',
+          corePlugins: {
+            preflight: false
+          },
+          theme: {
+            extend: {
+              fontFamily: {
+                sans: ['Inter', 'sans-serif'],
+              },
+              colors: {
+                navy: {
+                  50: '#eef2ff',
+                  100: '#e0e7ff',
+                  500: '#3b49df',
+                  600: '#2b36b8',
+                  700: '#1e268a',
+                  900: '#0f172a',
+                }
+              }
+            }
+          }
+        };
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

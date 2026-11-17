@@ -1,2034 +1,1942 @@
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import ProfileAvatar from './ProfileAvatar.jsx';
 import { requestJson, requireRecord } from './api.js';
-import { passwordError, profileError, PASSWORD_HINT } from './validation.js';
-import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { DEFAULT_STUDENT_AVATAR, DEFAULT_ADMIN_AVATAR } from './defaultAvatar.js';
+import { INDIAN_STATES_DISTRICTS } from './indianStatesDistricts.js';
+import './student-profile.css';
 
 import {
-  User,
-  Search,
-  Building2,
-  UserCheck,
-  Compass,
-  Users,
-  Phone,
-  Mail,
-  Calendar,
-  MapPin,
-  Camera,
-  Check,
-  BookOpen,
-  Upload,
-  Trash2,
-  Globe,
   GraduationCap,
-  Sparkles,
-  ShieldCheck,
-  Lock,
-  KeyRound,
-  Eye,
-  EyeOff,
-  Bell,
-  BellOff,
-  Code,
-  Home,
-  Navigation,
-  Hash,
-  Shield,
-  AlertCircle,
-  Info,
-  Grid,
-  Award,
-  Bookmark,
+  Moon,
+  Sun,
+  Camera,
+  User,
+  FolderGit2,
   Settings,
-  Share2,
-  BadgeCheck,
-  Heart,
-  MessageCircle,
-  ExternalLink,
-  Layers,
-  Plus,
-  Link2,
-  Pencil,
-  Copy,
-  ChevronLeft,
-  ChevronRight,
+  FileText,
+  MapPin,
+  Code2,
+  PlusCircle,
+  Search,
+  Sparkles,
+  Crop,
+  ImagePlus,
   X,
-  Trophy,
-  Flame,
-  Briefcase
+  Send,
+  ExternalLink,
+  Save,
+  Star,
+  Plus,
+  Link,
+  Users,
+  Trash2
 } from 'lucide-react';
 
-import { INDIAN_STATES_DISTRICTS } from './indianStatesDistricts.js';
 export { INDIAN_STATES_DISTRICTS };
 
-const DEFAULT_STUDENT_PROJECTS = [];
+// Instagram-style CSS photo filter definitions
+const FILTER_STYLES = {
+  'Original': 'none',
+  'Clarendon': 'contrast(1.2) saturate(1.35)',
+  'Juno': 'sepia(0.15) contrast(1.15) saturate(1.4) brightness(1.05)',
+  'Lark': 'contrast(0.9) brightness(1.1) saturate(1.15)',
+  'Moon': 'grayscale(1) contrast(1.1) brightness(1.1)',
+  'Gingham': 'brightness(1.05) hue-rotate(-10deg) sepia(0.12)'
+};
 
-export function ProfileSettings({ student, studentId, courses, state, setState, session, notify, onLogout, navigate, initialTab }) {
+const DEFAULT_COVER_IMAGE = 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=1600&q=80';
+const DEFAULT_STUDENT_PHOTO = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80';
+
+const INITIAL_PROJECTS = [
+  {
+    id: 101,
+    title: 'CampusFlow — Smart Attendance & Lecture Analytics',
+    description: 'Automated facial-recognition and BLE beacon attendance system integrated with faculty dashboards, cutting roll-call overhead by 90%.',
+    tech: ['React', 'FastAPI', 'OpenCV', 'PostgreSQL'],
+    demoUrl: 'https://github.com/aaravsharma/campusflow',
+    image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=900&q=80',
+    filter: 'Original',
+    aspect: '16:9',
+    date: 'Oct 2026'
+  },
+  {
+    id: 102,
+    title: 'DistriKV — Raft Consensus Key-Value Store',
+    description: 'Fault-tolerant distributed key-value storage engine implemented from scratch in Go with leader election, log replication, and snapshotting.',
+    tech: ['Go', 'gRPC', 'Raft', 'Docker'],
+    demoUrl: 'https://github.com/aaravsharma/distrikv',
+    image: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=900&q=80',
+    filter: 'Clarendon',
+    aspect: '16:9',
+    date: 'Aug 2026'
+  },
+  {
+    id: 103,
+    title: 'MedScan AI — Chest X-Ray Triage Assistant',
+    description: 'Deep learning diagnostic assistant utilizing DenseNet-121 with Grad-CAM heatmaps to highlight thoracic anomalies for rural clinics.',
+    tech: ['PyTorch', 'Python', 'Grad-CAM', 'Streamlit'],
+    demoUrl: '',
+    image: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=900&q=80',
+    filter: 'Lark',
+    aspect: '16:9',
+    date: 'May 2026'
+  }
+];
+
+export function ProfileSettings({
+  student,
+  studentId,
+  courses,
+  state,
+  setState,
+  session,
+  notify,
+  onLogout,
+  navigate,
+  initialTab
+}) {
+  // Determine active tab from URL or props
   const getTabFromUrl = () => {
     try {
       const searchParams = new URLSearchParams(window.location.search);
       const t = searchParams.get('tab');
-      if (t && ['posts', 'certificates', 'saved', 'edit', 'security', 'notifications', 'directory', 'office'].includes(t)) {
+      if (t && ['overview', 'projects', 'settings'].includes(t)) {
         return t;
       }
     } catch (e) {}
-    return initialTab || 'posts';
+    return initialTab === 'settings' || initialTab === 'edit'
+      ? 'settings'
+      : initialTab === 'projects' || initialTab === 'posts'
+      ? 'projects'
+      : 'overview';
   };
 
   const [activeTab, setActiveTab] = useState(getTabFromUrl);
-  useEffect(() => { if (initialTab) setActiveTab(initialTab); }, [initialTab]);
 
-  useEffect(() => { const sync = event => { if (event.detail?.page === 'profile' && event.detail?.params?.tab === 'edit') setActiveTab('edit'); }; window.addEventListener('podar-route-change', sync); return () => window.removeEventListener('podar-route-change', sync); }, []);
-  const handleTabChange = (newTab) => {
-    setActiveTab(newTab);
+  const switchTab = (tabName) => {
+    setActiveTab(tabName);
     try {
       const url = new URL(window.location.href);
-      if (newTab === 'posts') {
+      if (tabName === 'overview') {
         url.searchParams.delete('tab');
       } else {
-        url.searchParams.set('tab', newTab);
+        url.searchParams.set('tab', tabName);
       }
       window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
     } catch (e) {}
   };
 
-  useEffect(() => {
-    const handleRouteChange = (evt) => {
-      const tabParam = evt.detail?.params?.tab;
-      if (tabParam && ['posts', 'certificates', 'saved', 'edit', 'security', 'notifications', 'directory', 'office'].includes(tabParam)) {
-        setActiveTab(tabParam);
-      }
-    };
-    const handlePopState = () => {
-      setActiveTab(getTabFromUrl());
-    };
-    window.addEventListener('podar-route-change', handleRouteChange);
-    window.addEventListener('popstate', handlePopState);
-    return () => {
-      window.removeEventListener('podar-route-change', handleRouteChange);
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, []);
-
-  // Form State
-  const [formData, setFormData] = useState({
-    name: student?.name || '',
-    fathersName: student?.fathersName || '',
-    address: student?.address || '',
-    houseNo: student?.houseNo || '',
-    district: student?.district || '',
-    state: student?.state || '',
-    pinCode: student?.pinCode || '',
-    email: student?.email || '',
-    phone: student?.phone || '',
-    linkedin: student?.linkedin || '',
-    github: student?.github || '',
-    portfolioUrl: student?.portfolio || student?.portfolioUrl || '',
-    dob: student?.dob || '',
-    avatar: (student?.avatar && typeof student.avatar === 'string') ? student.avatar : DEFAULT_STUDENT_AVATAR,
-    course: student?.course || '',
-    semester: student?.semester || '',
-    goal: student?.goal || '',
-    gender: student?.gender || '',
-    bio: student?.bio || ''
+  // Dark Mode State
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof document !== 'undefined') {
+      return document.documentElement.classList.contains('dark') || localStorage.getItem('theme') === 'dark';
+    }
+    return false;
   });
 
-  // Sync state if student changes
+  const toggleDarkMode = () => {
+    const nextDark = !isDarkMode;
+    setIsDarkMode(nextDark);
+    if (typeof document !== 'undefined') {
+      if (nextDark) {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
+      }
+    }
+    showToast(nextDark ? 'Dark theme enabled' : 'Light theme enabled');
+  };
+
+  // Email alerts toggle state
+  const [emailAlerts, setEmailAlerts] = useState(true);
+
+  // Toast Notification State
+  const [toast, setToast] = useState(null);
+  const toastTimeoutRef = useRef(null);
+
+  const showToast = (message, type = 'success') => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToast({ message, type });
+    toastTimeoutRef.current = setTimeout(() => {
+      setToast(null);
+    }, 2800);
+  };
+
+  // Student Profile Data
+  const [profile, setProfile] = useState({
+    name: student?.name || 'Aarav Sharma',
+    degreeShort: student?.course || 'BCA',
+    branch: student?.branch || 'Computer Science & Engineering',
+    batch: student?.graduationYear || student?.batch || '2023–2027',
+    semester: student?.semester ? (String(student.semester).includes('Sem') ? student.semester : `${student.semester}th Semester`) : '5th Semester',
+    section: student?.section || 'Section A',
+    headline: student?.headline || 'Full-Stack Web Engineer • Applied ML Researcher • Open Source Contributor',
+    bio: student?.bio || 'Junior undergraduate passionate about distributed systems, full-stack web engineering, and applied machine learning. Technical Lead at the University Coding Club and Open Source contributor.',
+    objective: student?.goal || student?.objective || 'Seeking Software Engineering internships for Summer 2027 to build scalable cloud-native applications and intelligent backend systems.',
+    dob: student?.dob ? (typeof student.dob === 'string' && student.dob.includes('T') ? student.dob.split('T')[0] : String(student.dob)) : '14 Aug 2005',
+    blood: student?.blood || 'O+',
+    street: student?.address || student?.street || student?.houseNo || 'Flat 302, Green Park Residency, MG Road',
+    city: student?.city || 'Bengaluru',
+    pincode: student?.pinCode || student?.pincode || '560001',
+    state: student?.state || 'Karnataka',
+    district: student?.district || 'Bengaluru Urban',
+    personalEmail: student?.email || 'aarav.sharma.dev@gmail.com',
+    skills: student?.skills
+      ? (Array.isArray(student.skills) ? student.skills : student.skills.split(',').map(s => s.trim()).filter(Boolean))
+      : ['C++ / DSA', 'Python', 'React & TypeScript', 'Node.js', 'PostgreSQL', 'Linux Kernel', 'PyTorch', 'Docker & Git'],
+    avatar: student?.avatar || DEFAULT_STUDENT_PHOTO,
+    cover: student?.cover || DEFAULT_COVER_IMAGE
+  });
+
+  // Keep profile in sync if student prop updates
   useEffect(() => {
     if (student) {
-      setFormData(prev => ({
+      setProfile(prev => ({
         ...prev,
         name: student.name || prev.name,
-        email: student.email || prev.email,
-        phone: student.phone || prev.phone,
-        fathersName: student.fathersName || prev.fathersName,
-        address: student.address || prev.address,
-        houseNo: student.houseNo || prev.houseNo,
-        district: student.district || prev.district,
+        degreeShort: student.course || prev.degreeShort,
+        branch: student.branch || prev.branch,
+        batch: student.graduationYear || student.batch || prev.batch,
+        semester: student.semester ? (String(student.semester).includes('Sem') ? student.semester : `${student.semester}th Semester`) : prev.semester,
+        section: student.section || prev.section,
+        headline: student.headline || prev.headline,
+        bio: student.bio || prev.bio,
+        objective: student.goal || student.objective || prev.objective,
+        dob: student.dob ? (typeof student.dob === 'string' && student.dob.includes('T') ? student.dob.split('T')[0] : String(student.dob)) : prev.dob,
+        blood: student.blood || prev.blood,
+        street: student.address || student.street || student.houseNo || prev.street,
+        city: student.city || prev.city,
+        pincode: student.pinCode || student.pincode || prev.pincode,
         state: student.state || prev.state,
-        pinCode: student.pinCode || prev.pinCode,
-        linkedin: student.linkedin || prev.linkedin,
-        github: student.github || prev.github,
-        portfolioUrl: student.portfolioUrl || prev.portfolioUrl,
-        dob: student.dob || prev.dob,
-        avatar: (student?.avatar && typeof student.avatar === 'string')
-          ? student.avatar
-          : DEFAULT_STUDENT_AVATAR,
-        course: student.course || prev.course,
-        semester: student.semester || prev.semester,
-        goal: student.goal || prev.goal,
-        gender: student.gender || prev.gender,
-        bio: student.bio || prev.bio
+        district: student.district || prev.district,
+        personalEmail: student.email || prev.personalEmail,
+        avatar: student.avatar || prev.avatar,
+        cover: student.cover || prev.cover,
+        skills: student.skills
+          ? (Array.isArray(student.skills) ? student.skills : student.skills.split(',').map(s => s.trim()).filter(Boolean))
+          : prev.skills
       }));
     }
   }, [student]);
 
-  // Username
-  const username = useMemo(() => {
-    if (student?.username) return student.username;
-    if (student?.name) return student.name.toLowerCase().replace(/\s+/g, '.');
-    return 'student';
-  }, [student]);
+  // Highlighted skills set for the Overview tab
+  const [highlightedSkills, setHighlightedSkills] = useState(
+    () => new Set(['C++ / DSA', 'React & TypeScript', 'PyTorch'])
+  );
 
-  // Quick View Project Lightbox
-  const [selectedProject, setSelectedProject] = useState(null);
+  const toggleSkillHighlight = (skill) => {
+    setHighlightedSkills(prev => {
+      const next = new Set(prev);
+      if (next.has(skill)) next.delete(skill);
+      else next.add(skill);
+      return next;
+    });
+  };
 
-  // Student Projects
-  const [userProjects, setUserProjects] = useState([]);
-  useEffect(() => {
-    let localPosts = [];
+  // Projects State
+  const [projects, setProjects] = useState(() => {
     try {
       const saved = localStorage.getItem('podar_local_projects');
-      if (saved) localPosts = JSON.parse(saved);
-    } catch (e) {}
-
-    fetch('/api/projects?limit=30')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        const posts = data?.posts || [];
-        const combined = [...localPosts, ...posts];
-        const userSpecific = combined.filter(p => p.studentId === student?.id || p.author?.id === student?.id);
-        if (userSpecific.length > 0) {
-          setUserProjects(userSpecific);
-        } else {
-          setUserProjects(DEFAULT_STUDENT_PROJECTS);
-        }
-      })
-      .catch(() => {
-        setUserProjects(localPosts.length > 0 ? localPosts : DEFAULT_STUDENT_PROJECTS);
-      });
-  }, [student?.id]);
-
-  // Student Certificates
-  const [userCertificates, setUserCertificates] = useState([]);
-  useEffect(() => {
-    let cancelled = false;
-    setUserCertificates([]);
-    if (!student?.id) return;
-    requestJson('/api/certificates')
-      .then(data => { if (!cancelled) setUserCertificates(Array.isArray(data) ? data.filter(c => c.studentId === student.id) : []); })
-      .catch(() => { if (!cancelled) setUserCertificates([]); });
-    return () => { cancelled = true; };
-  }, [student?.id]);
-
-  // Password change state
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
-  });
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isSavingProfile, setIsSavingProfile] = useState(false);
-  const profileSaveInFlight = useRef(false);
-  const [profileSaveStatus, setProfileSaveStatus] = useState(null);
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [copiedShare, setCopiedShare] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
-
-  // Dynamic districts based on selected state
-  const currentDistricts = (formData.state && INDIAN_STATES_DISTRICTS[formData.state])
-    ? INDIAN_STATES_DISTRICTS[formData.state]
-    : [];
-
-  // Notification Preferences
-  const [notifications, setNotifications] = useState(() => {
-    try {
-      const saved = localStorage.getItem('podar-notifications-settings');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return {
-      enabled: true,
-      jobAlerts: true,
-      interviewReminders: true,
-      weeklyDigest: true,
-      collegeNotices: true,
-      quizDeadlines: true,
-      soundEffects: true
-    };
-  });
-
-  const fileInputRef = useRef(null);
-
-  const [isSavingAvatar, setIsSavingAvatar] = useState(false);
-  const avatarSaveInFlight = useRef(false);
-  const persistAvatar = async (avatar) => {
-    if (!student?.id) throw new Error('Please sign in again to update your photo.');
-    await requestJson('/api/students/' + encodeURIComponent(student.id), {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ avatar })
-    });
-    setFormData(prev => ({ ...prev, avatar }));
-    if (setState) setState(prev => ({ ...prev, students: (prev.students || []).map(s =>
-      s.id === student.id ? { ...s, avatar } : s) }));
-    try {
-      const cur = JSON.parse(localStorage.getItem('podar-pathways-session') || 'null');
-      if (cur) {
-        if (cur.student) cur.student.avatar = avatar;
-        cur.avatar = avatar;
-        localStorage.setItem('podar-pathways-session', JSON.stringify(cur));
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
-    } catch (error) {}
-    window.dispatchEvent(new CustomEvent('podar-student-updated', { detail: { avatar } }));
-  };
+    } catch (e) {}
+    return INITIAL_PROJECTS;
+  });
 
-  // Publish the compressed photo only after the server accepts it.
-  const handleAvatarUpload = async (e) => {
+  const [projectSearchInput, setProjectSearchInput] = useState('');
+
+  // Selected project for Details Modal
+  const [selectedProject, setSelectedProject] = useState(null);
+
+  // New Project Composer Modal State
+  const [isComposerOpen, setIsComposerOpen] = useState(false);
+  const [composerState, setComposerState] = useState({
+    title: '',
+    description: '',
+    tech: '',
+    demoUrl: '',
+    imageDataUrl: '',
+    useGradientCover: false,
+    aspectRatio: '16:9',
+    filter: 'Original'
+  });
+  const [composerDragOver, setComposerDragOver] = useState(false);
+  const [newSkillInput, setNewSkillInput] = useState('');
+  const [formErrors, setFormErrors] = useState({});
+
+  // File Upload Refs
+  const coverUploadRef = useRef(null);
+  const avatarUploadRef = useRef(null);
+  const projectImgUploadRef = useRef(null);
+
+  // Handle Cover Banner Upload
+  const handleCoverUpload = (e) => {
     const file = e.target.files?.[0];
-    if (!file || avatarSaveInFlight.current) return;
-    if (!file.type.startsWith('image/')) {
-      notify?.('Please select an image file (PNG, JPG, or WebP).');
-      return;
-    }
-    avatarSaveInFlight.current = true;
-    setIsSavingAvatar(true);
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const url = evt.target.result;
+      setProfile(prev => ({ ...prev, cover: url }));
+      showToast('Cover banner updated!');
+      persistProfileToServer({ cover: url });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Handle Avatar Upload
+  const handleAvatarUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const url = evt.target.result;
+      setProfile(prev => ({ ...prev, avatar: url }));
+      showToast('Profile photo updated!');
+      persistProfileToServer({ avatar: url });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Persist partial or full profile updates to local session and server
+  const persistProfileToServer = async (customFields = {}) => {
+    const activeStudentId = student?.id || session?.id || studentId;
+    if (!activeStudentId) return;
+
+    const updatedProfile = { ...profile, ...customFields };
+
+    // Update localStorage session
     try {
-      const compressedBase64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onerror = () => reject(new Error('Could not read this photo.'));
-        reader.onload = event => {
-          const img = new Image();
-          img.onerror = () => reject(new Error('Could not open this photo.'));
-          img.onload = () => {
-            try {
-              const scale = Math.min(1, 320 / Math.max(img.width, img.height));
-              const canvas = document.createElement('canvas');
-              canvas.width = Math.round(img.width * scale);
-              canvas.height = Math.round(img.height * scale);
-              canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-              resolve(canvas.toDataURL('image/jpeg', 0.88));
-            } catch (error) { reject(error); }
+      const curSession = JSON.parse(localStorage.getItem('podar-pathways-session') || 'null');
+      if (curSession) {
+        if (customFields.avatar) curSession.avatar = customFields.avatar;
+        if (curSession.student) {
+          curSession.student = {
+            ...curSession.student,
+            ...updatedProfile,
+            course: updatedProfile.degreeShort,
+            goal: updatedProfile.objective,
+            address: updatedProfile.street,
+            pinCode: updatedProfile.pincode
           };
-          img.src = event.target.result;
-        };
-        reader.readAsDataURL(file);
-      });
-      await persistAvatar(compressedBase64);
-      notify?.('Profile photo updated successfully!');
-    } catch (error) { notify?.(error.message || 'Could not update your profile photo.'); }
-    finally {
-      avatarSaveInFlight.current = false;
-      setIsSavingAvatar(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const handleRemoveAvatar = async () => {
-    if (avatarSaveInFlight.current) return;
-    avatarSaveInFlight.current = true;
-    setIsSavingAvatar(true);
-    try {
-      await persistAvatar('');
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      notify?.('Profile photo removed.');
-    } catch (error) { notify?.(error.message || 'Could not remove your profile photo.'); }
-    finally { avatarSaveInFlight.current = false; setIsSavingAvatar(false); }
-  };
-
-  // Save Profile Form
-  const handleSaveProfile = async (e) => {
-    e?.preventDefault();
-    if (profileSaveInFlight.current) return;
-    setProfileSaveStatus(null);
-    const error = profileError(formData);
-    if (error) { setProfileSaveStatus({ type: 'error', text: error }); return; }
-    if (!student?.id) { setProfileSaveStatus({ type: 'error', text: 'Please sign in again to save your profile.' }); return; }
-    profileSaveInFlight.current = true;
-    setIsSavingProfile(true);
-    try {
-      const saved = requireRecord(await requestJson('/api/students/' + encodeURIComponent(student.id), {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, goal: formData.goal.trim(), portfolio: formData.portfolioUrl, name: student.name, email: student.email })
-      }), 'student');
-      if (saved.id !== student.id) throw new Error('The server returned a different profile. Please refresh and try again.');
-      setFormData(prev => ({ ...prev, ...saved, portfolioUrl: saved.portfolio ?? prev.portfolioUrl }));
-      if (setState) setState(prev => ({ ...prev, students: (prev.students || []).some(item => item.id === saved.id)
-        ? prev.students.map(item => item.id === saved.id ? { ...item, ...saved } : item)
-        : [...(prev.students || []), saved] }));
-      try {
-        const current = JSON.parse(localStorage.getItem('podar-pathways-session') || 'null');
-        if (current?.id === saved.id || current?.student?.id === saved.id) {
-          current.student = { ...(current.student || {}), ...saved };
-          current.avatar = saved.avatar || '';
-          localStorage.setItem('podar-pathways-session', JSON.stringify(current));
         }
-      } catch {}
-      setProfileSaveStatus({ type: 'success', text: 'Profile saved successfully.' });
-      notify?.('Profile saved successfully.');
-    } catch (error) {
-      setProfileSaveStatus({ type: 'error', text: error.message || 'Could not save your profile. Please try again.' });
-    } finally { profileSaveInFlight.current = false; setIsSavingProfile(false); }
-  };
-
-  // Update Password
-  const handleUpdatePassword = async (e) => {
-    if (e) e.preventDefault();
-
-    if (!passwordData.currentPassword) { notify?.('Enter your current password.'); return; }
-    if (passwordData.newPassword === passwordData.currentPassword) { notify?.('Choose a different new password.'); return; }
-    if (!passwordData.newPassword) {
-      notify?.('Please enter your new password.');
-      return;
-    }
-
-    if (passwordError(passwordData.newPassword)) {
-      notify?.(PASSWORD_HINT);
-      return;
-    }
-
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      notify?.('New passwords do not match. Please re-enter.');
-      return;
-    }
-
-    setIsChangingPassword(true);
-
-    try {
-      if (student?.id) {
-        const res = await fetch(`/api/students/${student.id}/change-password`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            currentPassword: passwordData.currentPassword,
-            newPassword: passwordData.newPassword
-          })
-        });
-
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data.error || 'Failed to update password.');
-        }
-
-        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-        notify?.('Password updated successfully! You can now use your new password.');
-      } else {
-        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-        throw new Error('Please sign in again to change your password.');
+        localStorage.setItem('podar-pathways-session', JSON.stringify(curSession));
       }
-    } catch (err) {
-      notify?.(err.message || 'Could not update password.');
-    } finally {
-      setIsChangingPassword(false);
-    }
-  };
 
-  // Target user identification (URL query param or prop)
-  const getTargetUserIdFromUrl = () => {
-    try {
-      const searchParams = new URLSearchParams(window.location.search);
-      return searchParams.get('id') || searchParams.get('user') || studentId || null;
-    } catch (e) {
-      return studentId || null;
-    }
-  };
-
-  const [targetUserId, setTargetUserId] = useState(getTargetUserIdFromUrl);
-
-  // Sync when route or history changes
-  useEffect(() => {
-    const handleSyncUser = () => {
-      setTargetUserId(getTargetUserIdFromUrl());
-    };
-    window.addEventListener('popstate', handleSyncUser);
-    window.addEventListener('podar-route-change', handleSyncUser);
-    return () => {
-      window.removeEventListener('popstate', handleSyncUser);
-      window.removeEventListener('podar-route-change', handleSyncUser);
-    };
-  }, [studentId]);
-
-  // Load all administrators for Directory & Profile Switching
-  const [allAdmins, setAllAdmins] = useState([]);
-
-  useEffect(() => {
-    fetch('/api/admins')
-      .then(res => res.ok ? res.json() : null)
-      .then(list => {
-        if (Array.isArray(list) && list.length > 0) {
-          setAllAdmins(list.map(a => ({
-            ...a,
-            avatar: a.avatar || DEFAULT_ADMIN_AVATAR,
-            userType: 'admin'
-          })));
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  // Extra fetched students if state.students isn't populated
-  const [fetchedStudents, setFetchedStudents] = useState([]);
-  useEffect(() => {
-    fetch('/api/students')
-      .then(res => res.ok ? res.json() : null)
-      .then(list => {
-        if (Array.isArray(list) && list.length > 0) {
-          setFetchedStudents(list);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  // Merged student roster
-  const allStudents = useMemo(() => {
-    const map = new Map();
-    (state?.students || []).forEach(s => map.set(s.id, s));
-    fetchedStudents.forEach(s => {
-      if (!map.has(s.id)) map.set(s.id, s);
-    });
-    if (student && !map.has(student.id)) map.set(student.id, student);
-    return Array.from(map.values()).map(s => ({
-      ...s,
-      avatar: (s?.avatar && typeof s.avatar === 'string') ? s.avatar : DEFAULT_STUDENT_AVATAR,
-      userType: 'student'
-    }));
-  }, [state?.students, fetchedStudents, student]);
-
-  // Determine if viewing own profile or someone else
-  const activeProfileUser = useMemo(() => {
-    if (!targetUserId) return null;
-    if (student?.id === targetUserId || session?.id === targetUserId) {
-      return null;
-    }
-    const foundStudent = allStudents.find(s => s.id === targetUserId || s.email === targetUserId || s.phone === targetUserId);
-    if (foundStudent) return { ...foundStudent, userType: 'student' };
-
-    const foundAdmin = allAdmins.find(a => a.id === targetUserId || a.email === targetUserId || a.phone === targetUserId);
-    if (foundAdmin) return { ...foundAdmin, userType: 'admin' };
-
-    return null;
-  }, [targetUserId, allStudents, allAdmins, student?.id, session?.id]);
-
-  const isOwnProfile = !activeProfileUser;
-  const isViewingAdmin = activeProfileUser?.userType === 'admin';
-  const isViewingStudent = activeProfileUser?.userType === 'student';
-
-  // Target peer projects
-  const [peerProjects, setPeerProjects] = useState([]);
-  useEffect(() => {
-    if (!activeProfileUser || isViewingAdmin) {
-      setPeerProjects([]);
-      return;
-    }
-    fetch('/api/projects?limit=30')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        const posts = data?.posts || [];
-        const filtered = posts.filter(p => p.studentId === activeProfileUser.id || p.author?.id === activeProfileUser.id);
-        if (filtered.length > 0) {
-          setPeerProjects(filtered);
-        } else {
-          setPeerProjects([]);
-        }
-      })
-      .catch(() => setPeerProjects([]));
-  }, [activeProfileUser, isViewingAdmin]);
-
-  // Target peer certificates
-  const [peerCertificates, setPeerCertificates] = useState([]);
-  useEffect(() => {
-    let cancelled = false;
-    setPeerCertificates([]);
-    if (!activeProfileUser || isViewingAdmin || isOwnProfile) return;
-    requestJson('/api/students/' + encodeURIComponent(activeProfileUser.id) + '/public-certificates')
-      .then(data => { if (!cancelled) setPeerCertificates(Array.isArray(data) ? data : []); })
-      .catch(() => { if (!cancelled) setPeerCertificates([]); });
-    return () => { cancelled = true; };
-  }, [activeProfileUser?.id, isViewingAdmin, isOwnProfile]);
-
-  const currentProjects = isOwnProfile ? userProjects : peerProjects;
-  const currentCertificates = isOwnProfile ? userCertificates : peerCertificates;
-
-  // Campus Directory state
-  const [directorySearch, setDirectorySearch] = useState('');
-  const [directoryFilter, setDirectoryFilter] = useState('all'); // 'all' | 'students' | 'admins'
-
-  const directoryList = useMemo(() => {
-    const sList = allStudents.map(s => ({
-      ...s,
-      userType: 'student',
-      displayRole: `${s.course || 'Course not added'} • Sem ${s.semester || 'Not added'}`,
-      displayHeadline: s.goal || 'Student at Podar Pathways'
-    }));
-    const aList = allAdmins.map(a => ({
-      ...a,
-      userType: 'admin',
-      displayRole: `${a.role || 'Administrator'} • ${a.department || 'Administration'}`,
-      displayHeadline: a.department || 'Podar Administration'
-    }));
-    return [...sList, ...aList];
-  }, [allStudents, allAdmins]);
-
-  const filteredDirectoryList = useMemo(() => {
-    const q = directorySearch.trim().toLowerCase();
-    return directoryList.filter(item => {
-      if (directoryFilter === 'students' && item.userType !== 'student') return false;
-      if (directoryFilter === 'admins' && item.userType !== 'admin') return false;
-      if (!q) return true;
-      const matchName = item.name?.toLowerCase().includes(q);
-      const matchRole = item.displayRole?.toLowerCase().includes(q);
-      const matchHeadline = item.displayHeadline?.toLowerCase().includes(q);
-      const matchEmail = item.email?.toLowerCase().includes(q);
-      return matchName || matchRole || matchHeadline || matchEmail;
-    });
-  }, [directoryList, directorySearch, directoryFilter]);
-
-  const handleSelectUser = (user) => {
-    const isMe = (session?.role === 'student' && user.id === (student?.id || session?.id)) ||
-                 (session?.role === 'admin' && user.id === session?.id);
-    if (isMe) {
-      handleBackToMyProfile();
-    } else {
-      setTargetUserId(user.id);
-      setActiveTab(user.userType === 'admin' ? 'office' : 'posts');
-      try {
-        const url = new URL(window.location.href);
-        url.searchParams.set('id', user.id);
-        url.searchParams.delete('tab');
-        window.history.pushState(window.history.state, '', url.pathname + url.search + url.hash);
-      } catch (e) {}
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  };
-
-  const handleBackToMyProfile = () => {
-    setTargetUserId(null);
-    setActiveTab('posts');
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.delete('id');
-      url.searchParams.delete('user');
-      url.searchParams.delete('tab');
-      window.history.pushState(window.history.state, '', url.pathname + url.search + url.hash);
+      // Update state if setState provided
+      if (setState) {
+        setState(prev => ({
+          ...prev,
+          students: (prev.students || []).map(s =>
+            s.id === activeStudentId
+              ? {
+                  ...s,
+                  ...updatedProfile,
+                  course: updatedProfile.degreeShort,
+                  goal: updatedProfile.objective,
+                  address: updatedProfile.street,
+                  pinCode: updatedProfile.pincode
+                }
+              : s
+          )
+        }));
+      }
     } catch (e) {}
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
 
-  // Canonical Share Profile Link Helper
-  const getShareUrl = (customId) => {
-    const origin = window.location.origin;
-    const isHashMode = window.location.hash.startsWith('#/');
-    const basePath = isHashMode ? `${origin}/#/profile` : `${origin}/profile`;
-    const target = customId || (!isOwnProfile && activeProfileUser ? activeProfileUser.id : null);
-    if (target) {
-      return `${basePath}?id=${encodeURIComponent(target)}`;
-    }
-    return basePath;
-  };
-
-  const handleCopyShareUrl = async () => {
-    const url = getShareUrl();
+    // Send PUT request to API
     try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(url);
-      } else {
-        const ta = document.createElement('textarea');
-        ta.value = url;
-        ta.style.position = 'fixed';
-        ta.style.left = '-9999px';
-        document.body.appendChild(ta);
-        ta.focus();
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-      }
-      setCopiedShare(true);
-      notify?.('Profile link copied to clipboard!');
-      setTimeout(() => setCopiedShare(false), 2500);
-    } catch (e) {
-      prompt('Copy profile link:', url);
+      await fetch(`/api/students/${encodeURIComponent(activeStudentId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: updatedProfile.name,
+          headline: updatedProfile.headline,
+          bio: updatedProfile.bio,
+          goal: updatedProfile.objective,
+          dob: updatedProfile.dob,
+          blood: updatedProfile.blood,
+          email: updatedProfile.personalEmail,
+          street: updatedProfile.street,
+          address: updatedProfile.street,
+          city: updatedProfile.city,
+          pincode: updatedProfile.pincode,
+          pinCode: updatedProfile.pincode,
+          state: updatedProfile.state,
+          district: updatedProfile.district,
+          course: updatedProfile.degreeShort,
+          branch: updatedProfile.branch,
+          graduationYear: updatedProfile.batch,
+          semester: updatedProfile.semester,
+          section: updatedProfile.section,
+          skills: Array.isArray(updatedProfile.skills) ? updatedProfile.skills.join(', ') : updatedProfile.skills,
+          avatar: updatedProfile.avatar,
+          cover: updatedProfile.cover
+        })
+      });
+    } catch (err) {
+      console.warn('API sync notice:', err);
     }
   };
 
-  // Share Profile Action
-  const handleShareProfile = async () => {
-    const shareUrl = getShareUrl();
-    const title = `${displayName} - Podar Pathways Profile`;
-    const text = isOwnProfile
-      ? `Check out ${displayName}'s student profile, projects, and credentials on Podar Pathways!`
-      : `Check out ${displayName}'s ${isViewingAdmin ? 'administrative' : 'student'} profile on Podar Pathways!`;
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title,
-          text,
-          url: shareUrl
-        });
-        setCopiedShare(true);
-        setTimeout(() => setCopiedShare(false), 2500);
-        return;
-      } catch (err) {
-        if (err.name === 'AbortError') return;
-      }
+  // Add new skill in settings
+  const handleAddSkill = (e) => {
+    e?.preventDefault();
+    const val = newSkillInput.trim();
+    if (!val) return;
+    if (!profile.skills.includes(val)) {
+      const nextSkills = [...profile.skills, val];
+      setProfile(prev => ({ ...prev, skills: nextSkills }));
+      showToast(`Added "${val}" to skills`);
     }
-    // Fallback: open share modal
-    setShowShareModal(true);
+    setNewSkillInput('');
   };
 
-  const studentName = formData?.name || student?.name || 'Student';
-  const studentSem = formData?.semester ? (String(formData.semester).toLowerCase().startsWith('sem') ? formData.semester : `Semester ${formData.semester}`) : 'Semester not added';
-  const studentScore = Number.isFinite(Number(student?.score)) ? Number(student.score) : 0;
-  const studentCompletion = Number.isFinite(Number(student?.completion)) ? Number(student.completion) : 0;
+  // Remove skill in settings
+  const handleRemoveSkill = (index) => {
+    const removed = profile.skills[index];
+    const nextSkills = profile.skills.filter((_, i) => i !== index);
+    setProfile(prev => ({ ...prev, skills: nextSkills }));
+    setHighlightedSkills(prev => {
+      const next = new Set(prev);
+      next.delete(removed);
+      return next;
+    });
+  };
 
-  const displayName = isOwnProfile ? studentName : (activeProfileUser?.name || 'User Profile');
-  const cleanFormAvatar = (formData?.avatar && typeof formData.avatar === 'string') ? formData.avatar : DEFAULT_STUDENT_AVATAR;
-  const cleanActiveAvatar = (activeProfileUser?.avatar && typeof activeProfileUser?.avatar === 'string') ? activeProfileUser.avatar : (isViewingAdmin ? DEFAULT_ADMIN_AVATAR : DEFAULT_STUDENT_AVATAR);
-  const displayAvatar = isOwnProfile ? cleanFormAvatar : (cleanActiveAvatar || (isViewingAdmin ? DEFAULT_ADMIN_AVATAR : DEFAULT_STUDENT_AVATAR));
-  const displayDeptOrCourse = isOwnProfile ? (formData?.course || 'Course not added') : (isViewingAdmin ? (activeProfileUser?.department || 'Administration') : (activeProfileUser?.course || 'Course not added'));
-  const displaySemOrRole = isOwnProfile ? studentSem : (isViewingAdmin ? (activeProfileUser?.role || 'Super Admin') : (activeProfileUser?.semester ? `Semester ${activeProfileUser?.semester}` : 'Semester not added'));
-  const displayGoal = isOwnProfile ? (formData?.goal || 'Career goal not added') : (isViewingAdmin ? (activeProfileUser?.role || 'Super Admin') : (activeProfileUser?.goal || 'Career goal not added'));
-  const displayBio = isOwnProfile ? (formData?.bio || 'No biography added yet.') : (activeProfileUser?.bio || (isViewingAdmin ? 'No biography added yet.' : 'No biography added yet.'));
-  const displayScore = isOwnProfile ? studentScore : (Number.isFinite(Number(activeProfileUser?.score)) ? Number(activeProfileUser?.score) : 0);
-  const displayCompletion = isOwnProfile ? studentCompletion : (Number.isFinite(Number(activeProfileUser?.completion)) ? Number(activeProfileUser?.completion) : 0);
-  const displayPortfolio = isOwnProfile ? formData?.portfolioUrl : activeProfileUser?.portfolioUrl;
-  const displayGithub = isOwnProfile ? formData?.github : activeProfileUser?.github;
-  const displayLinkedin = isOwnProfile ? formData?.linkedin : activeProfileUser?.linkedin;
+  // Save full settings form
+  const handleSaveAllSettings = (e) => {
+    e.preventDefault();
+    const errors = {};
+
+    if (!profile.name.trim()) errors.name = 'Full Name is required';
+    if (!profile.degreeShort) errors.degreeShort = 'Degree is required';
+    if (!profile.branch) errors.branch = 'Branch is required';
+    if (!profile.semester) errors.semester = 'Semester is required';
+    if (!profile.section) errors.section = 'Section is required';
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      const firstKey = Object.keys(errors)[0];
+      showToast(`Please fill in required field: ${errors[firstKey]}`, 'error');
+      return;
+    }
+
+    setFormErrors({});
+    persistProfileToServer();
+    showToast('All student profile changes saved!');
+    switchTab('overview');
+  };
+
+  // Reset profile defaults
+  const handleResetDefaults = () => {
+    const reset = {
+      name: 'Aarav Sharma',
+      degreeShort: '',
+      branch: '',
+      batch: '2023–2027',
+      semester: '',
+      section: '',
+      headline: 'Full-Stack Web Engineer • Applied ML Researcher • Open Source Contributor',
+      bio: 'Junior undergraduate passionate about distributed systems, full-stack web engineering, and applied machine learning. Technical Lead at the University Coding Club and Open Source contributor.',
+      objective: 'Seeking Software Engineering internships for Summer 2027 to build scalable cloud-native applications and intelligent backend systems.',
+      dob: '14 Aug 2005',
+      blood: '',
+      street: '',
+      city: '',
+      pincode: '',
+      state: '',
+      district: '',
+      personalEmail: 'aarav.sharma.dev@gmail.com',
+      skills: ['C++ / DSA', 'Python', 'React & TypeScript', 'Node.js', 'PostgreSQL', 'Linux Kernel', 'PyTorch', 'Docker & Git'],
+      avatar: DEFAULT_STUDENT_PHOTO,
+      cover: DEFAULT_COVER_IMAGE
+    };
+    setProfile(reset);
+    setFormErrors({});
+    showToast('Profile reset to default (dropdowns set to None)');
+  };
+
+  // Project Composer Handlers
+  const handleOpenComposer = () => {
+    setComposerState({
+      title: '',
+      description: '',
+      tech: '',
+      demoUrl: '',
+      imageDataUrl: '',
+      useGradientCover: false,
+      aspectRatio: '16:9',
+      filter: 'Original'
+    });
+    setIsComposerOpen(true);
+  };
+
+  const handleComposerFile = (file) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      setComposerState(prev => ({
+        ...prev,
+        imageDataUrl: evt.target.result,
+        useGradientCover: false
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleShareProject = (e) => {
+    e.preventDefault();
+    if (!composerState.title.trim()) {
+      showToast('Project Title is required', 'error');
+      return;
+    }
+
+    const techTags = composerState.tech
+      ? composerState.tech.split(',').map(t => t.trim()).filter(Boolean)
+      : ['Student Project'];
+
+    const dateLabel = new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+
+    const newProject = {
+      id: Date.now(),
+      title: composerState.title.trim(),
+      description: composerState.description.trim(),
+      tech: techTags,
+      demoUrl: composerState.demoUrl.trim(),
+      image: composerState.imageDataUrl || '',
+      filter: composerState.filter,
+      aspect: composerState.aspectRatio,
+      date: dateLabel
+    };
+
+    const nextProjects = [newProject, ...projects];
+    setProjects(nextProjects);
+
+    try {
+      localStorage.setItem('podar_local_projects', JSON.stringify(nextProjects));
+    } catch (e) {}
+
+    setIsComposerOpen(false);
+    showToast('Project shared to your portfolio!');
+  };
+
+  // Filter projects by search
+  const filteredProjects = useMemo(() => {
+    const query = projectSearchInput.trim().toLowerCase();
+    if (!query) return projects;
+    return projects.filter(p =>
+      p.title.toLowerCase().includes(query) ||
+      p.description.toLowerCase().includes(query) ||
+      (Array.isArray(p.tech) && p.tech.some(t => t.toLowerCase().includes(query)))
+    );
+  }, [projects, projectSearchInput]);
+
+  // Derived labels
+  const degreeBranchLabel = useMemo(() => {
+    const parts = [profile.degreeShort, profile.branch].filter(Boolean);
+    if (!parts.length) return 'Academic program not specified';
+    return parts.join(' • ');
+  }, [profile.degreeShort, profile.branch]);
+
+  const batchYearLabel = useMemo(() => {
+    if (profile.batch && profile.batch.includes('–')) {
+      return `Class of ${profile.batch.split('–')[1].trim()}`;
+    }
+    return profile.batch ? `Class of ${profile.batch}` : '';
+  }, [profile.batch]);
+
+  // Cascading districts list for Settings
+  const districtOptions = useMemo(() => {
+    if (profile.state && INDIAN_STATES_DISTRICTS[profile.state]) {
+      return INDIAN_STATES_DISTRICTS[profile.state];
+    }
+    return [];
+  }, [profile.state]);
 
   return (
-    <div className="insta-profile-wrapper">
-      {/* Hidden file input for avatar */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleAvatarUpload}
-        accept="image/png,image/jpeg,image/webp"
-        style={{ display: 'none' }}
-      />
+    <div className={`student-profile-portal bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans antialiased transition-colors duration-300 min-h-screen pb-16 ${isDarkMode ? 'dark' : ''}`}>
 
-      {/* ============================================================ */}
-      {/* 1. INSTAGRAM PROFILE HEADER                                  */}
-      {/* ============================================================ */}
-            {/* Top Banner when viewing someone else */}
-      {!isOwnProfile && (
-        <div className="insta-peer-top-banner">
-          <button
-            type="button"
-            className="insta-back-pill"
-            onClick={handleBackToMyProfile}
-          >
-            <ChevronLeft size={16} />
-            <span>Back to My Profile</span>
-          </button>
-
-          <div className="insta-peer-tag">
-            <span className="insta-peer-dot" />
-            <span>Viewing {isViewingAdmin ? 'Administrator' : 'Student'} Profile</span>
+      {/* Floating Toast Notification Container */}
+      {toast && (
+        <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none">
+          <div className={`${toast.type === 'error' ? 'bg-rose-600 text-white' : 'bg-slate-900 dark:bg-slate-800 text-white border border-slate-700'} px-4 py-2.5 rounded-xl shadow-lg text-xs font-medium flex items-center gap-2 transition-all duration-300 modal-animate-enter pointer-events-auto`}>
+            <span>{toast.message}</span>
           </div>
         </div>
       )}
 
-      {/* ============================================================ */}
-      {/* 1. INSTAGRAM PROFILE HEADER                                  */}
-      {/* ============================================================ */}
-      <header className="insta-profile-header">
-        {/* Left: Avatar with colorful story ring */}
-        <div className="insta-avatar-column">
-          <div
-            className={`insta-avatar-ring-wrap ${isViewingAdmin ? 'admin-ring' : ''} ${!isOwnProfile ? 'peer' : ''}`}
-            onClick={() => {
-              if (isOwnProfile) fileInputRef.current?.click();
-            }}
-            title={isOwnProfile ? "Click to change profile picture" : displayName}
-          >
-            <div className={`insta-avatar-ring ${isViewingAdmin ? 'admin' : ''}`}>
-              <ProfileAvatar src={displayAvatar} name={displayName} alt={displayName} className="insta-avatar-img" />
+      {/* Top College Portal Navigation */}
+      <nav className="sticky top-0 z-30 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors duration-300">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-navy-600 flex items-center justify-center text-white font-bold shadow-sm">
+              <GraduationCap className="w-5 h-5 text-white" />
             </div>
-          </div>
-        </div>
-
-        {/* Right: Username, Buttons, Stats, Bio */}
-        <div className="insta-meta-column">
-          {/* Top Row: Full Name + Verified Badge */}
-          <div className="insta-user-actions-row">
-            <div className="insta-username-group">
-              <h2 className="insta-username">{displayName}</h2>
-              {isViewingAdmin ? (
-                <span className="insta-verified-badge admin" title="Verified Institutional Administrator">
-                  <ShieldCheck size={20} fill="#f59e0b" color="#ffffff" />
-                </span>
-              ) : (
-                <span className="insta-verified-badge" title="Verified College Student">
-                  <BadgeCheck size={20} fill="#0284c7" color="#ffffff" />
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Stats Row */}
-          {isViewingAdmin ? (
-            <div className="insta-stats-row admin-stats">
-              <div className="insta-stat-item static">
-                <strong>{activeProfileUser?.department || 'Administration'}</strong>
-                <span>department</span>
-              </div>
-              <div className="insta-stat-item static">
-                <strong>{activeProfileUser?.role || 'Super Admin'}</strong>
-                <span>role</span>
-              </div>
-              <div className="insta-stat-item static">
-                <strong>Verified</strong>
-                <span>institutional staff</span>
-              </div>
-              <button
-                type="button"
-                className="insta-stat-item"
-                onClick={() => handleTabChange('directory')}
-                title="Browse campus community"
-              >
-                <strong>{directoryList.length}</strong>
-                <span>community</span>
-              </button>
-            </div>
-          ) : (
-            <div className="insta-stats-row">
-              <button
-                type="button"
-                className="insta-stat-item"
-                onClick={() => handleTabChange('posts')}
-              >
-                <strong>{currentProjects.length}</strong>
-                <span>projects</span>
-              </button>
-
-              <button
-                type="button"
-                className="insta-stat-item"
-                onClick={() => handleTabChange('certificates')}
-                title="Click to view certificates & credentials"
-              >
-                <strong>{currentCertificates.length}</strong>
-                <span>credentials</span>
-              </button>
-
-              <button
-                type="button"
-                className="insta-stat-item"
-                onClick={() => {
-                  if (isOwnProfile) navigate?.('score');
-                }}
-                title="P-CARE Employability score"
-              >
-                <strong>{displayScore}/100</strong>
-                <span>P-CARE</span>
-              </button>
-
-              <button
-                type="button"
-                className="insta-stat-item"
-                onClick={() => {
-                  if (isOwnProfile) navigate?.('passport');
-                }}
-                title="Digital career readiness"
-              >
-                <strong>{displayCompletion}%</strong>
-                <span>readiness</span>
-              </button>
-            </div>
-          )}
-
-          {/* Bio & Details Block */}
-          <div className="insta-bio-block">
-            <div className="insta-full-name-line">
-              <span className={`insta-dept-pill ${isViewingAdmin ? 'admin' : ''}`}>
-                {displayDeptOrCourse} • {displaySemOrRole}
+            <div>
+              <span className="font-bold text-base sm:text-lg tracking-tight text-slate-900 dark:text-white">
+                Podar <span className="text-navy-600 dark:text-indigo-400">CampusPortal</span>
+              </span>
+              <span className="hidden md:inline-block ml-2 text-xs px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-medium">
+                Autumn Semester 2026
               </span>
             </div>
+          </div>
 
-            {displayGoal && (
-              <p className={`insta-headline ${isViewingAdmin ? 'admin' : ''}`}>
-                {isViewingAdmin ? (
-                  <Briefcase size={14} className="insta-headline-icon" />
-                ) : (
-                  <Sparkles size={14} className="insta-headline-icon" />
-                )}
-                <span>{displayGoal}</span>
-              </p>
-            )}
-
-            <p className="insta-bio-text">
-              {displayBio}
-            </p>
-
-            {/* Clickable External Links in Bio */}
-            <div className="insta-bio-links">
-              {displayPortfolio && (
-                <a
-                  href={displayPortfolio.startsWith('http') ? displayPortfolio : `https://${displayPortfolio}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="insta-bio-link"
-                >
-                  <Link2 size={13} />
-                  <span>{displayPortfolio.replace(/^https?:\/\//, '')}</span>
-                </a>
-              )}
-
-              {displayGithub && (
-                <a
-                  href={displayGithub.startsWith('http') ? displayGithub : `https://${displayGithub}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="insta-bio-link"
-                >
-                  <Code size={13} />
-                  <span>{displayGithub.replace(/^https?:\/\//, '')}</span>
-                </a>
-              )}
-
-              {displayLinkedin && (
-                <a
-                  href={displayLinkedin.startsWith('http') ? displayLinkedin : `https://${displayLinkedin}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="insta-bio-link"
-                >
-                  <ExternalLink size={13} />
-                  <span>{displayLinkedin.replace(/^https?:\/\//, '')}</span>
-                </a>
-              )}
-
-              {isViewingAdmin && activeProfileUser?.email && (
-                <a
-                  href={`mailto:${activeProfileUser?.email}`}
-                  className="insta-bio-link"
-                >
-                  <Mail size={13} />
-                  <span>{activeProfileUser?.email}</span>
-                </a>
-              )}
-
-              {isViewingAdmin && activeProfileUser?.phone && (
-                <a
-                  href={`tel:${activeProfileUser?.phone}`}
-                  className="insta-bio-link"
-                >
-                  <Phone size={13} />
-                  <span>{activeProfileUser?.phone}</span>
-                </a>
-              )}
-            </div>
-
-            {/* Action Buttons: Edit profile, Share profile, Campus Directory, Settings */}
-            <div className="insta-action-buttons" style={{ marginTop: '16px' }}>
-              {isOwnProfile ? (
-                <>
-                  <button
-                    type="button"
-                    className={`insta-btn-secondary ${activeTab === 'edit' ? 'active' : ''}`}
-                    onClick={() => handleTabChange('edit')}
-                  >
-                    <Pencil size={14} />
-                    <span>Edit profile</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="insta-btn-secondary"
-                    onClick={handleShareProfile}
-                  >
-                    {copiedShare ? <Check size={14} color="#10b981" /> : <Share2 size={14} />}
-                    <span>{copiedShare ? 'Copied' : 'Share profile'}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className={`insta-icon-btn ${activeTab === 'security' ? 'active' : ''}`}
-                    onClick={() => handleTabChange('security')}
-                    title="Account security & settings"
-                  >
-                    <Settings size={18} />
-                  </button>
-                </>
-              ) : isViewingAdmin ? (
-                <>
-                  <a
-                    href={`mailto:${activeProfileUser?.email || 'admin@podar.edu'}?subject=Inquiry%20from%20Student`}
-                    className="insta-btn-primary"
-                    style={{ textDecoration: 'none' }}
-                  >
-                    <Mail size={14} />
-                    <span>Email Office</span>
-                  </a>
-
-                  {activeProfileUser?.phone && (
-                    <a
-                      href={`tel:${activeProfileUser?.phone}`}
-                      className="insta-btn-secondary"
-                      style={{ textDecoration: 'none' }}
-                    >
-                      <Phone size={14} />
-                      <span>Call Office</span>
-                    </a>
-                  )}
-
-                  <button
-                    type="button"
-                    className="insta-btn-secondary"
-                    onClick={handleShareProfile}
-                  >
-                    {copiedShare ? <Check size={14} color="#10b981" /> : <Share2 size={14} />}
-                    <span>{copiedShare ? 'Copied' : 'Share profile'}</span>
-                  </button>
-                </>
-              ) : (
-                <>
-                  <a
-                    href={`mailto:${activeProfileUser?.email || ''}?subject=Connecting%20via%20Podar%20Pathways`}
-                    className="insta-btn-primary"
-                    style={{ textDecoration: 'none' }}
-                  >
-                    <Mail size={14} />
-                    <span>Contact Student</span>
-                  </a>
-
-                  <button
-                    type="button"
-                    className="insta-btn-secondary"
-                    onClick={handleShareProfile}
-                  >
-                    {copiedShare ? <Check size={14} color="#10b981" /> : <Share2 size={14} />}
-                    <span>{copiedShare ? 'Copied' : 'Share profile'}</span>
-                  </button>
-                </>
-              )}
-            </div>
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={toggleDarkMode}
+              aria-label="Toggle Dark Mode"
+              className="p-2.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-colors"
+            >
+              {isDarkMode ? <Moon className="w-4 h-4 text-indigo-300" /> : <Sun className="w-4 h-4 text-amber-500" />}
+            </button>
           </div>
         </div>
-      </header>
-
-      {/* ============================================================ */}
-      {/* 3. INSTAGRAM TAB NAVIGATION STRIP                            */}
-      {/* ============================================================ */}
-      <nav className="insta-tab-nav">
-        {isViewingAdmin ? (
-          <>
-            <button
-              type="button"
-              className={`insta-tab-item ${activeTab === 'office' ? 'active' : ''}`}
-              onClick={() => handleTabChange('office')}
-            >
-              <Building2 size={16} />
-              <span>OFFICE INFO</span>
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              type="button"
-              className={`insta-tab-item ${activeTab === 'posts' || activeTab === 'profile' ? 'active' : ''}`}
-              onClick={() => handleTabChange('posts')}
-            >
-              <Grid size={16} />
-              <span>PROJECTS</span>
-            </button>
-
-            {isOwnProfile && (
-              <button
-                type="button"
-                className={`insta-tab-item ${activeTab === 'notifications' ? 'active' : ''}`}
-                onClick={() => handleTabChange('notifications')}
-              >
-                <Bell size={16} />
-                <span>ALERTS</span>
-              </button>
-            )}
-          </>
-        )}
       </nav>
 
-      {/* ============================================================ */}
-      {/* 4. TAB CONTENT 1: INSTAGRAM PROJECTS GRID                    */}
-      {/* ============================================================ */}
-      {(activeTab === 'posts' || activeTab === 'profile') && (
-        <div className="insta-tab-body">
-          {currentProjects.length > 0 ? (
-            <div className="insta-posts-grid">
-              {currentProjects.map((proj, idx) => {
-                const coverImg = Array.isArray(proj.images) && proj.images.length > 0
-                  ? (proj.images[0]?.imageUrl || proj.images[0])
-                  : (proj.image || 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&auto=format&fit=crop&q=80');
+      {/* Main Content Container */}
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
 
-                const hasMultipleImages = Array.isArray(proj.images) && proj.images.length > 1;
+        {/* 1. HEADER & ACADEMIC BANNER CARD */}
+        <section className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 overflow-hidden transition-colors duration-300">
 
-                return (
-                  <div
-                    key={proj.id || idx}
-                    className="insta-grid-item"
-                    onClick={() => setSelectedProject(proj)}
-                  >
-                    <img src={coverImg} alt={proj.title} className="insta-grid-img" loading="lazy" />
+          {/* College Campus Cover Banner */}
+          <div
+            onClick={() => coverUploadRef.current?.click()}
+            title="Click to change cover banner"
+            className="relative h-44 sm:h-56 w-full bg-gradient-to-r from-slate-900 via-indigo-900 to-navy-600 overflow-hidden group cursor-pointer"
+          >
+            <img
+              src={profile.cover || DEFAULT_COVER_IMAGE}
+              alt="University Campus Banner"
+              className="w-full h-full object-cover object-center opacity-85 transition-transform duration-700 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent"></div>
 
-                    {hasMultipleImages && (
-                      <span className="insta-multi-photo-icon" title="Multiple photos">
-                        <Layers size={14} />
-                      </span>
-                    )}
-
-                    {/* Instagram Hover Overlay with Likes & Comments */}
-                    <div className="insta-grid-hover-overlay">
-                      <div className="insta-hover-stat">
-                        <Heart size={18} fill="#ffffff" color="#ffffff" />
-                        <strong>{proj.likesCount || 34 + (idx * 7)}</strong>
-                      </div>
-                      <div className="insta-hover-stat">
-                        <MessageCircle size={18} fill="#ffffff" color="#ffffff" />
-                        <strong>{proj.commentsCount || 8 + (idx * 3)}</strong>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            {/* Hover Camera Overlay */}
+            <div className="absolute inset-0 bg-black/45 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-1.5 text-white pointer-events-none">
+              <div className="w-11 h-11 rounded-full bg-white/15 border border-white/25 flex items-center justify-center">
+                <Camera className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-xs font-medium tracking-wide">Change Banner</span>
             </div>
-          ) : (
-            <div className="insta-empty-state">
-              <Grid size={48} color="#94a3b8" />
-              <h3>No Projects Shared Yet</h3>
-              <p>Showcase your academic capstones, web apps, or prototypes with your student peers.</p>
-              <button
-                type="button"
-                className="button primary"
-                onClick={() => navigate?.('projects')}
-                style={{ marginTop: '12px' }}
+            <input
+              type="file"
+              ref={coverUploadRef}
+              accept="image/*"
+              onClick={(e) => e.stopPropagation()}
+              onChange={handleCoverUpload}
+              className="hidden"
+            />
+          </div>
+
+          {/* Student Profile Info Section */}
+          <div className="px-6 sm:px-8 pb-6">
+            <div className="relative flex flex-col sm:flex-row sm:items-end sm:justify-between -mt-14 sm:-mt-16 mb-5 gap-4">
+
+              {/* Circular Student Avatar */}
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  avatarUploadRef.current?.click();
+                }}
+                title="Click to change profile photo"
+                className="relative inline-block w-28 h-28 sm:w-32 sm:h-32 rounded-full group cursor-pointer"
               >
-                <Plus size={16} />
-                <span>Create First Project Post</span>
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+                <img
+                  src={profile.avatar || DEFAULT_STUDENT_PHOTO}
+                  alt={profile.name}
+                  className="w-full h-full object-cover rounded-full border-4 border-white dark:border-slate-900 shadow-lg bg-slate-200 dark:bg-slate-800"
+                />
 
-      {/* ============================================================ */}
-      {/* 5. TAB CONTENT 2: CERTIFICATES GALLERY                       */}
-      {/* ============================================================ */}
-      {activeTab === 'certificates' && (
-        <div className="insta-tab-body">
-          {currentCertificates.length > 0 ? (
-            <div className="insta-certs-grid">
-              {currentCertificates.map((cert) => (
-                <div key={cert.id} className="insta-cert-card">
-                  <div className="insta-cert-preview">
-                    {cert.fileData?.startsWith('data:image') ? (
-                      <img src={cert.fileData} alt={cert.programTitle} className="insta-cert-img" />
-                    ) : (
-                      <div className="insta-cert-fallback">
-                        <Award size={36} color="#0d9488" />
-                        <span>{cert.programTitle}</span>
-                      </div>
-                    )}
+                {/* Avatar Hover Camera Overlay */}
+                <div className="absolute inset-1 rounded-full bg-black/45 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center text-white pointer-events-none">
+                  <Camera className="w-6 h-6 text-white" />
+                </div>
+                <input
+                  type="file"
+                  ref={avatarUploadRef}
+                  accept="image/*"
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                />
+              </div>
+            </div>
+
+            {/* Student Name, Academic Summary & Bio */}
+            <div className="space-y-2.5">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+                  {profile.name}
+                </h1>
+                <p className="text-sm sm:text-base font-medium text-navy-600 dark:text-indigo-400 mt-0.5">
+                  {batchYearLabel ? `${degreeBranchLabel} • ${batchYearLabel}` : degreeBranchLabel}
+                </p>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                  {profile.headline}
+                </p>
+              </div>
+
+              <p className="text-slate-600 dark:text-slate-300 text-sm max-w-3xl leading-relaxed">
+                {profile.bio}
+              </p>
+            </div>
+          </div>
+
+          {/* Interactive Navigation Tabs */}
+          <div className="border-t border-slate-200 dark:border-slate-800 px-6 sm:px-8 flex gap-6 sm:gap-8 overflow-x-auto no-scrollbar">
+            <button
+              type="button"
+              onClick={() => switchTab('overview')}
+              className={`tab-btn py-4 text-sm whitespace-nowrap transition-colors flex items-center gap-2 border-b-2 ${
+                activeTab === 'overview'
+                  ? 'border-navy-600 text-navy-600 dark:text-indigo-400 dark:border-indigo-400 font-semibold'
+                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-medium'
+              }`}
+            >
+              <User className="w-4 h-4" />
+              <span>Overview</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => switchTab('projects')}
+              className={`tab-btn py-4 text-sm whitespace-nowrap transition-colors flex items-center gap-2 border-b-2 ${
+                activeTab === 'projects'
+                  ? 'border-navy-600 text-navy-600 dark:text-indigo-400 dark:border-indigo-400 font-semibold'
+                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-medium'
+              }`}
+            >
+              <FolderGit2 className="w-4 h-4" />
+              <span>Projects</span>
+              <span className="ml-0.5 px-2 py-0.5 text-[11px] font-semibold rounded-full bg-indigo-50 dark:bg-indigo-500/15 text-navy-600 dark:text-indigo-300">
+                {projects.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => switchTab('settings')}
+              className={`tab-btn py-4 text-sm whitespace-nowrap transition-colors flex items-center gap-2 border-b-2 ${
+                activeTab === 'settings'
+                  ? 'border-navy-600 text-navy-600 dark:text-indigo-400 dark:border-indigo-400 font-semibold'
+                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-medium'
+              }`}
+            >
+              <Settings className="w-4 h-4" />
+              <span>Profile Settings</span>
+            </button>
+          </div>
+        </section>
+
+        {/* 2. TAB PANELS */}
+        <div>
+
+          {/* TAB 1: OVERVIEW */}
+          {activeTab === 'overview' && (
+            <div className="tab-panel space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                {/* About, Career Objective & Domain Interests Card */}
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+                  <h3 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-navy-600 dark:text-indigo-400" />
+                    <span>About & Career Objective</span>
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                    {profile.bio || 'No academic bio added yet.'}
+                  </p>
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                      Career Objective
+                    </p>
+                    <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed">
+                      {profile.objective || 'No career objective specified.'}
+                    </p>
                   </div>
-                  <div className="insta-cert-meta">
-                    <h4 className="insta-cert-title">{cert.programTitle}</h4>
-                    <span className="insta-cert-issuer">{cert.issuer || 'Podar Academic Board'}</span>
-                    <div className="insta-cert-footer">
-                      <code className="insta-cert-code">{cert.verificationCode || cert.credentialId || 'VERIFIED'}</code>
-                      <span className="insta-cert-badge">
-                        <ShieldCheck size={13} color="#059669" />
-                        <span>Verified</span>
+                  <div className="pt-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                      Research & Domain Interests
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-50 dark:bg-indigo-500/10 text-navy-600 dark:text-indigo-300">
+                        Distributed Systems
+                      </span>
+                      <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-50 dark:bg-indigo-500/10 text-navy-600 dark:text-indigo-300">
+                        Full-Stack Architecture
+                      </span>
+                      <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-50 dark:bg-indigo-500/10 text-navy-600 dark:text-indigo-300">
+                        Applied AI / LLMs
+                      </span>
+                      <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-50 dark:bg-indigo-500/10 text-navy-600 dark:text-indigo-300">
+                        Cloud & DevOps
                       </span>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="insta-empty-state">
-              <Award size={48} color="#94a3b8" />
-              <h3>No Certificates Added Yet</h3>
-              <p>Complete certified courses and upload your credentials to earn verified badges and score points.</p>
-              <button
-                type="button"
-                className="button primary"
-                onClick={() => navigate?.('courses')}
-                style={{ marginTop: '12px' }}
-              >
-                <span>Browse Courses & Certifications</span>
-              </button>
+
+                {/* Academic & Personal Identity Details */}
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                      <GraduationCap className="w-4 h-4 text-navy-600 dark:text-indigo-400" />
+                      <span>Academic & Personal Details</span>
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => switchTab('settings')}
+                      className="text-xs font-medium text-navy-600 dark:text-indigo-400 hover:underline"
+                    >
+                      Edit
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-3 text-xs">
+                    <div>
+                      <p className="text-slate-400 font-medium">Degree & Branch</p>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
+                        {[profile.degreeShort, profile.branch].filter(Boolean).join(' — ') || 'Not specified'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 font-medium">Batch / Section</p>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
+                        {[profile.batch, profile.section].filter(Boolean).join(' • ') || 'Not specified'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 font-medium">Current Semester</p>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
+                        {profile.semester || 'Not specified'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 font-medium">Date of Birth</p>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
+                        {profile.dob || 'Not specified'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 font-medium">Blood Group</p>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
+                        {profile.blood || 'Not specified'}
+                      </p>
+                    </div>
+                    <div className="col-span-2 sm:col-span-1">
+                      <p className="text-slate-400 font-medium">Personal Email</p>
+                      <p
+                        className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5 truncate"
+                        title={profile.personalEmail}
+                      >
+                        {profile.personalEmail || 'Not specified'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Address Details Card */}
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-navy-600 dark:text-indigo-400" />
+                      <span>Address Details</span>
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => switchTab('settings')}
+                      className="text-xs font-medium text-navy-600 dark:text-indigo-400 hover:underline"
+                    >
+                      Edit
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-3 text-xs">
+                    <div className="col-span-2 sm:col-span-3">
+                      <p className="text-slate-400 font-medium">Street / House / Area Address</p>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
+                        {profile.street || 'Not specified'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 font-medium">City / Town</p>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
+                        {profile.city || 'Not specified'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 font-medium">District</p>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
+                        {profile.district || 'Not specified'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 font-medium">State / UT</p>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
+                        {profile.state || 'Not specified'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-slate-400 font-medium">PIN Code</p>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
+                        {profile.pincode || 'Not specified'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Technical Skills & Stack */}
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                      <Code2 className="w-4 h-4 text-navy-600 dark:text-indigo-400" />
+                      <span>Technical Skills & Stack</span>
+                    </h3>
+                    <span className="text-[11px] text-slate-400">Tap to highlight • Edit in Settings</span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {profile.skills.length === 0 ? (
+                      <p className="text-xs text-slate-400">No skills added yet. Add them in Profile Settings.</p>
+                    ) : (
+                      profile.skills.map(skill => {
+                        const isPinned = highlightedSkills.has(skill);
+                        return (
+                          <button
+                            key={skill}
+                            type="button"
+                            onClick={() => toggleSkillHighlight(skill)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 border ${
+                              isPinned
+                                ? 'bg-navy-600 text-white border-navy-600 shadow-sm'
+                                : 'bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-navy-400'
+                            }`}
+                          >
+                            {isPinned && <Star className="w-3 h-3 fill-current" />}
+                            <span>{skill}</span>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+              </div>
             </div>
           )}
-        </div>
-      )}
 
-      {/* ============================================================ */}
-      {/* 6. TAB CONTENT 3: SAVED ITEMS                                */}
-      {/* ============================================================ */}
-      {/* ============================================================ */}
-      {/* TAB CONTENT: CAMPUS DIRECTORY & PROFILES                     */}
-      {/* ============================================================ */}
-      {activeTab === 'directory' && (
-        <div className="insta-tab-body">
-          <div className="insta-directory-container">
-            {/* Directory Header */}
-            <div className="insta-directory-hero">
-              <div className="insta-dir-hero-icon">
-                <Users size={28} />
-              </div>
-              <div>
-                <h3>Campus Community & Directory</h3>
-                <p>Browse and connect with registered students, faculty mentors, and college administrators across Podar Pathways.</p>
-              </div>
-            </div>
+          {/* TAB 2: PROJECTS */}
+          {activeTab === 'projects' && (
+            <div className="tab-panel space-y-6">
 
-            {/* Directory Search & Filters */}
-            <div className="insta-dir-controls">
-              <div className="insta-dir-search-wrap">
-                <Search size={18} className="insta-dir-search-icon" />
-                <input
-                  type="text"
-                  className="insta-dir-search-input"
-                  placeholder="Search by name, course, role, or department..."
-                  value={directorySearch}
-                  onChange={(e) => setDirectorySearch(e.target.value)}
-                />
-                {directorySearch && (
+              {/* Top Action Header, Search & Upload Button */}
+              <div className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <FolderGit2 className="w-5 h-5 text-navy-600 dark:text-indigo-400" />
+                      <span>Uploaded Student Projects</span>
+                    </h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Showcase your academic builds, hackathon prototypes, and personal software projects.
+                    </p>
+                  </div>
                   <button
                     type="button"
-                    className="insta-dir-clear-btn"
-                    onClick={() => setDirectorySearch('')}
+                    onClick={handleOpenComposer}
+                    className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-navy-600 hover:bg-navy-700 text-white shadow-sm shadow-indigo-500/20 transition-all flex items-center justify-center gap-2"
                   >
-                    <X size={14} />
+                    <PlusCircle className="w-4 h-4" />
+                    <span>Upload Project</span>
                   </button>
+                </div>
+
+                {/* Search Filter Input */}
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+                  <div className="relative max-w-md">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={projectSearchInput}
+                      onChange={(e) => setProjectSearchInput(e.target.value)}
+                      placeholder="Search uploaded projects by title or tech stack..."
+                      className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Projects Card Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredProjects.length === 0 ? (
+                  <div className="col-span-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-10 text-center space-y-2">
+                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                      No matching projects found
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      Try a different search keyword or upload a new project post.
+                    </p>
+                  </div>
+                ) : (
+                  filteredProjects.map(proj => {
+                    const cssFilter = FILTER_STYLES[proj.filter] || 'none';
+                    return (
+                      <article
+                        key={proj.id}
+                        className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col justify-between group hover:shadow-md transition-all"
+                      >
+                        <div>
+                          <div
+                            onClick={() => setSelectedProject(proj)}
+                            className="relative h-44 w-full bg-gradient-to-br from-navy-700 via-indigo-700 to-blue-600 overflow-hidden cursor-pointer"
+                          >
+                            {proj.image ? (
+                              <img
+                                src={proj.image}
+                                alt={proj.title}
+                                style={{ filter: cssFilter }}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center text-white/90 gap-1.5">
+                                <Code2 className="w-8 h-8" />
+                                <span className="text-[11px] font-medium opacity-80">Software Build</span>
+                              </div>
+                            )}
+                            <span className="absolute bottom-2.5 left-2.5 px-2.5 py-0.5 rounded-lg bg-slate-950/65 text-white text-[11px] font-medium backdrop-blur-sm">
+                              {proj.date}
+                            </span>
+                          </div>
+
+                          <div className="p-5 space-y-2.5">
+                            <h3
+                              onClick={() => setSelectedProject(proj)}
+                              className="text-base font-bold text-slate-900 dark:text-white group-hover:text-navy-600 dark:group-hover:text-indigo-400 transition-colors cursor-pointer line-clamp-1"
+                            >
+                              {proj.title}
+                            </h3>
+                            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-3">
+                              {proj.description || 'No description provided.'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="px-5 pb-5 pt-2 space-y-3">
+                          <div className="flex flex-wrap gap-1.5">
+                            {Array.isArray(proj.tech) &&
+                              proj.tech.map((t, idx) => (
+                                <span
+                                  key={idx}
+                                  className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+                                >
+                                  {t}
+                                </span>
+                              ))}
+                          </div>
+
+                          <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedProject(proj)}
+                              className="text-xs font-semibold text-navy-600 dark:text-indigo-400 hover:underline"
+                            >
+                              View Details
+                            </button>
+
+                            {proj.demoUrl ? (
+                              <a
+                                href={proj.demoUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white flex items-center gap-1"
+                              >
+                                <span>Live / Repo</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            ) : (
+                              <span className="text-[11px] text-slate-400">Local build</span>
+                            )}
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })
                 )}
               </div>
-
-              <div className="insta-dir-filter-chips">
-                <button
-                  type="button"
-                  className={`insta-dir-chip ${directoryFilter === 'all' ? 'active' : ''}`}
-                  onClick={() => setDirectoryFilter('all')}
-                >
-                  All Members ({directoryList.length})
-                </button>
-                <button
-                  type="button"
-                  className={`insta-dir-chip ${directoryFilter === 'students' ? 'active' : ''}`}
-                  onClick={() => setDirectoryFilter('students')}
-                >
-                  Students ({directoryList.filter(u => u.userType === 'student').length})
-                </button>
-                <button
-                  type="button"
-                  className={`insta-dir-chip ${directoryFilter === 'admins' ? 'active' : ''}`}
-                  onClick={() => setDirectoryFilter('admins')}
-                >
-                  Faculty & Admins ({directoryList.filter(u => u.userType === 'admin').length})
-                </button>
-              </div>
             </div>
+          )}
 
-            {/* Directory Grid */}
-            {filteredDirectoryList.length > 0 ? (
-              <div className="insta-dir-grid">
-                {filteredDirectoryList.map((user) => {
-                  const isMe = (session?.role === 'student' && user.id === (student?.id || session?.id)) ||
-                               (session?.role === 'admin' && user.id === session?.id);
-                  const isCurrentlyViewed = targetUserId ? targetUserId === user.id : isMe;
+          {/* TAB 3: PROFILE SETTINGS */}
+          {activeTab === 'settings' && (
+            <div className="tab-panel">
+              <form onSubmit={handleSaveAllSettings} noValidate className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-                  return (
-                    <div
-                      key={user.id}
-                      className={`insta-dir-card ${isCurrentlyViewed ? 'current' : ''}`}
-                      onClick={() => handleSelectUser(user)}
-                    >
-                      <div className="insta-dir-avatar-wrap">
-                        <div className={`insta-dir-avatar-ring ${user.userType === 'admin' ? 'admin' : ''}`}>
-                          <ProfileAvatar src={user.avatar} name={user.name} alt={user.name} className="insta-dir-avatar-img" />
-                        </div>
-                        {user.userType === 'admin' ? (
-                          <span className="insta-dir-badge-icon admin" title="College Administration">
-                            <ShieldCheck size={14} color="#f59e0b" fill="#1e293b" />
-                          </span>
-                        ) : (
-                          <span className="insta-dir-badge-icon student" title="Verified Student">
-                            <BadgeCheck size={14} color="#0284c7" />
-                          </span>
-                        )}
+                {/* Left 2 Columns: Personal, Address, Academic & Skills Cards */}
+                <div className="lg:col-span-2 space-y-6">
+
+                  {/* Card A: Personal Information */}
+                  <div className="bg-white dark:bg-slate-900 p-6 sm:p-7 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-5">
+                    <div>
+                      <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                        <User className="w-4 h-4 text-navy-600 dark:text-indigo-400" />
+                        <span>Personal Information</span>
+                      </h2>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Fields marked with <span className="text-rose-500 font-bold">*</span> are required; all others are optional.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                          Full Name <span className="text-rose-500 font-bold">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={profile.name}
+                          onChange={(e) => setProfile(prev => ({ ...prev, name: e.target.value }))}
+                          required
+                          className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border ${
+                            formErrors.name ? 'border-rose-500 ring-2 ring-rose-500/30' : 'border-slate-200 dark:border-slate-700'
+                          } text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500`}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                          Tagline / Headline
+                        </label>
+                        <input
+                          type="text"
+                          value={profile.headline}
+                          onChange={(e) => setProfile(prev => ({ ...prev, headline: e.target.value }))}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                        Academic Bio
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={profile.bio}
+                        onChange={(e) => setProfile(prev => ({ ...prev, bio: e.target.value }))}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500 resize-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                        Career Objective
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={profile.objective}
+                        onChange={(e) => setProfile(prev => ({ ...prev, objective: e.target.value }))}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500 resize-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                          Date of Birth
+                        </label>
+                        <input
+                          type="text"
+                          value={profile.dob}
+                          onChange={(e) => setProfile(prev => ({ ...prev, dob: e.target.value }))}
+                          className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500"
+                        />
                       </div>
 
-                      <div className="insta-dir-card-body">
-                        <div className="insta-dir-card-top">
-                          <h4 className="insta-dir-user-name">
-                            {user.name}
-                            {isMe && <span className="insta-dir-you-tag">You</span>}
-                          </h4>
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                          Blood Group
+                        </label>
+                        <select
+                          value={profile.blood}
+                          onChange={(e) => setProfile(prev => ({ ...prev, blood: e.target.value }))}
+                          className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500"
+                        >
+                          <option value="">None</option>
+                          <option value="A+">A+</option>
+                          <option value="A-">A-</option>
+                          <option value="B+">B+</option>
+                          <option value="B-">B-</option>
+                          <option value="AB+">AB+</option>
+                          <option value="AB-">AB-</option>
+                          <option value="O+">O+</option>
+                          <option value="O-">O-</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                          Personal Email
+                        </label>
+                        <input
+                          type="email"
+                          value={profile.personalEmail}
+                          onChange={(e) => setProfile(prev => ({ ...prev, personalEmail: e.target.value }))}
+                          className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card B: Address Details */}
+                  <div className="bg-white dark:bg-slate-900 p-6 sm:p-7 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-5">
+                    <div>
+                      <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-navy-600 dark:text-indigo-400" />
+                        <span>Address Details</span>
+                      </h2>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Residential and permanent location details (optional).
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                        Street / House / Area Address
+                      </label>
+                      <input
+                        type="text"
+                        value={profile.street}
+                        onChange={(e) => setProfile(prev => ({ ...prev, street: e.target.value }))}
+                        placeholder="e.g., Flat 302, Green Park Residency, MG Road"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                          City / Town
+                        </label>
+                        <input
+                          type="text"
+                          value={profile.city}
+                          onChange={(e) => setProfile(prev => ({ ...prev, city: e.target.value }))}
+                          placeholder="e.g., Bengaluru"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                          PIN Code
+                        </label>
+                        <input
+                          type="text"
+                          value={profile.pincode}
+                          onChange={(e) => setProfile(prev => ({ ...prev, pincode: e.target.value.replace(/[^0-9]/g, '').slice(0, 6) }))}
+                          placeholder="e.g., 560001"
+                          maxLength={6}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Cascading State & District */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                          State / Union Territory
+                        </label>
+                        <select
+                          value={profile.state}
+                          onChange={(e) => setProfile(prev => ({ ...prev, state: e.target.value, district: '' }))}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500"
+                        >
+                          <option value="">None</option>
+                          {Object.keys(INDIAN_STATES_DISTRICTS).map(st => (
+                            <option key={st} value={st}>{st}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                          District
+                        </label>
+                        <select
+                          value={profile.district}
+                          onChange={(e) => setProfile(prev => ({ ...prev, district: e.target.value }))}
+                          disabled={!profile.state || districtOptions.length === 0}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          <option value="">None</option>
+                          {districtOptions.map(dist => (
+                            <option key={dist} value={dist}>{dist}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card C: Academic & Enrollment Details */}
+                  <div className="bg-white dark:bg-slate-900 p-6 sm:p-7 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-5">
+                    <div>
+                      <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                        <GraduationCap className="w-4 h-4 text-navy-600 dark:text-indigo-400" />
+                        <span>Academic & Enrollment Details</span>
+                      </h2>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Program, branch, and semester details (<span className="text-rose-500 font-bold">*</span> required).
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                          Degree <span className="text-rose-500 font-bold">*</span>
+                        </label>
+                        <select
+                          value={profile.degreeShort}
+                          onChange={(e) => setProfile(prev => ({ ...prev, degreeShort: e.target.value }))}
+                          required
+                          className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border ${
+                            formErrors.degreeShort ? 'border-rose-500 ring-2 ring-rose-500/30' : 'border-slate-200 dark:border-slate-700'
+                          } text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500`}
+                        >
+                          <option value="">None</option>
+                          <option value="B.Tech">B.Tech</option>
+                          <option value="B.E.">B.E.</option>
+                          <option value="B.Sc">B.Sc</option>
+                          <option value="BCA">BCA</option>
+                          <option value="M.Tech">M.Tech</option>
+                          <option value="MCA">MCA</option>
+                          <option value="Ph.D.">Ph.D.</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                          Branch / Department <span className="text-rose-500 font-bold">*</span>
+                        </label>
+                        <select
+                          value={profile.branch}
+                          onChange={(e) => setProfile(prev => ({ ...prev, branch: e.target.value }))}
+                          required
+                          className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border ${
+                            formErrors.branch ? 'border-rose-500 ring-2 ring-rose-500/30' : 'border-slate-200 dark:border-slate-700'
+                          } text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500`}
+                        >
+                          <option value="">None</option>
+                          <option value="Computer Science & Engineering">Computer Science & Engineering</option>
+                          <option value="Information Technology">Information Technology</option>
+                          <option value="Artificial Intelligence & Data Science">Artificial Intelligence & Data Science</option>
+                          <option value="Electronics & Communication">Electronics & Communication</option>
+                          <option value="Electrical Engineering">Electrical Engineering</option>
+                          <option value="Mechanical Engineering">Mechanical Engineering</option>
+                          <option value="Civil Engineering">Civil Engineering</option>
+                          <option value="Chemical Engineering">Chemical Engineering</option>
+                          <option value="Biotechnology">Biotechnology</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                          Academic Batch
+                        </label>
+                        <input
+                          type="text"
+                          value={profile.batch}
+                          onChange={(e) => setProfile(prev => ({ ...prev, batch: e.target.value }))}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                            Semester <span className="text-rose-500 font-bold">*</span>
+                          </label>
+                          <select
+                            value={profile.semester}
+                            onChange={(e) => setProfile(prev => ({ ...prev, semester: e.target.value }))}
+                            required
+                            className={`w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border ${
+                              formErrors.semester ? 'border-rose-500 ring-2 ring-rose-500/30' : 'border-slate-200 dark:border-slate-700'
+                            } text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500`}
+                          >
+                            <option value="">None</option>
+                            <option value="1st Semester">1st Sem</option>
+                            <option value="2nd Semester">2nd Sem</option>
+                            <option value="3rd Semester">3rd Sem</option>
+                            <option value="4th Semester">4th Sem</option>
+                            <option value="5th Semester">5th Sem</option>
+                            <option value="6th Semester">6th Sem</option>
+                            <option value="7th Semester">7th Sem</option>
+                            <option value="8th Semester">8th Sem</option>
+                          </select>
                         </div>
 
-                        <span className={`insta-dir-role-badge ${user.userType === 'admin' ? 'admin' : 'student'}`}>
-                          {user.displayRole}
-                        </span>
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                            Section <span className="text-rose-500 font-bold">*</span>
+                          </label>
+                          <select
+                            value={profile.section}
+                            onChange={(e) => setProfile(prev => ({ ...prev, section: e.target.value }))}
+                            required
+                            className={`w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border ${
+                              formErrors.section ? 'border-rose-500 ring-2 ring-rose-500/30' : 'border-slate-200 dark:border-slate-700'
+                            } text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500`}
+                          >
+                            <option value="">None</option>
+                            <option value="Section A">Section A</option>
+                            <option value="Section B">Section B</option>
+                            <option value="Section C">Section C</option>
+                            <option value="Section D">Section D</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
-                        <p className="insta-dir-headline">
-                          {user.displayHeadline || (user.userType === 'admin' ? 'College Administration' : 'Podar Student')}
-                        </p>
+                  {/* Card D: Technical Skills Manager */}
+                  <div className="bg-white dark:bg-slate-900 p-6 sm:p-7 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+                    <div>
+                      <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-navy-600 dark:text-indigo-400" />
+                        <span>Technical Skills & Expertise</span>
+                      </h2>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Manage skills showcased on your public academic profile.
+                      </p>
+                    </div>
 
-                        <div className="insta-dir-card-footer">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newSkillInput}
+                        onChange={(e) => setNewSkillInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddSkill();
+                          }
+                        }}
+                        placeholder="e.g. Next.js, Docker, PyTorch"
+                        className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddSkill}
+                        className="px-4 py-2.5 rounded-xl bg-navy-600 hover:bg-navy-700 text-white text-xs sm:text-sm font-semibold transition-colors flex items-center gap-1.5"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Add</span>
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      {profile.skills.map((skill, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-medium bg-indigo-50 dark:bg-indigo-500/15 text-navy-600 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-500/20"
+                        >
+                          <span>{skill}</span>
                           <button
                             type="button"
-                            className={`insta-dir-view-btn ${isCurrentlyViewed ? 'active' : ''}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSelectUser(user);
-                            }}
+                            onClick={() => handleRemoveSkill(idx)}
+                            className="hover:text-rose-500 transition-colors"
+                            aria-label={`Remove ${skill}`}
                           >
-                            {isMe ? 'My Profile' : 'View Profile'}
-                            <ChevronRight size={14} />
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Right Column: Preferences & Save Actions */}
+                <div className="space-y-6">
+
+                  {/* Preferences Card */}
+                  <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+                    <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+                      System Preferences
+                    </h3>
+
+                    {/* Dark Theme Switch */}
+                    <div className="flex items-center justify-between py-1">
+                      <div>
+                        <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">Dark Theme</p>
+                        <p className="text-[11px] text-slate-400">Toggle high-contrast dark mode</p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={isDarkMode}
+                        onClick={toggleDarkMode}
+                        className={`w-11 h-6 rounded-full p-0.5 transition-colors flex items-center ${
+                          isDarkMode ? 'bg-navy-600' : 'bg-slate-300 dark:bg-slate-700'
+                        }`}
+                      >
+                        <span
+                          className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform ${
+                            isDarkMode ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    {/* Email Alerts Switch */}
+                    <div className="flex items-center justify-between py-1">
+                      <div>
+                        <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">Email Alerts</p>
+                        <p className="text-[11px] text-slate-400">Project & portal activity alerts</p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={emailAlerts}
+                        onClick={() => {
+                          const next = !emailAlerts;
+                          setEmailAlerts(next);
+                          showToast(`Email alerts ${next ? 'enabled' : 'disabled'}`);
+                        }}
+                        className={`w-11 h-6 rounded-full p-0.5 transition-colors flex items-center ${
+                          emailAlerts ? 'bg-navy-600' : 'bg-slate-300 dark:bg-slate-700'
+                        }`}
+                      >
+                        <span
+                          className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform ${
+                            emailAlerts ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Save & Reset Actions Card */}
+                  <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 px-4 rounded-xl bg-navy-600 hover:bg-navy-700 text-white text-xs sm:text-sm font-semibold shadow-sm transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>Save All Changes</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResetDefaults}
+                      className="w-full py-2.5 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors"
+                    >
+                      Reset to Default
+                    </button>
+                  </div>
+
+                </div>
+              </form>
+            </div>
+          )}
+
+        </div>
+      </main>
+
+      {/* SINGLE-VIEW INSTAGRAM-STYLE PROJECT POST COMPOSER MODAL */}
+      {isComposerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-3 sm:p-5 overflow-y-auto">
+          <form
+            onSubmit={handleShareProject}
+            noValidate
+            className="bg-white dark:bg-slate-900 rounded-3xl max-w-4xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden my-auto modal-animate-enter"
+          >
+            {/* Modal Header */}
+            <div className="px-4 sm:px-6 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
+              <button
+                type="button"
+                onClick={() => setIsComposerOpen(false)}
+                className="text-xs sm:text-sm font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 px-2 py-1 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight">
+                New Project Post
+              </h3>
+              <button
+                type="submit"
+                className="text-xs sm:text-sm font-bold text-navy-600 dark:text-indigo-400 hover:text-navy-700 dark:hover:text-indigo-300 px-2.5 py-1 rounded-lg transition-colors"
+              >
+                Share
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="grid grid-cols-1 lg:grid-cols-12">
+
+              {/* Left Pane: Media Dropzone, Aspect Ratio & Filters */}
+              <div className="lg:col-span-7 bg-slate-100/80 dark:bg-slate-950/70 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 p-4 sm:p-5 flex flex-col justify-between gap-4">
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setComposerDragOver(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    setComposerDragOver(false);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setComposerDragOver(false);
+                    const file = e.dataTransfer?.files?.[0];
+                    if (file) handleComposerFile(file);
+                  }}
+                  className={`relative w-full min-h-[260px] sm:min-h-[320px] rounded-2xl border-2 border-dashed ${
+                    composerDragOver ? 'border-navy-500 bg-indigo-50/40 dark:bg-indigo-950/20' : 'border-slate-300 dark:border-slate-700'
+                  } bg-white dark:bg-slate-900/90 flex items-center justify-center overflow-hidden transition-all`}
+                >
+                  {!composerState.imageDataUrl && !composerState.useGradientCover ? (
+                    /* Empty Dropzone State */
+                    <div className="p-6 text-center space-y-3.5 max-w-xs mx-auto">
+                      <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-500/15 text-navy-600 dark:text-indigo-400 flex items-center justify-center mx-auto shadow-sm">
+                        <PlusCircle className="w-7 h-7" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                          Drag project screenshot here
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          or select a cover photo from your device
+                        </p>
+                      </div>
+                      <div className="flex flex-col sm:flex-row items-center justify-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => projectImgUploadRef.current?.click()}
+                          className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-semibold bg-navy-600 hover:bg-navy-700 text-white shadow-sm transition-colors"
+                        >
+                          Select from device
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setComposerState(prev => ({ ...prev, useGradientCover: true, imageDataUrl: '' }))}
+                          className="w-full sm:w-auto px-3.5 py-2 rounded-xl text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-slate-700 transition-colors"
+                        >
+                          Use Gradient Cover
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Preview State */
+                    <div className="w-full h-full flex flex-col items-center justify-center p-3">
+                      <div
+                        className={`relative w-full ${
+                          composerState.aspectRatio === '4:5'
+                            ? 'aspect-[4/5]'
+                            : composerState.aspectRatio === '1:1'
+                            ? 'aspect-square'
+                            : 'aspect-video'
+                        } max-h-[300px] rounded-xl overflow-hidden shadow-md bg-gradient-to-br from-navy-700 via-indigo-700 to-blue-600 flex items-center justify-center transition-all duration-300`}
+                      >
+                        {composerState.imageDataUrl ? (
+                          <img
+                            src={composerState.imageDataUrl}
+                            alt="Preview"
+                            style={{ filter: FILTER_STYLES[composerState.filter] || 'none' }}
+                            className="w-full h-full object-cover transition-all duration-300"
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center text-white/95 gap-2 p-4 text-center">
+                            <Code2 className="w-10 h-10" />
+                            <span className="text-xs font-semibold tracking-wide uppercase opacity-90">
+                              Custom Gradient Cover
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Top-Right Quick Actions */}
+                        <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => projectImgUploadRef.current?.click()}
+                            className="px-2.5 py-1 rounded-lg bg-slate-950/70 hover:bg-slate-950 text-white text-[11px] font-medium backdrop-blur-md flex items-center gap-1 transition-colors"
+                          >
+                            <ImagePlus className="w-3 h-3" />
+                            <span>Change Photo</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setComposerState(prev => ({ ...prev, imageDataUrl: '', useGradientCover: false }))}
+                            className="px-2.5 py-1 rounded-lg bg-slate-950/70 hover:bg-rose-600 text-white text-[11px] font-medium backdrop-blur-md flex items-center gap-1 transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                            <span>Remove</span>
                           </button>
                         </div>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="insta-empty-state">
-                <Users size={48} color="#94a3b8" />
-                <h3>No profiles match your search</h3>
-                <p>Try searching with another name, course, role, or department.</p>
-                <button
-                  type="button"
-                  className="button secondary"
-                  onClick={() => { setDirectorySearch(''); setDirectoryFilter('all'); }}
-                  style={{ marginTop: '12px' }}
-                >
-                  Clear Search Filters
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ============================================================ */}
-      {/* TAB CONTENT: ADMIN OFFICE & PURVIEW                          */}
-      {/* ============================================================ */}
-      {activeTab === 'office' && isViewingAdmin && (
-        <div className="insta-tab-body">
-          <div className="admin-office-card">
-            <div className="admin-office-header">
-              <div className="admin-office-badge">
-                <ShieldCheck size={28} color="#0284c7" />
-              </div>
-              <div>
-                <h3>Official Institutional Administration</h3>
-                <p>Verified Faculty & Administrative Staff Member at Podar Pathways</p>
-              </div>
-            </div>
-
-            <div className="admin-office-grid">
-              <div className="admin-office-item">
-                <span className="admin-office-label"><Briefcase size={14} /> Department / Cell</span>
-                <strong>{activeProfileUser?.department || 'Career & Placement Cell'}</strong>
-              </div>
-              <div className="admin-office-item">
-                <span className="admin-office-label"><Shield size={14} /> Official Role</span>
-                <strong>{activeProfileUser?.role || 'Super Admin'}</strong>
-              </div>
-              <div className="admin-office-item">
-                <span className="admin-office-label"><Mail size={14} /> Official Email</span>
-                <a href={`mailto:${activeProfileUser?.email || 'admin@podar.edu'}`}>{activeProfileUser?.email || 'admin@podar.edu'}</a>
-              </div>
-              <div className="admin-office-item">
-                <span className="admin-office-label"><Phone size={14} /> Direct Helpline / Phone</span>
-                <a href={`tel:${activeProfileUser?.phone || '9999988888'}`}>{activeProfileUser?.phone || '9999988888'}</a>
-              </div>
-            </div>
-
-            <div className="admin-office-notice">
-              <h4>Administrative Scope & Purview</h4>
-              <p>
-                Oversees student career advancement, corporate recruitment partnerships, internship validation,
-                P-CARE employability score compliance, and verified institutional credentials across college cohorts.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'saved' && (
-        <div className="insta-tab-body">
-          <div className="insta-empty-state">
-            <Bookmark size={48} color="#94a3b8" />
-            <h3>Save Posts and Opportunities</h3>
-            <p>Save interesting student projects, hackathons, or job openings to revisit them anytime.</p>
-            <button
-              type="button"
-              className="button secondary"
-              onClick={() => navigate?.('opportunities')}
-              style={{ marginTop: '12px' }}
-            >
-              <span>Explore Opportunities</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ============================================================ */}
-      {/* 7. TAB CONTENT 4: EDIT PROFILE DETAILS                       */}
-      {/* ============================================================ */}
-      {isOwnProfile && activeTab === 'edit' && (
-        <div className="insta-tab-body">
-          <form onSubmit={handleSaveProfile} className="panel insta-edit-panel">
-            <div className="insta-panel-header">
-              <div>
-                <h3>Edit Student Profile</h3>
-                <p>Keep your profile details, career aspirations, and contact records updated. Fields marked * are required.</p>
-              </div>
-              <button
-                type="submit"
-                className="button primary"
-                disabled={isSavingProfile}
-              >
-                {isSavingProfile ? 'Saving...' : 'Save Profile'}
-              </button>
-            </div>
-
-            {profileSaveStatus && <p role={profileSaveStatus.type === 'error' ? 'alert' : 'status'} className={'profile-save-message ' + profileSaveStatus.type}>{profileSaveStatus.text}</p>}
-            {/* Avatar Row */}
-            <div className="insta-edit-avatar-row">
-              <div className="insta-avatar-ring small">
-                <ProfileAvatar src={formData.avatar} name={studentName} alt={studentName} className="insta-avatar-img" />
-              </div>
-              <div className="insta-edit-avatar-actions">
-                <strong>{studentName}</strong>
-                <div className="insta-avatar-btns-wrap">
-                  <button
-                    type="button"
-                    className="button outline small"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isSavingAvatar}
-                  >
-                    <Upload size={14} />
-                    <span>Change Photo</span>
-                  </button>
-                  {formData.avatar && (
-                    <button
-                      type="button"
-                      className="button ghost small"
-                      onClick={handleRemoveAvatar}
-                      disabled={isSavingAvatar}
-                      style={{ color: '#dc2626' }}
-                    >
-                      <Trash2 size={14} />
-                      <span>Remove</span>
-                    </button>
                   )}
-                </div>
-              </div>
-            </div>
 
-            {/* Bio Editor with Live Counter */}
-            <div className="form-group" style={{ marginTop: '18px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <label className="field-label">Bio & Career Headline</label>
-                <span style={{ fontSize: '11.5px', color: '#94a3b8' }}>
-                  {(formData.bio || '').length} / 250
-                </span>
-              </div>
-              <textarea
-                rows={3}
-                maxLength={250}
-                placeholder="Share a brief introduction, your tech passions, or what you are currently building..."
-                value={formData.bio}
-                onChange={e => setFormData({ ...formData, bio: e.target.value })}
-                className="field-textarea"
-              />
-            </div>
-
-            {/* Career Goal */}
-            <div className="form-group">
-              <label className="field-label" htmlFor="student-career-goal">Target Career Goal <span aria-hidden="true">*</span></label>
-              <input
-                type="text"
-                placeholder="e.g. Cloud Solutions Architect, Full-Stack Developer"
-                id="student-career-goal" required maxLength={200}
-                value={formData.goal}
-                onChange={e => setFormData({ ...formData, goal: e.target.value })}
-                className="field-input"
-              />
-            </div>
-
-            {/* Locked Institutional Credentials */}
-            <div className="insta-locked-section">
-              <div className="insta-locked-header">
-                <Lock size={15} color="#64748b" />
-                <span>Verified College Records (Locked by Administration)</span>
-              </div>
-              <div className="form-row-2">
-                <div className="form-group">
-                  <label className="field-label">Full Name</label>
-                  <input type="text" value={formData.name} disabled className="field-input locked" />
-                </div>
-                <div className="form-group">
-                  <label className="field-label">College Email</label>
-                  <input type="text" value={formData.email} disabled className="field-input locked" />
-                </div>
-              </div>
-            </div>
-
-            {/* Personal Details */}
-            <h4 className="insta-section-subtitle">Personal Details</h4>
-            <div className="form-row-2">
-              <div className="form-group">
-                <label className="field-label">Father's / Guardian's Name</label>
-                <input
-                  type="text"
-                  placeholder="Father's Name"
-                  value={formData.fathersName}
-                  onChange={e => setFormData({ ...formData, fathersName: e.target.value })}
-                  className="field-input"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="field-label">Date of Birth</label>
-                <input
-                  type="date"
-                  value={formData.dob}
-                  onChange={e => setFormData({ ...formData, dob: e.target.value })}
-                  className="field-input"
-                />
-              </div>
-            </div>
-
-            <div className="form-row-2">
-              <div className="form-group">
-                <label className="field-label" htmlFor="student-mobile">Registered Mobile (10-Digit) <span aria-hidden="true">*</span></label>
-                <input
-                  type="tel"
-                  placeholder="Enter your 10-digit mobile number"
-                  id="student-mobile" required pattern="[0-9]{10}"
-                  value={formData.phone}
-                  onChange={e => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
-                  className="field-input"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="field-label">Gender</label>
-                <select
-                  value={formData.gender}
-                  aria-label="Gender"
-                  onChange={e => setFormData({ ...formData, gender: e.target.value })}
-                  className="field-select"
-                >
-                  <option value="">Select Gender</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Residential Address */}
-            <h4 className="insta-section-subtitle">Residential Address</h4>
-            <div className="form-group">
-              <label className="field-label">House / Flat / Street Address</label>
-              <input
-                type="text"
-                placeholder="House No, Apartment, Street / Colony"
-                value={formData.houseNo}
-                onChange={e => setFormData({ ...formData, houseNo: e.target.value })}
-                className="field-input"
-              />
-            </div>
-
-            <div className="form-row-3">
-              <div className="form-group">
-                <label className="field-label">State</label>
-                <select
-                  value={formData.state}
-                  aria-label="State"
-                  onChange={e => setFormData({ ...formData, state: e.target.value, district: '' })}
-                  className="field-select"
-                >
-                  <option value="">Select State</option>
-                  {Object.keys(INDIAN_STATES_DISTRICTS).map(st => (
-                    <option key={st} value={st}>{st}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label className="field-label" htmlFor="student-district">District {formData.state && <span aria-hidden="true">*</span>}</label>
-                <select
-                  id="student-district" required={Boolean(formData.state)}
-                  value={formData.district}
-                  disabled={!formData.state}
-                  aria-label="District"
-                  onChange={e => setFormData({ ...formData, district: e.target.value })}
-                  className="field-select"
-                >
-                  <option value="">Select District</option>
-                  {formData.district && !currentDistricts.includes(formData.district) && (
-                    <option value={formData.district}>{formData.district}</option>
-                  )}
-                  {currentDistricts.map(dist => (
-                    <option key={dist} value={dist}>{dist}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label className="field-label">PIN Code (6 Digits)</label>
-                <input
-                  type="text"
-                  placeholder="Enter your 6-digit PIN code"
-                  maxLength={6}
-                  value={formData.pinCode}
-                  onChange={e => setFormData({ ...formData, pinCode: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-                  className="field-input"
-                />
-              </div>
-            </div>
-
-            {/* Social & Professional Links */}
-            <h4 className="insta-section-subtitle">Social & Portfolio Links</h4>
-            {/* <div className="form-row-2">
-              <div className="form-group">
-                <label className="field-label">Portfolio / Personal Website</label>
-                <input
-                  type="text"
-                  placeholder="https://myportfolio.dev"
-                  value={formData.portfolioUrl}
-                  onChange={e => setFormData({ ...formData, portfolioUrl: e.target.value })}
-                  className="field-input"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="field-label">GitHub Profile</label>
-                <input
-                  type="text"
-                  placeholder="github.com/username"
-                  value={formData.github}
-                  onChange={e => setFormData({ ...formData, github: e.target.value })}
-                  className="field-input"
-                />
-              </div>
-            </div> */}
-
-            {/* <div className="form-group">
-              <label className="field-label">LinkedIn Profile URL</label>
-              <input
-                type="text"
-                placeholder="linkedin.com/in/username"
-                value={formData.linkedin}
-                onChange={e => setFormData({ ...formData, linkedin: e.target.value })}
-                className="field-input"
-              />
-            </div> */}
-
-            {/* Footer Submit */}
-            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-              <button
-                type="button"
-                className="button outline"
-                onClick={() => handleTabChange('posts')}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="button primary"
-                disabled={isSavingProfile}
-              >
-                {isSavingProfile ? 'Saving...' : 'Save Profile'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* ============================================================ */}
-      {/* 8. TAB CONTENT 5: LOGIN & SECURITY                           */}
-      {/* ============================================================ */}
-      {isOwnProfile && activeTab === 'security' && (
-        <div className="insta-tab-body">
-          <form onSubmit={handleUpdatePassword} className="panel insta-edit-panel">
-            <div className="insta-panel-header">
-              <div>
-                <h3>Login & Security Settings</h3>
-                <p>Manage your account password, 2-factor authentication, and active sessions.</p>
-              </div>
-            </div>
-
-            <div className="insta-security-card">
-              <ShieldCheck size={24} color="#059669" />
-              <div>
-                <strong>Two-Factor Authentication (2FA) Active</strong>
-                <p>Your account is protected by mobile OTP verification on institutional login.</p>
-              </div>
-            </div>
-
-            <h4 className="insta-section-subtitle" style={{ marginTop: '20px' }}>Change Account Password</h4>
-            <div className="form-group">
-              <label className="field-label">Current Password</label>
-              <div className="insta-pw-wrap">
-                <input
-                  type={showCurrentPassword ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  value={passwordData.currentPassword}
-                  onChange={e => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                  className="field-input"
-                />
-                <button
-                  type="button"
-                  className="insta-pw-eye"
-                  aria-label={showCurrentPassword ? 'Hide password' : 'Show password'}
-                      aria-pressed={showCurrentPassword}
-                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                >
-                  {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
-
-            <div className="form-row-2">
-              <div className="form-group">
-                <label className="field-label">New Password (Min 6 Characters)</label>
-                <div className="insta-pw-wrap">
                   <input
-                    type={showNewPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    value={passwordData.newPassword}
-                    onChange={e => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                    className="field-input"
-                  />
-                  <button
-                    type="button"
-                    className="insta-pw-eye"
-                    aria-label={showNewPassword ? 'Hide password' : 'Show password'}
-                      aria-pressed={showNewPassword}
-                      onClick={() => setShowNewPassword(!showNewPassword)}
-                  >
-                    {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="field-label">Confirm New Password</label>
-                <div className="insta-pw-wrap">
-                  <input
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    value={passwordData.confirmPassword}
-                    onChange={e => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                    className="field-input"
-                  />
-                  <button
-                    type="button"
-                    className="insta-pw-eye"
-                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                      aria-pressed={showConfirmPassword}
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  >
-                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
-              <button
-                type="submit"
-                className="button primary"
-                disabled={isChangingPassword || !passwordData.newPassword || passwordData.newPassword !== passwordData.confirmPassword}
-              >
-                {isChangingPassword ? 'Updating Password...' : 'Update Password'}
-              </button>
-            </div>
-
-            <div className="insta-danger-section" style={{ marginTop: '30px', paddingTop: '20px', borderTop: '1px solid #f1f5f9' }}>
-              <h4>Session Management</h4>
-              <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 14px 0' }}>
-                You are currently signed in as <strong>{studentName}</strong>.
-              </p>
-              <button
-                type="button"
-                className="button outline"
-                onClick={onLogout}
-                style={{ color: '#dc2626', borderColor: '#fca5a5' }}
-              >
-                Sign Out from Device
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* ============================================================ */}
-      {/* 9. TAB CONTENT 6: NOTIFICATIONS                              */}
-      {/* ============================================================ */}
-      {isOwnProfile && activeTab === 'notifications' && (
-        <div className="insta-tab-body">
-          <div className="panel insta-edit-panel">
-            <div className="insta-panel-header">
-              <div>
-                <h3>Notification Preferences</h3>
-                <p>Choose the career alerts and college campus announcements you receive.</p>
-              </div>
-            </div>
-
-            <div className="insta-toggle-list">
-              {[
-                { key: 'jobAlerts', title: 'Job & Internship Opportunities', desc: 'Get notified when matching openings are published by campus placement cell.' },
-                { key: 'interviewReminders', title: 'Interview & Schedule Reminders', desc: 'Alerts 24 hours prior to scheduled mock assessments or drives.' },
-                { key: 'collegeNotices', title: 'Official Academic Notices', desc: 'Direct notices from Podar Academic Board and department heads.' },
-                { key: 'quizDeadlines', title: 'Coursework & Certificate Deadlines', desc: 'Reminders for elected course validity and test submissions.' },
-                { key: 'soundEffects', title: 'Audio Sound Cues', desc: 'Play subtle acoustic sounds on new notifications and achievements.' }
-              ].map(item => (
-                <div key={item.key} className="insta-toggle-row">
-                  <div>
-                    <strong>{item.title}</strong>
-                    <p>{item.desc}</p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={notifications[item.key] !== false}
-                    onChange={e => {
-                      const updated = { ...notifications, [item.key]: e.target.checked };
-                      setNotifications(updated);
-                      try {
-                        localStorage.setItem('podar-notifications-settings', JSON.stringify(updated));
-                      } catch (err) {}
-                      notify?.('Notification preference updated.');
+                    type="file"
+                    ref={projectImgUploadRef}
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleComposerFile(file);
                     }}
-                    className="insta-switch"
+                    className="hidden"
                   />
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
-
-      {/* ============================================================ */}
-      {/* 11. PROJECT QUICK VIEW MODAL (INSTAGRAM POST LIGHTBOX)       */}
-      {/* ============================================================ */}
-      {selectedProject && (
-        <div className="insta-post-backdrop">
-          <div className="insta-post-modal" onClick={e => e.stopPropagation()}>
-            {/* Modal Image Section */}
-            <div className="insta-post-img-side">
-              <img
-                src={Array.isArray(selectedProject.images) && selectedProject.images.length > 0
-                  ? (selectedProject.images[0]?.imageUrl || selectedProject.images[0])
-                  : (selectedProject.image || 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&auto=format&fit=crop&q=80')}
-                alt={selectedProject.title}
-                className="insta-post-full-img"
-              />
-            </div>
-
-            {/* Modal Details Section */}
-            <div className="insta-post-info-side">
-              <div className="insta-post-info-header">
-                <div className="insta-post-author">
-                  <div className="insta-avatar-ring micro">
-                    <ProfileAvatar src={formData.avatar} name={studentName} alt={studentName} className="insta-avatar-img" />
+                {/* Aspect Ratio & Filter Controls */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      <Crop className="w-3.5 h-3.5" />
+                      <span>Aspect Ratio</span>
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {['16:9', '4:5', '1:1'].map(ratio => (
+                        <button
+                          key={ratio}
+                          type="button"
+                          onClick={() => setComposerState(prev => ({ ...prev, aspectRatio: ratio }))}
+                          className={`aspect-pill px-2.5 py-1 rounded-lg text-[11px] transition-colors ${
+                            composerState.aspectRatio === ratio
+                              ? 'font-semibold bg-navy-600 text-white'
+                              : 'font-medium bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          {ratio}
+                        </button>
+                      ))}
+                    </div>
                   </div>
+
+                  {/* Filter Pills */}
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Photo Filters</span>
+                    </span>
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                      {Object.keys(FILTER_STYLES).map(filterName => (
+                        <button
+                          key={filterName}
+                          type="button"
+                          onClick={() => setComposerState(prev => ({ ...prev, filter: filterName }))}
+                          className={`img-filter-pill px-2.5 py-1 rounded-lg text-[11px] whitespace-nowrap transition-colors ${
+                            composerState.filter === filterName
+                              ? 'font-semibold bg-navy-600 text-white'
+                              : 'font-medium bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          {filterName}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Pane: Author, Title, Description, Tech Tags & Link */}
+              <div className="lg:col-span-5 p-4 sm:p-6 flex flex-col justify-between space-y-4">
+                <div className="space-y-4">
+                  {/* Author Header */}
+                  <div className="flex items-center gap-3 pb-2 border-b border-slate-100 dark:border-slate-800">
+                    <img
+                      src={profile.avatar || DEFAULT_STUDENT_PHOTO}
+                      alt={profile.name}
+                      className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                        {profile.name}
+                      </p>
+                      <p className="text-[11px] text-slate-400">Posting to Student Portfolio</p>
+                    </div>
+                  </div>
+
+                  {/* Project Title * */}
                   <div>
-                    <strong className="insta-post-author-name">{studentName}</strong>
-                    <span className="insta-post-author-handle">@{username}</span>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Project Title <span className="text-rose-500 font-bold">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={composerState.title}
+                      onChange={(e) => setComposerState(prev => ({ ...prev, title: e.target.value }))}
+                      placeholder="e.g., Campus Smart Attendance System"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500"
+                    />
+                  </div>
+
+                  {/* Caption / Description with Counter */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        Caption / Description
+                      </label>
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        {composerState.description.length} / 500
+                      </span>
+                    </div>
+                    <textarea
+                      rows={4}
+                      maxLength={500}
+                      value={composerState.description}
+                      onChange={(e) => setComposerState(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Write a caption about what you built, how it works, and key highlights..."
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500 resize-none"
+                    />
+                  </div>
+
+                  {/* Tech Stack / Tags */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Tech Stack / Tags
+                    </label>
+                    <input
+                      type="text"
+                      value={composerState.tech}
+                      onChange={(e) => setComposerState(prev => ({ ...prev, tech: e.target.value }))}
+                      placeholder="React, Node.js, MongoDB (comma-separated)"
+                      className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500"
+                    />
+                    {composerState.tech && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {composerState.tech.split(',').map(t => t.trim()).filter(Boolean).map((t, idx) => (
+                          <span
+                            key={idx}
+                            className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-indigo-50 dark:bg-indigo-500/15 text-navy-600 dark:text-indigo-300"
+                          >
+                            #{t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Project / Live Link */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Project / Live Link
+                    </label>
+                    <div className="relative">
+                      <Link className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="url"
+                        value={composerState.demoUrl}
+                        onChange={(e) => setComposerState(prev => ({ ...prev, demoUrl: e.target.value }))}
+                        placeholder="https://my-project.vercel.app (optional)"
+                        className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500"
+                      />
+                    </div>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="insta-close-icon-btn"
-                  onClick={() => setSelectedProject(null)}
-                >
-                  <X size={18} />
-                </button>
-              </div>
 
-              <div className="insta-post-info-body">
-                <h3 className="insta-post-modal-title">{selectedProject.title}</h3>
-                <p className="insta-post-modal-desc">{selectedProject.description}</p>
-
-                {Array.isArray(selectedProject.tags) && selectedProject.tags.length > 0 && (
-                  <div className="insta-post-tags-wrap">
-                    {selectedProject.tags.map(t => (
-                      <span key={t} className="insta-post-tag-chip">#{t}</span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="insta-post-info-footer">
-                <div className="insta-post-stats-row">
-                  <span className="insta-post-stat">
-                    <Heart size={16} color="#ef4444" fill="#ef4444" />
-                    <strong>{selectedProject.likesCount || 42} likes</strong>
-                  </span>
-                  <span className="insta-post-stat">
-                    <MessageCircle size={16} color="#64748b" />
-                    <strong>{selectedProject.commentsCount || 9} comments</strong>
-                  </span>
-                </div>
-
-                <div className="insta-post-btn-actions">
-                  {selectedProject.demoUrl && (
-                    <a
-                      href={selectedProject.demoUrl.startsWith('http') ? selectedProject.demoUrl : `https://${selectedProject.demoUrl}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="button primary small"
-                      style={{ textDecoration: 'none' }}
-                    >
-                      <Globe size={14} />
-                      <span>Live Project</span>
-                    </a>
-                  )}
-
-                  {selectedProject.githubUrl && (
-                    <a
-                      href={selectedProject.githubUrl.startsWith('http') ? selectedProject.githubUrl : `https://${selectedProject.githubUrl}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="button outline small"
-                      style={{ textDecoration: 'none' }}
-                    >
-                      <Code size={14} />
-                      <span>GitHub</span>
-                    </a>
-                  )}
+                {/* Mobile Bottom Share Button */}
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 lg:hidden">
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 rounded-xl text-sm font-semibold bg-navy-600 hover:bg-navy-700 text-white shadow-sm flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span>Share Project</span>
+                  </button>
                 </div>
               </div>
+
             </div>
-          </div>
+          </form>
         </div>
       )}
-      {/* ============================================================ */}
-      {/* 12. SHARE PROFILE MODAL                                     */}
-      {/* ============================================================ */}
-      {showShareModal && (
-        <div className="share-modal-backdrop">
-          <div className="share-modal-card" onClick={e => e.stopPropagation()}>
-            <div className="share-modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Share2 size={18} color="#0284c7" />
-                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#0f172a' }}>
-                  Share Student Profile
-                </h3>
-              </div>
-              <button
-                type="button"
-                className="share-modal-close"
-                onClick={() => setShowShareModal(false)}
-                aria-label="Close"
-              >
-                <X size={18} />
-              </button>
-            </div>
 
-            {/* Mini Profile Preview */}
-            <div className="share-preview-card">
-              <div className="insta-avatar-ring small" style={{ width: '52px', height: '52px' }}>
-                <ProfileAvatar src={formData.avatar} name={studentName} alt={studentName} className="insta-avatar-img" />
-              </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <strong style={{ fontSize: '14.5px', color: '#0f172a' }}>{studentName}</strong>
-                  <BadgeCheck size={16} fill="#0284c7" color="#ffffff" />
-                </div>
-                <span style={{ fontSize: '12px', color: '#64748b' }}>
-                  {formData.course || 'Course not added'} • {studentSem}
-                </span>
-                {formData.goal && (
-                  <p style={{ margin: '3px 0 0 0', fontSize: '12px', color: '#0284c7', fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {formData.goal}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Copy Link Input */}
-            <div className="share-link-box">
-              <div className="share-link-input-wrap">
-                <Link2 size={15} color="#64748b" style={{ flexShrink: 0 }} />
-                <input
-                  type="text"
-                  readOnly
-                  value={getShareUrl()}
-                  className="share-link-input"
-                  onClick={e => e.target.select()}
+      {/* PROJECT DETAIL MODAL */}
+      {selectedProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden modal-animate-enter">
+            <div className="h-48 w-full bg-gradient-to-r from-navy-700 to-indigo-600 relative overflow-hidden">
+              {selectedProject.image && (
+                <img
+                  src={selectedProject.image}
+                  alt={selectedProject.title}
+                  style={{ filter: FILTER_STYLES[selectedProject.filter] || 'none' }}
+                  className="w-full h-full object-cover"
                 />
-              </div>
+              )}
               <button
                 type="button"
-                className={`button ${copiedShare ? 'success' : 'primary'} small`}
-                onClick={handleCopyShareUrl}
-                style={{ flexShrink: 0 }}
+                onClick={() => setSelectedProject(null)}
+                className="absolute top-3 right-3 p-2 rounded-xl bg-black/50 text-white hover:bg-black/70 transition-colors"
               >
-                {copiedShare ? <Check size={14} /> : <Copy size={14} />}
-                <span>{copiedShare ? 'Copied' : 'Copy'}</span>
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Quick Share Buttons */}
-            <div className="share-channels-title">Share via:</div>
-            <div className="share-channels-grid">
-              <a
-                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`Check out ${studentName}'s student profile & projects on Podar Pathways:\n${getShareUrl()}`)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="share-channel-btn whatsapp"
-              >
-                <span className="share-channel-icon">💬</span>
-                <span>WhatsApp</span>
-              </a>
+            <div className="p-6 space-y-4">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-slate-400">
+                  Uploaded {selectedProject.date}
+                </span>
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                {selectedProject.title}
+              </h3>
+              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                {selectedProject.description || 'No description provided.'}
+              </p>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {Array.isArray(selectedProject.tech) &&
+                  selectedProject.tech.map((t, idx) => (
+                    <span
+                      key={idx}
+                      className="px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-50 dark:bg-indigo-500/15 text-navy-600 dark:text-indigo-300"
+                    >
+                      {t}
+                    </span>
+                  ))}
+              </div>
 
-              <a
-                href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(getShareUrl())}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="share-channel-btn linkedin"
-              >
-                <span className="share-channel-icon">💼</span>
-                <span>LinkedIn</span>
-              </a>
-
-              <a
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out ${studentName}'s student profile on Podar Pathways!`)}&url=${encodeURIComponent(getShareUrl())}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="share-channel-btn twitter"
-              >
-                <span className="share-channel-icon">𝕏</span>
-                <span>Twitter / X</span>
-              </a>
-
-              <a
-                href={`mailto:?subject=${encodeURIComponent(`${studentName} - Podar Pathways Profile`)}&body=${encodeURIComponent(`Hi,\n\nCheck out ${studentName}'s student profile, projects, and verified credentials on Podar Pathways:\n${getShareUrl()}\n\nBest regards,\n${studentName}`)}`}
-                className="share-channel-btn email"
-              >
-                <Mail size={16} />
-                <span>Email</span>
-              </a>
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-3">
+                {selectedProject.demoUrl && (
+                  <a
+                    href={selectedProject.demoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-navy-600 hover:bg-navy-700 text-white flex items-center gap-1.5 transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Open Project Link</span>
+                  </a>
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }
 
-
 // ADMIN PROFILE & PHOTO SETTINGS
 // ========================================================
 export function AdminProfileSettings({ session, state, setState, notify, onLogout }) {
-  const fileInputRef = React.useRef(null);
-  const [avatar, setAvatar] = React.useState(
+  const fileInputRef = useRef(null);
+  const [avatar, setAvatar] = useState(
     session?.avatar || session?.admin?.avatar || DEFAULT_ADMIN_AVATAR
   );
-  const [name, setName] = React.useState(session?.name || session?.admin?.name || 'Podar Administrator');
-  const [phone, setPhone] = React.useState(session?.adminPhone || session?.admin?.phone || '');
-  const [department, setDepartment] = React.useState(session?.department || session?.admin?.department || 'Career & Placement Cell');
-  const [role, setRole] = React.useState(session?.adminRole || session?.admin?.role || 'Super Admin');
+  const [name, setName] = useState(session?.name || session?.admin?.name || 'Podar Administrator');
+  const [phone, setPhone] = useState(session?.adminPhone || session?.admin?.phone || '');
+  const [department, setDepartment] = useState(session?.department || session?.admin?.department || 'Career & Placement Cell');
+  const [role, setRole] = useState(session?.adminRole || session?.admin?.role || 'Super Admin');
   const email = session?.email || session?.admin?.email || '';
-  const [saving, setSaving] = React.useState(false);
+  const [saving, setSaving] = useState(false);
 
   // Compress & handle photo upload
   const handlePhotoUpload = (e) => {
@@ -2178,7 +2086,6 @@ export function AdminProfileSettings({ session, state, setState, notify, onLogou
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-                    
               style={{
                 position: 'absolute',
                 bottom: '0',
@@ -2221,7 +2128,6 @@ export function AdminProfileSettings({ session, state, setState, notify, onLogou
                 type="button"
                 className="minimal-btn-secondary"
                 onClick={() => fileInputRef.current?.click()}
-                    
               >
                 <Camera size={13} style={{ display: 'inline', marginRight: '5px', verticalAlign: 'middle' }} />
                 Upload Photo
