@@ -658,7 +658,7 @@ export function CourseCatalog({
                     <span className="preview-filename">{uploadForm.fileName || 'certificate.jpg'}</span>
                     <button
                       type="button"
-                      className="button outline small"
+                      className="button minimal small"
                       onClick={() => setUploadForm({ ...uploadForm, fileData: '', fileName: '' })}
                     >
                       Change
@@ -686,7 +686,7 @@ export function CourseCatalog({
             <div className="modal-actions">
               <button
                 type="button"
-                className="button outline"
+                className="button minimal"
                 onClick={() => setUploadModalOpen(false)}
               >
                 Cancel
@@ -744,7 +744,7 @@ export function CourseCatalog({
             <div className="modal-actions" style={{ marginTop: 20 }}>
               <button
                 type="button"
-                className="button outline"
+                className="button minimal"
                 onClick={() => setPendingInfoCert(null)}
               >
                 Close
@@ -799,11 +799,11 @@ export function CourseCatalog({
           <h2 id="enrolled-courses-heading">Enrolled courses</h2>
           <p>Courses you have visited appear here so you can continue learning.</p>
           {enrollment.owner !== currentStudentId || enrollment.loading ? <p role="status">Loading your enrolled courses…</p> : enrollment.error ?
-            <div role="alert"><p>{enrollment.error}</p><button className="button outline" onClick={() => fetchPrograms()}>Try again</button></div> :
+            <div role="alert"><p>{enrollment.error}</p><button className="button minimal" onClick={() => fetchPrograms()}>Try again</button></div> :
             selectEnrolledCourses(enrollment.courses, searchQuery).length ? <div className="enrolled-courses-list">
               {selectEnrolledCourses(enrollment.courses, searchQuery).map(course => <article className="enrolled-course-row" key={course.id}>
                 <div><strong>{course.title}</strong><span>{course.issuer || course.provider || 'Podar Pathways'}</span></div>
-                <button className="button outline" disabled={openingCourseId !== ''} onClick={() => handleOpenCourse(course)}>{openingCourseId === course.id ? 'Opening…' : 'Revisit'} <ExternalLink size={14} /></button>
+                <button className="button minimal" disabled={openingCourseId !== ''} onClick={() => handleOpenCourse(course)}>{openingCourseId === course.id ? 'Opening…' : 'Revisit'} <ExternalLink size={14} /></button>
               </article>)}
             </div> : <div className="enrolled-courses-empty"><BookOpen size={28} /><h3>{searchQuery ? 'No enrolled courses match your search' : 'No enrolled courses yet'}</h3><p>{searchQuery ? 'Try another course name.' : 'Click Visit on a course below to add it here.'}</p></div>}
         </section>}
@@ -852,7 +852,7 @@ export function CourseCatalog({
                       {/* Button 2: Upload Certificate */}
                       {cert?.status === 'verified' ? (
                         <button
-                          className="button outline minimal-btn verified"
+                          className="button minimal minimal-btn verified"
                           onClick={() => {
                             const idx = onlyVerifiedCertificates.findIndex(c => c.id === cert.id);
                             setLightboxIndex(idx !== -1 ? idx : 0);
@@ -864,7 +864,7 @@ export function CourseCatalog({
                         </button>
                       ) : cert?.status === 'pending' ? (
                         <button
-                          className="button outline minimal-btn pending"
+                          className="button minimal minimal-btn pending"
                           onClick={() => setPendingInfoCert(cert)}
                           title="Click to view submission status"
                         >
@@ -873,7 +873,7 @@ export function CourseCatalog({
                         </button>
                       ) : (
                         <button
-                          className="button outline minimal-btn"
+                          className="button minimal minimal-btn"
                           onClick={() => handleOpenUploadModal(course)}
                           title="Upload your certificate"
                         >
@@ -1346,7 +1346,7 @@ export function CourseCatalog({
                   <div className="info-code-box">
                     <code>{activeLightboxCert.verificationCode || 'PODAR-VERIF-78291'}</code>
                     <button
-                      className="button outline small"
+                      className="button minimal small"
                       onClick={() => handleCopyCode(activeLightboxCert.verificationCode)}
                     >
                       {copiedCode ? 'Copied' : 'Copy'}

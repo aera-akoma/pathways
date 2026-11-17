@@ -193,6 +193,102 @@
   box-shadow: 0 0 0 3px rgba(129, 140, 248, .2);
 }
 
+.student-profile-portal input[type='date'] {
+  color-scheme: light;
+}
+
+.student-profile-portal.dark input[type='date'] {
+  color-scheme: dark;
+}
+
+.student-profile-portal .profile-setting-switch {
+  appearance: none;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 42px;
+  height: 24px;
+  flex: 0 0 42px;
+  padding: 2px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #e2e8f0;
+  cursor: pointer;
+  transition: background-color .18s ease, border-color .18s ease;
+}
+
+.student-profile-portal .profile-setting-switch.is-on {
+  border-color: #3730a3;
+  background: #3730a3;
+}
+
+.student-profile-portal .profile-setting-switch:focus-visible {
+  outline: 2px solid #818cf8;
+  outline-offset: 2px;
+}
+
+.student-profile-portal .profile-setting-switch-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .18);
+  transform: translateX(0);
+  transition: transform .18s ease;
+}
+
+.student-profile-portal .profile-setting-switch.is-on .profile-setting-switch-thumb {
+  transform: translateX(18px);
+}
+
+.student-profile-portal .profile-save-button,
+.student-profile-portal .profile-reset-button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font: 600 13px/1.2 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  cursor: pointer;
+  transition: background-color .18s ease, border-color .18s ease, color .18s ease;
+}
+
+.student-profile-portal .profile-save-button {
+  background: #3730a3;
+  color: #fff;
+}
+
+.student-profile-portal .profile-save-button:hover {
+  background: #312e81;
+}
+
+.student-profile-portal .profile-reset-button {
+  border-color: #e2e8f0;
+  background: #fff;
+  color: #475569;
+}
+
+.student-profile-portal .profile-reset-button:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #1e293b;
+}
+
+.student-profile-portal.dark .profile-reset-button {
+  border-color: #475569;
+  background: #1e293b;
+  color: #cbd5e1;
+}
+
+.student-profile-portal.dark .profile-reset-button:hover {
+  background: #334155;
+}
+
 @media (max-width: 640px) {
   .student-profile-tabs {
     gap: 6px;

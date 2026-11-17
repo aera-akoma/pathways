@@ -48,6 +48,14 @@ const normalizeProfileClass = value => {
   const normalized = String(value || '').trim().toUpperCase();
   return PROFILE_CLASSES.includes(normalized) ? normalized : (value ? 'Other' : 'BCA');
 };
+const normalizeDateInput = value => {
+  if (!value) return '';
+  const raw = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+};
 
 const INITIAL_PROJECTS = [
   {
@@ -131,7 +139,13 @@ export function ProfileSettings({
   // Dark Mode State
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof document !== 'undefined') {
-      return document.documentElement.classList.contains('dark') || localStorage.getItem('theme') === 'dark';
+      let enabled = document.documentElement.classList.contains('dark');
+      try {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) enabled = savedTheme === 'dark';
+      } catch {}
+      document.documentElement.classList.toggle('dark', enabled);
+      return enabled;
     }
     return false;
   });
@@ -171,13 +185,13 @@ export function ProfileSettings({
     name: student?.name || 'Aarav Sharma',
     degreeShort: normalizeProfileClass(student?.course),
     branch: student?.branch || 'Computer Science & Engineering',
-    batch: student?.graduationYear || student?.batch || '2023–2027',
     semester: student?.semester ? (String(student.semester).includes('Sem') ? student.semester : `${student.semester}th Semester`) : '5th Semester',
     section: student?.section || 'Section A',
     headline: student?.headline || 'Full-Stack Web Engineer • Applied ML Researcher • Open Source Contributor',
     bio: student?.bio || 'Junior undergraduate passionate about distributed systems, full-stack web engineering, and applied machine learning. Technical Lead at the University Coding Club and Open Source contributor.',
     objective: student?.goal || student?.objective || 'Seeking Software Engineering internships for Summer 2027 to build scalable cloud-native applications and intelligent backend systems.',
-    dob: student?.dob ? (typeof student.dob === 'string' && student.dob.includes('T') ? student.dob.split('T')[0] : String(student.dob)) : '14 Aug 2005',
+    dob: normalizeDateInput(student?.dob),
+    phone: student?.phone || session?.phone || '',
     blood: student?.blood || 'O+',
     street: student?.address || student?.street || student?.houseNo || 'Flat 302, Green Park Residency, MG Road',
     city: student?.city || 'Bengaluru',
@@ -200,13 +214,13 @@ export function ProfileSettings({
         name: student.name || prev.name,
         degreeShort: student.course ? normalizeProfileClass(student.course) : prev.degreeShort,
         branch: student.branch || prev.branch,
-        batch: student.graduationYear || student.batch || prev.batch,
         semester: student.semester ? (String(student.semester).includes('Sem') ? student.semester : `${student.semester}th Semester`) : prev.semester,
         section: student.section || prev.section,
         headline: student.headline || prev.headline,
         bio: student.bio || prev.bio,
         objective: student.goal || student.objective || prev.objective,
-        dob: student.dob ? (typeof student.dob === 'string' && student.dob.includes('T') ? student.dob.split('T')[0] : String(student.dob)) : prev.dob,
+        dob: student.dob ? normalizeDateInput(student.dob) : prev.dob,
+        phone: student.phone || prev.phone,
         blood: student.blood || prev.blood,
         street: student.address || student.street || student.houseNo || prev.street,
         city: student.city || prev.city,
@@ -322,7 +336,8 @@ export function ProfileSettings({
             course: updatedProfile.degreeShort,
             goal: updatedProfile.objective,
             address: updatedProfile.street,
-            pinCode: updatedProfile.pincode
+          pinCode: updatedProfile.pincode,
+          phone: updatedProfile.phone
           };
         }
         localStorage.setItem('podar-pathways-session', JSON.stringify(curSession));
@@ -340,7 +355,8 @@ export function ProfileSettings({
                   course: updatedProfile.degreeShort,
                   goal: updatedProfile.objective,
                   address: updatedProfile.street,
-                  pinCode: updatedProfile.pincode
+                  pinCode: updatedProfile.pincode,
+                  phone: updatedProfile.phone
                 }
               : s
           )
@@ -355,6 +371,7 @@ export function ProfileSettings({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: updatedProfile.name,
+          phone: updatedProfile.phone,
           headline: updatedProfile.headline,
           bio: updatedProfile.bio,
           goal: updatedProfile.objective,
@@ -370,7 +387,6 @@ export function ProfileSettings({
           district: updatedProfile.district,
           course: updatedProfile.degreeShort,
           branch: updatedProfile.branch,
-          graduationYear: updatedProfile.batch,
           semester: updatedProfile.semester,
           section: updatedProfile.section,
           skills: Array.isArray(updatedProfile.skills) ? updatedProfile.skills.join(', ') : updatedProfile.skills,
@@ -414,6 +430,7 @@ export function ProfileSettings({
     const errors = {};
 
     if (!profile.name.trim()) errors.name = 'Full Name is required';
+    if (!/^[0-9]{10}$/.test(String(profile.phone || ''))) errors.phone = 'Enter a valid 10-digit mobile number';
     if (!profile.degreeShort) errors.degreeShort = 'Class is required';
     if (!profile.semester) errors.semester = 'Semester is required';
     if (!profile.section) errors.section = 'Section is required';
@@ -437,13 +454,13 @@ export function ProfileSettings({
       name: 'Aarav Sharma',
       degreeShort: '',
       branch: '',
-      batch: '2023–2027',
+      phone: '',
       semester: '',
       section: '',
       headline: 'Full-Stack Web Engineer • Applied ML Researcher • Open Source Contributor',
       bio: 'Junior undergraduate passionate about distributed systems, full-stack web engineering, and applied machine learning. Technical Lead at the University Coding Club and Open Source contributor.',
       objective: 'Seeking Software Engineering internships for Summer 2027 to build scalable cloud-native applications and intelligent backend systems.',
-      dob: '14 Aug 2005',
+      dob: '',
       blood: '',
       street: '',
       city: '',
@@ -539,13 +556,6 @@ export function ProfileSettings({
   const degreeBranchLabel = useMemo(() => {
     return profile.degreeShort || 'Class not specified';
   }, [profile.degreeShort]);
-
-  const batchYearLabel = useMemo(() => {
-    if (profile.batch && profile.batch.includes('–')) {
-      return `Class of ${profile.batch.split('–')[1].trim()}`;
-    }
-    return profile.batch ? `Class of ${profile.batch}` : '';
-  }, [profile.batch]);
 
   // Cascading districts list for Settings
   const districtOptions = useMemo(() => {
@@ -645,7 +655,7 @@ export function ProfileSettings({
                   {profile.name}
                 </h1>
                 <p className="text-sm sm:text-base font-medium text-navy-600 dark:text-indigo-400 mt-0.5">
-                  {batchYearLabel ? `${degreeBranchLabel} • ${batchYearLabel}` : degreeBranchLabel}
+                  {degreeBranchLabel}
                 </p>
                 <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
                   {profile.headline}
@@ -783,9 +793,9 @@ export function ProfileSettings({
                       </p>
                     </div>
                     <div>
-                      <p className="text-slate-400 font-medium">Batch / Section</p>
+                      <p className="text-slate-400 font-medium">Section</p>
                       <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
-                        {[profile.batch, profile.section].filter(Boolean).join(' • ') || 'Not specified'}
+                        {profile.section || 'Not specified'}
                       </p>
                     </div>
                     <div>
@@ -795,9 +805,15 @@ export function ProfileSettings({
                       </p>
                     </div>
                     <div>
+                      <p className="text-slate-400 font-medium">Mobile Number</p>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
+                        {profile.phone || 'Not specified'}
+                      </p>
+                    </div>
+                    <div>
                       <p className="text-slate-400 font-medium">Date of Birth</p>
                       <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
-                        {profile.dob || 'Not specified'}
+                        {profile.dob ? new Date(`${profile.dob}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not specified'}
                       </p>
                     </div>
                     <div>
@@ -1121,13 +1137,34 @@ export function ProfileSettings({
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                          Mobile Number <span className="text-rose-500 font-bold">*</span>
+                        </label>
+                        <input
+                          type="tel"
+                          inputMode="numeric"
+                          autoComplete="tel-national"
+                          maxLength={10}
+                          required
+                          placeholder="10-digit mobile number"
+                          value={profile.phone}
+                          onChange={(e) => setProfile(prev => ({ ...prev, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
+                          aria-invalid={Boolean(formErrors.phone)}
+                          aria-describedby={formErrors.phone ? 'profile-phone-error' : undefined}
+                          className={`w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border ${formErrors.phone ? 'border-rose-500 ring-2 ring-rose-500/30' : 'border-slate-200 dark:border-slate-700'} text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500`}
+                        />
+                        {formErrors.phone && <p id="profile-phone-error" className="mt-1 text-xs text-rose-600" role="alert">{formErrors.phone}</p>}
+                      </div>
+
                       <div>
                         <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                           Date of Birth
                         </label>
                         <input
-                          type="text"
+                          type="date"
+                          max={new Date().toISOString().slice(0, 10)}
                           value={profile.dob}
                           onChange={(e) => setProfile(prev => ({ ...prev, dob: e.target.value }))}
                           className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500"
@@ -1289,18 +1326,6 @@ export function ProfileSettings({
                         </select>
                       </div>
 
-                      <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                          Academic Batch
-                        </label>
-                        <input
-                          type="text"
-                          value={profile.batch}
-                          onChange={(e) => setProfile(prev => ({ ...prev, batch: e.target.value }))}
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500"
-                        />
-                      </div>
-
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
@@ -1427,15 +1452,9 @@ export function ProfileSettings({
                         role="switch"
                         aria-checked={isDarkMode}
                         onClick={toggleDarkMode}
-                        className={`w-11 h-6 rounded-full p-0.5 transition-colors flex items-center ${
-                          isDarkMode ? 'bg-navy-600' : 'bg-slate-300 dark:bg-slate-700'
-                        }`}
+                        className={`profile-setting-switch ${isDarkMode ? 'is-on' : ''}`}
                       >
-                        <span
-                          className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform ${
-                            isDarkMode ? 'translate-x-5' : 'translate-x-0'
-                          }`}
-                        />
+                        <span className="profile-setting-switch-thumb" />
                       </button>
                     </div>
 
@@ -1454,15 +1473,9 @@ export function ProfileSettings({
                           setEmailAlerts(next);
                           showToast(`Email alerts ${next ? 'enabled' : 'disabled'}`);
                         }}
-                        className={`w-11 h-6 rounded-full p-0.5 transition-colors flex items-center ${
-                          emailAlerts ? 'bg-navy-600' : 'bg-slate-300 dark:bg-slate-700'
-                        }`}
+                        className={`profile-setting-switch ${emailAlerts ? 'is-on' : ''}`}
                       >
-                        <span
-                          className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform ${
-                            emailAlerts ? 'translate-x-5' : 'translate-x-0'
-                          }`}
-                        />
+                        <span className="profile-setting-switch-thumb" />
                       </button>
                     </div>
                   </div>
@@ -1471,7 +1484,7 @@ export function ProfileSettings({
                   <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
                     <button
                       type="submit"
-                      className="w-full py-2.5 px-4 rounded-xl bg-navy-600 hover:bg-navy-700 text-white text-xs sm:text-sm font-semibold shadow-sm transition-colors flex items-center justify-center gap-2"
+                      className="profile-save-button"
                     >
                       <Save className="w-4 h-4" />
                       <span>Save All Changes</span>
@@ -1479,7 +1492,7 @@ export function ProfileSettings({
                     <button
                       type="button"
                       onClick={handleResetDefaults}
-                      className="w-full py-2.5 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/70 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors"
+                      className="profile-reset-button"
                     >
                       Reset to Default
                     </button>

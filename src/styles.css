@@ -335,7 +335,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   display:inline-flex
 }
 
-.button.outline {
+.button.minimal {
   border: 1px solid #e2e8f0;
   border-radius: 7px;
   color: #475569;
@@ -344,7 +344,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   font-weight: 600;
 }
 
-.button.outline:hover:not(:disabled) {
+.button.minimal:hover:not(:disabled) {
   border-color: #cbd5e1;
   color: #1e293b;
   background: #f8fafc;
