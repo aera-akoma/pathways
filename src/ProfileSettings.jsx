@@ -7,8 +7,6 @@ import './student-profile.css';
 
 import {
   GraduationCap,
-  Moon,
-  Sun,
   Camera,
   User,
   FolderGit2,
@@ -567,36 +565,6 @@ export function ProfileSettings({
           </div>
         </div>
       )}
-
-      {/* Top College Portal Navigation */}
-      <nav className="sticky top-0 z-30 bg-white/85 dark:bg-slate-900/85 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors duration-300">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-navy-600 flex items-center justify-center text-white font-bold shadow-sm">
-              <GraduationCap className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <span className="font-bold text-base sm:text-lg tracking-tight text-slate-900 dark:text-white">
-                Podar <span className="text-navy-600 dark:text-indigo-400">CampusPortal</span>
-              </span>
-              <span className="hidden md:inline-block ml-2 text-xs px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-medium">
-                Autumn Semester 2026
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <button
-              type="button"
-              onClick={toggleDarkMode}
-              aria-label="Toggle Dark Mode"
-              className="p-2.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-colors"
-            >
-              {isDarkMode ? <Moon className="w-4 h-4 text-indigo-300" /> : <Sun className="w-4 h-4 text-amber-500" />}
-            </button>
-          </div>
-        </div>
-      </nav>
 
       {/* Main Content Container */}
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
