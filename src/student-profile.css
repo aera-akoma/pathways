@@ -90,6 +90,14 @@
   animation: fadeInModal 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Quick stat pills in header */
+.profile-stat-pill {
+  transition: all 0.2s ease;
+}
+.profile-stat-pill:hover {
+  transform: translateY(-1px);
+}
+
 /* Responsive custom utilities */
 @media (max-width: 640px) {
   .student-profile-portal .grid-cols-2 {

@@ -69,6 +69,11 @@ function formatTimeAgo(isoString) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+function normalizeNotification(notification) {
+  const readValue = notification?.read ?? notification?.isRead ?? 0;
+  return { ...notification, read: readValue === true || readValue === 1 || readValue === '1' };
+}
+
 export function NotificationBell({ session, student, navigate, notify }) {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -100,11 +105,10 @@ export function NotificationBell({ session, student, navigate, notify }) {
       } else if (student?.id || session?.id) {
         url += `?studentId=${student?.id || session?.id}`;
       }
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        setNotifications(Array.isArray(data) ? data : []);
-      }
+      const res = await fetch(url, { credentials: 'same-origin' });
+      if (!res.ok) throw new Error(`Could not load notifications (${res.status}).`);
+      const data = await res.json();
+      setNotifications(Array.isArray(data) ? data.map(normalizeNotification) : []);
     } catch (err) {
       console.warn('Notifications fetch note:', err);
     } finally {
@@ -154,26 +158,33 @@ export function NotificationBell({ session, student, navigate, notify }) {
       prev.map((n) => (n.id === id ? { ...n, read: 1 } : n))
     );
     try {
-      await fetch(`/api/notifications/${id}/read`, { method: 'PUT' });
+      const response = await fetch(`/api/notifications/${id}/read`, { method: 'PUT', credentials: 'same-origin' });
+      if (!response.ok) throw new Error(`Could not mark notification as read (${response.status}).`);
     } catch (err) {
       console.warn('Mark read error:', err);
+      notify?.('Could not update this notification. Please try again.');
+      fetchNotifications();
     }
   };
 
   const handleMarkAllRead = async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: 1 })));
     try {
-      await fetch('/api/notifications/read-all', {
+      const response = await fetch('/api/notifications/read-all', {
         method: 'PUT',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           studentId: student?.id || session?.id,
           role: session?.role
         })
       });
+      if (!response.ok) throw new Error(`Could not update notifications (${response.status}).`);
       if (notify) notify('All marked as read');
     } catch (err) {
       console.warn('Mark all read error:', err);
+      notify?.('Could not update notifications. Please try again.');
+      fetchNotifications();
     }
   };
 
@@ -181,9 +192,12 @@ export function NotificationBell({ session, student, navigate, notify }) {
     if (e) e.stopPropagation();
     setNotifications((prev) => prev.filter((n) => n.id !== id));
     try {
-      await fetch(`/api/notifications/${id}`, { method: 'DELETE' });
+      const response = await fetch(`/api/notifications/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+      if (!response.ok) throw new Error(`Could not dismiss notification (${response.status}).`);
     } catch (err) {
       console.warn('Delete notification error:', err);
+      notify?.('Could not dismiss this notification. Please try again.');
+      fetchNotifications();
     }
   };
 
@@ -191,10 +205,13 @@ export function NotificationBell({ session, student, navigate, notify }) {
     setNotifications((prev) => prev.filter((n) => !n.read));
     try {
       const targetParam = session?.role === 'admin' ? '' : `?studentId=${student?.id || session?.id}`;
-      await fetch(`/api/notifications/clear/read${targetParam}`, { method: 'DELETE' });
+      const response = await fetch(`/api/notifications/clear/read${targetParam}`, { method: 'DELETE', credentials: 'same-origin' });
+      if (!response.ok) throw new Error(`Could not clear notifications (${response.status}).`);
       if (notify) notify('Cleared read notifications');
     } catch (err) {
       console.warn('Clear read error:', err);
+      notify?.('Could not clear notifications. Please try again.');
+      fetchNotifications();
     }
   };
 
@@ -313,7 +330,12 @@ export function NotificationBell({ session, student, navigate, notify }) {
                 className="notif-micro-btn icon-only"
                 onClick={() => {
                   setIsOpen(false);
-                  if (navigate) navigate(session?.role === 'admin' ? 'admin-profile' : 'profile', {params: {tab: 'notifications'}});
+                  if (navigate) {
+                    navigate(
+                      session?.role === 'admin' ? 'admin-profile' : 'profile',
+                      session?.role === 'admin' ? {} : { params: { tab: 'settings' } }
+                    );
+                  }
                 }}
                 title="Notification preferences"
               >
@@ -408,7 +430,16 @@ export function NotificationBell({ session, student, navigate, notify }) {
                 <div
                   key={n.id}
                   className={`notif-feed-row ${!n.read ? 'is-unread' : 'is-read'}`}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleItemClick(n)}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      handleItemClick(n);
+                    }
+                  }}
                 >
                   <div className={`notif-icon-badge ${n.type || 'default'}`}>
                     {renderIcon(n.type)}
