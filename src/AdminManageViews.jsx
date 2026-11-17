@@ -2,6 +2,7 @@ import { ACADEMIC_COURSES, academicCourseOption } from './academicCourses.js';
 import { requestJson, requireRecord } from './api.js';
 import { passwordError, PASSWORD_HINT } from './validation.js';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { ProfileAvatar } from './ProfileAvatar.jsx';
 import { DEFAULT_ADMIN_AVATAR, DEFAULT_STUDENT_AVATAR } from './defaultAvatar.js';
 import { INITIAL_CERTIFICATES, generateCertificateSVG } from './defaultCertificates.js';
 import './styles.css';
@@ -999,11 +1000,12 @@ export function AdminCoursesView({ state, setState, notify, navigate }) {
                       <tr key={s.id}>
                         <td>
                           <div className="engagement-student-cell">
-                            <img
+                            <ProfileAvatar
                               src={s.avatar || DEFAULT_STUDENT_AVATAR}
+                              name={s.name}
                               alt={s.name}
                               className="engagement-student-avatar"
-                              onError={e => { e.currentTarget.src = DEFAULT_STUDENT_AVATAR; }}
+                              style={{ width: '36px', height: '36px' }}
                             />
                             <div>
                               <div className="engagement-student-name">{s.name}</div>
@@ -2293,9 +2295,11 @@ export function AdminUserManagementView({ state, setState, session, notify, navi
             return (
               <div key={admin.id} className="minimal-item-row" style={{ alignItems: 'flex-start' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', flex: 1, minWidth: 0 }}>
-                  <img
+                  <ProfileAvatar
                     src={admin.avatar || DEFAULT_ADMIN_AVATAR}
+                    name={admin.name}
                     alt={admin.name}
+                    className="admin-avatar"
                     style={{
                       width: '40px',
                       height: '40px',
@@ -3793,9 +3797,9 @@ export function AdminStudentDirectoryView({ state, setState, session, notify, na
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div className="avatar small" style={{ width: '34px', height: '34px', flexShrink: 0 }}>
                           {st?.avatar && typeof st.avatar === 'string' ? (
-                            <img src={st.avatar} alt={st.name} className="avatar-img" onError={e => { e.currentTarget.style.display = 'none'; }} />
+                            <ProfileAvatar src={st.avatar} name={st.name} alt={st.name} className="avatar-img" />
                           ) : (
-                            <img src={DEFAULT_STUDENT_AVATAR} alt={st.name} className="avatar-img" />
+                            <ProfileAvatar src={DEFAULT_STUDENT_AVATAR} name={st.name} alt={st.name} className="avatar-img" />
                           )}
                         </div>
                         <div style={{ minWidth: 0 }}>

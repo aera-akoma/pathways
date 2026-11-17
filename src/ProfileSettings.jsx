@@ -27,19 +27,7 @@ import {
   Plus,
   Link,
   Users,
-  Trash2,
-  Bell,
-  Share2,
-  Award,
-  Check,
-  ChevronLeft,
-  Phone,
-  Mail,
-  Globe,
-  CheckCheck,
-  Filter,
-  ShieldCheck,
-  BadgeCheck
+  Trash2
 } from 'lucide-react';
 
 export { INDIAN_STATES_DISTRICTS };
@@ -55,15 +43,10 @@ const FILTER_STYLES = {
 };
 
 const DEFAULT_COVER_IMAGE = 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=1600&q=80';
-const DEFAULT_STUDENT_PHOTO = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80';
-
-// Helper to ensure external links don't navigate to relative paths
-const formatExternalUrl = (url) => {
-  if (!url) return '';
-  const trimmed = String(url).trim();
-  if (!trimmed) return '';
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  return `https://${trimmed}`;
+const PROFILE_CLASSES = ['BCA', 'MCA', 'BBA', 'MBA', 'Other'];
+const normalizeProfileClass = value => {
+  const normalized = String(value || '').trim().toUpperCase();
+  return PROFILE_CLASSES.includes(normalized) ? normalized : (value ? 'Other' : 'BCA');
 };
 
 const INITIAL_PROJECTS = [
@@ -102,33 +85,6 @@ const INITIAL_PROJECTS = [
   }
 ];
 
-const INITIAL_NOTIFICATIONS = [
-  {
-    id: 'notif-1',
-    title: 'Placement Drive Notice',
-    message: 'Google Summer Internship 2027 applications are now open for CS & IT students.',
-    type: 'opportunity',
-    date: '10m ago',
-    read: false
-  },
-  {
-    id: 'notif-2',
-    title: 'P-CARE Score Updated',
-    message: 'Your readiness score was upgraded to 85/100 following your project submission.',
-    type: 'score',
-    date: '2h ago',
-    read: false
-  },
-  {
-    id: 'notif-3',
-    title: 'Academic Milestone',
-    message: 'Semester V course enrollments and elective electives have been confirmed.',
-    type: 'academic',
-    date: '1d ago',
-    read: true
-  }
-];
-
 export function ProfileSettings({
   student,
   studentId,
@@ -141,25 +97,20 @@ export function ProfileSettings({
   navigate,
   initialTab
 }) {
-  // Check if viewing own profile vs a peer or admin view
-  const isOwnProfile = useMemo(() => {
-    if (studentId && session?.id && studentId !== session.id) return false;
-    return true;
-  }, [studentId, session?.id]);
-
   // Determine active tab from URL or props
   const getTabFromUrl = () => {
     try {
       const searchParams = new URLSearchParams(window.location.search);
       const t = searchParams.get('tab');
-      if (t && ['overview', 'projects', 'certificates', 'settings'].includes(t)) {
+      if (t && ['overview', 'projects', 'settings'].includes(t)) {
         return t;
       }
     } catch (e) {}
-    if (initialTab === 'settings' || initialTab === 'edit') return 'settings';
-    if (initialTab === 'projects' || initialTab === 'posts') return 'projects';
-    if (initialTab === 'certificates') return 'certificates';
-    return 'overview';
+    return initialTab === 'settings' || initialTab === 'edit'
+      ? 'settings'
+      : initialTab === 'projects' || initialTab === 'posts'
+      ? 'projects'
+      : 'overview';
   };
 
   const [activeTab, setActiveTab] = useState(getTabFromUrl);
@@ -201,25 +152,7 @@ export function ProfileSettings({
   };
 
   // Email alerts toggle state
-  const [emailAlerts, setEmailAlerts] = useState(() => {
-    try {
-      const saved = localStorage.getItem('podar-notifications-settings');
-      if (saved) return JSON.parse(saved).enabled !== false;
-    } catch {}
-    return true;
-  });
-
-  const handleToggleEmailAlerts = () => {
-    const next = !emailAlerts;
-    setEmailAlerts(next);
-    try {
-      const existing = JSON.parse(localStorage.getItem('podar-notifications-settings') || '{}');
-      const updated = { ...existing, enabled: next, jobAlerts: next };
-      localStorage.setItem('podar-notifications-settings', JSON.stringify(updated));
-      window.dispatchEvent(new CustomEvent('podar-notifications-changed', { detail: updated }));
-    } catch {}
-    showToast(`Email alerts ${next ? 'enabled' : 'disabled'}`);
-  };
+  const [emailAlerts, setEmailAlerts] = useState(true);
 
   // Toast Notification State
   const [toast, setToast] = useState(null);
@@ -236,7 +169,7 @@ export function ProfileSettings({
   // Student Profile Data
   const [profile, setProfile] = useState({
     name: student?.name || 'Aarav Sharma',
-    degreeShort: student?.course || 'BCA',
+    degreeShort: normalizeProfileClass(student?.course),
     branch: student?.branch || 'Computer Science & Engineering',
     batch: student?.graduationYear || student?.batch || '2023–2027',
     semester: student?.semester ? (String(student.semester).includes('Sem') ? student.semester : `${student.semester}th Semester`) : '5th Semester',
@@ -252,16 +185,10 @@ export function ProfileSettings({
     state: student?.state || 'Karnataka',
     district: student?.district || 'Bengaluru Urban',
     personalEmail: student?.email || 'aarav.sharma.dev@gmail.com',
-    phone: student?.phone || '9876543210',
-    portfolioUrl: student?.portfolio || student?.portfolioUrl || 'https://aaravsharma.dev',
-    github: student?.github || 'https://github.com/aaravsharma',
-    linkedin: student?.linkedin || 'https://linkedin.com/in/aaravsharma',
-    score: student?.score || 85,
-    completion: student?.completion || 95,
     skills: student?.skills
       ? (Array.isArray(student.skills) ? student.skills : student.skills.split(',').map(s => s.trim()).filter(Boolean))
       : ['C++ / DSA', 'Python', 'React & TypeScript', 'Node.js', 'PostgreSQL', 'Linux Kernel', 'PyTorch', 'Docker & Git'],
-    avatar: student?.avatar || DEFAULT_STUDENT_PHOTO,
+    avatar: student?.avatar || DEFAULT_STUDENT_AVATAR,
     cover: student?.cover || DEFAULT_COVER_IMAGE
   });
 
@@ -271,7 +198,7 @@ export function ProfileSettings({
       setProfile(prev => ({
         ...prev,
         name: student.name || prev.name,
-        degreeShort: student.course || prev.degreeShort,
+        degreeShort: student.course ? normalizeProfileClass(student.course) : prev.degreeShort,
         branch: student.branch || prev.branch,
         batch: student.graduationYear || student.batch || prev.batch,
         semester: student.semester ? (String(student.semester).includes('Sem') ? student.semester : `${student.semester}th Semester`) : prev.semester,
@@ -287,12 +214,6 @@ export function ProfileSettings({
         state: student.state || prev.state,
         district: student.district || prev.district,
         personalEmail: student.email || prev.personalEmail,
-        phone: student.phone || prev.phone,
-        portfolioUrl: student.portfolio || student.portfolioUrl || prev.portfolioUrl,
-        github: student.github || prev.github,
-        linkedin: student.linkedin || prev.linkedin,
-        score: student.score || prev.score,
-        completion: student.completion || prev.completion,
         avatar: student.avatar || prev.avatar,
         cover: student.cover || prev.cover,
         skills: student.skills
@@ -330,41 +251,6 @@ export function ProfileSettings({
 
   const [projectSearchInput, setProjectSearchInput] = useState('');
 
-  // Certificates State
-  const [certificates, setCertificates] = useState([
-    {
-      id: 'cert-1',
-      title: 'Full Stack Cloud Development',
-      issuer: 'Podar Academic Pathways',
-      date: 'Aug 2026',
-      status: 'verified',
-      verifiedBy: 'Dr. H.P. Singh (Principal)'
-    },
-    {
-      id: 'cert-2',
-      title: 'Neural Networks & Deep Learning',
-      issuer: 'DeepLearning.AI / Coursera',
-      date: 'Jun 2026',
-      status: 'verified',
-      verifiedBy: 'Department of Computer Science'
-    }
-  ]);
-
-  // Fetch certificates from API if available
-  useEffect(() => {
-    const studentIdToFetch = student?.id || session?.id;
-    if (!studentIdToFetch) return;
-    fetch('/api/certificates')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          const studentCerts = data.filter(c => c.studentId === studentIdToFetch || c.studentName === profile.name);
-          if (studentCerts.length > 0) setCertificates(studentCerts);
-        }
-      })
-      .catch(() => {});
-  }, [student?.id, session?.id, profile.name]);
-
   // Selected project for Details Modal
   const [selectedProject, setSelectedProject] = useState(null);
 
@@ -383,40 +269,6 @@ export function ProfileSettings({
   const [composerDragOver, setComposerDragOver] = useState(false);
   const [newSkillInput, setNewSkillInput] = useState('');
   const [formErrors, setFormErrors] = useState({});
-
-  // Student Inbox & Notifications State
-  const [isInboxOpen, setIsInboxOpen] = useState(false);
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
-  const [inboxFilter, setInboxFilter] = useState('all'); // 'all' | 'unread'
-
-  const unreadCount = useMemo(() => {
-    return notifications.filter(n => !n.read).length;
-  }, [notifications]);
-
-  const markAllNotificationsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    showToast('All messages marked as read');
-  };
-
-  const markSingleNotificationRead = (id) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-  };
-
-  // Share profile handler
-  const [copiedShare, setCopiedShare] = useState(false);
-  const handleShareProfile = () => {
-    try {
-      const url = window.location.origin + '/?page=profile' + (profile.name ? `&name=${encodeURIComponent(profile.name)}` : '');
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(url);
-      }
-      setCopiedShare(true);
-      setTimeout(() => setCopiedShare(false), 2400);
-      showToast('Profile link copied to clipboard!');
-    } catch {
-      showToast('Could not copy link to clipboard.', 'error');
-    }
-  };
 
   // File Upload Refs
   const coverUploadRef = useRef(null);
@@ -470,8 +322,7 @@ export function ProfileSettings({
             course: updatedProfile.degreeShort,
             goal: updatedProfile.objective,
             address: updatedProfile.street,
-            pinCode: updatedProfile.pincode,
-            portfolio: updatedProfile.portfolioUrl
+            pinCode: updatedProfile.pincode
           };
         }
         localStorage.setItem('podar-pathways-session', JSON.stringify(curSession));
@@ -489,8 +340,7 @@ export function ProfileSettings({
                   course: updatedProfile.degreeShort,
                   goal: updatedProfile.objective,
                   address: updatedProfile.street,
-                  pinCode: updatedProfile.pincode,
-                  portfolio: updatedProfile.portfolioUrl
+                  pinCode: updatedProfile.pincode
                 }
               : s
           )
@@ -511,7 +361,6 @@ export function ProfileSettings({
           dob: updatedProfile.dob,
           blood: updatedProfile.blood,
           email: updatedProfile.personalEmail,
-          phone: updatedProfile.phone,
           street: updatedProfile.street,
           address: updatedProfile.street,
           city: updatedProfile.city,
@@ -524,9 +373,6 @@ export function ProfileSettings({
           graduationYear: updatedProfile.batch,
           semester: updatedProfile.semester,
           section: updatedProfile.section,
-          portfolio: updatedProfile.portfolioUrl,
-          github: updatedProfile.github,
-          linkedin: updatedProfile.linkedin,
           skills: Array.isArray(updatedProfile.skills) ? updatedProfile.skills.join(', ') : updatedProfile.skills,
           avatar: updatedProfile.avatar,
           cover: updatedProfile.cover
@@ -568,8 +414,7 @@ export function ProfileSettings({
     const errors = {};
 
     if (!profile.name.trim()) errors.name = 'Full Name is required';
-    if (!profile.degreeShort) errors.degreeShort = 'Degree is required';
-    if (!profile.branch) errors.branch = 'Branch is required';
+    if (!profile.degreeShort) errors.degreeShort = 'Class is required';
     if (!profile.semester) errors.semester = 'Semester is required';
     if (!profile.section) errors.section = 'Section is required';
 
@@ -590,35 +435,29 @@ export function ProfileSettings({
   const handleResetDefaults = () => {
     const reset = {
       name: 'Aarav Sharma',
-      degreeShort: 'BCA',
-      branch: 'Computer Science & Engineering',
+      degreeShort: '',
+      branch: '',
       batch: '2023–2027',
-      semester: '5th Semester',
-      section: 'Section A',
+      semester: '',
+      section: '',
       headline: 'Full-Stack Web Engineer • Applied ML Researcher • Open Source Contributor',
       bio: 'Junior undergraduate passionate about distributed systems, full-stack web engineering, and applied machine learning. Technical Lead at the University Coding Club and Open Source contributor.',
       objective: 'Seeking Software Engineering internships for Summer 2027 to build scalable cloud-native applications and intelligent backend systems.',
       dob: '14 Aug 2005',
-      blood: 'O+',
-      street: 'Flat 302, Green Park Residency, MG Road',
-      city: 'Bengaluru',
-      pincode: '560001',
-      state: 'Karnataka',
-      district: 'Bengaluru Urban',
+      blood: '',
+      street: '',
+      city: '',
+      pincode: '',
+      state: '',
+      district: '',
       personalEmail: 'aarav.sharma.dev@gmail.com',
-      phone: '9876543210',
-      portfolioUrl: 'https://aaravsharma.dev',
-      github: 'https://github.com/aaravsharma',
-      linkedin: 'https://linkedin.com/in/aaravsharma',
-      score: 85,
-      completion: 95,
       skills: ['C++ / DSA', 'Python', 'React & TypeScript', 'Node.js', 'PostgreSQL', 'Linux Kernel', 'PyTorch', 'Docker & Git'],
-      avatar: DEFAULT_STUDENT_PHOTO,
+      avatar: DEFAULT_STUDENT_AVATAR,
       cover: DEFAULT_COVER_IMAGE
     };
     setProfile(reset);
     setFormErrors({});
-    showToast('Profile reset to default values');
+    showToast('Profile reset to default (dropdowns set to None)');
   };
 
   // Project Composer Handlers
@@ -667,7 +506,7 @@ export function ProfileSettings({
       title: composerState.title.trim(),
       description: composerState.description.trim(),
       tech: techTags,
-      demoUrl: formatExternalUrl(composerState.demoUrl),
+      demoUrl: composerState.demoUrl.trim(),
       image: composerState.imageDataUrl || '',
       filter: composerState.filter,
       aspect: composerState.aspectRatio,
@@ -698,10 +537,8 @@ export function ProfileSettings({
 
   // Derived labels
   const degreeBranchLabel = useMemo(() => {
-    const parts = [profile.degreeShort, profile.branch].filter(Boolean);
-    if (!parts.length) return 'Academic program not specified';
-    return parts.join(' • ');
-  }, [profile.degreeShort, profile.branch]);
+    return profile.degreeShort || 'Class not specified';
+  }, [profile.degreeShort]);
 
   const batchYearLabel = useMemo(() => {
     if (profile.batch && profile.batch.includes('–')) {
@@ -733,38 +570,14 @@ export function ProfileSettings({
       {/* Main Content Container */}
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
 
-        {/* Peer or Admin View Back Banner */}
-        {!isOwnProfile && (
-          <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 rounded-2xl p-3.5 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => {
-                if (typeof window !== 'undefined') {
-                  window.dispatchEvent(new CustomEvent('podar-route-change', { detail: { page: 'profile', params: { tab: 'directory' } } }));
-                }
-                navigate?.('profile');
-              }}
-              className="text-xs font-semibold text-navy-600 dark:text-indigo-400 hover:underline flex items-center gap-1.5"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              <span>Back to Campus Directory</span>
-            </button>
-            <span className="text-xs text-indigo-700 dark:text-indigo-300 font-medium">
-              Viewing Student Record
-            </span>
-          </div>
-        )}
-
         {/* 1. HEADER & ACADEMIC BANNER CARD */}
         <section className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-200/80 dark:border-slate-800 overflow-hidden transition-colors duration-300">
 
           {/* College Campus Cover Banner */}
           <div
-            onClick={() => {
-              if (isOwnProfile) coverUploadRef.current?.click();
-            }}
-            title={isOwnProfile ? "Click to change cover banner" : "Campus Cover"}
-            className={`relative h-44 sm:h-56 w-full bg-gradient-to-r from-slate-900 via-indigo-900 to-navy-600 overflow-hidden group ${isOwnProfile ? 'cursor-pointer' : ''}`}
+            onClick={() => coverUploadRef.current?.click()}
+            title="Click to change cover banner"
+            className="relative h-44 sm:h-56 w-full bg-gradient-to-r from-slate-900 via-indigo-900 to-navy-600 overflow-hidden group cursor-pointer"
           >
             <img
               src={profile.cover || DEFAULT_COVER_IMAGE}
@@ -773,15 +586,13 @@ export function ProfileSettings({
             />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent"></div>
 
-            {/* Hover Camera Overlay (Only for own profile) */}
-            {isOwnProfile && (
-              <div className="absolute inset-0 bg-black/45 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-1.5 text-white pointer-events-none">
-                <div className="w-11 h-11 rounded-full bg-white/15 border border-white/25 flex items-center justify-center">
-                  <Camera className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-xs font-medium tracking-wide">Change Banner</span>
+            {/* Hover Camera Overlay */}
+            <div className="absolute inset-0 bg-black/45 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-1.5 text-white pointer-events-none">
+              <div className="w-11 h-11 rounded-full bg-white/15 border border-white/25 flex items-center justify-center">
+                <Camera className="w-5 h-5 text-white" />
               </div>
-            )}
+              <span className="text-xs font-medium tracking-wide">Change Banner</span>
+            </div>
             <input
               type="file"
               ref={coverUploadRef}
@@ -800,23 +611,22 @@ export function ProfileSettings({
               <div
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (isOwnProfile) avatarUploadRef.current?.click();
+                  avatarUploadRef.current?.click();
                 }}
-                title={isOwnProfile ? "Click to change profile photo" : profile.name}
-                className={`relative inline-block w-28 h-28 sm:w-32 sm:h-32 rounded-full group ${isOwnProfile ? 'cursor-pointer' : ''}`}
+                title="Click to change profile photo"
+                className="relative inline-block w-28 h-28 sm:w-32 sm:h-32 rounded-full group cursor-pointer"
               >
-                <img
-                  src={profile.avatar || DEFAULT_STUDENT_PHOTO}
+                <ProfileAvatar
+                  src={profile.avatar || DEFAULT_STUDENT_AVATAR}
+                  name={profile.name}
                   alt={profile.name}
                   className="w-full h-full object-cover rounded-full border-4 border-white dark:border-slate-900 shadow-lg bg-slate-200 dark:bg-slate-800"
                 />
 
                 {/* Avatar Hover Camera Overlay */}
-                {isOwnProfile && (
-                  <div className="absolute inset-1 rounded-full bg-black/45 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center text-white pointer-events-none">
-                    <Camera className="w-6 h-6 text-white" />
-                  </div>
-                )}
+                <div className="absolute inset-1 rounded-full bg-black/45 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center text-white pointer-events-none">
+                  <Camera className="w-6 h-6 text-white" />
+                </div>
                 <input
                   type="file"
                   ref={avatarUploadRef}
@@ -826,78 +636,14 @@ export function ProfileSettings({
                   className="hidden"
                 />
               </div>
-
-              {/* Action Buttons Right Row */}
-              <div className="flex flex-wrap items-center gap-2 pt-2 sm:pt-0">
-                {isOwnProfile ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setIsInboxOpen(true)}
-                      className="relative px-3.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-navy-400 text-slate-700 dark:text-slate-200 transition-all flex items-center gap-2 shadow-sm"
-                      title="Open Student Inbox"
-                    >
-                      <Bell className="w-4 h-4 text-navy-600 dark:text-indigo-400" />
-                      <span>Inbox</span>
-                      {unreadCount > 0 && (
-                        <span className="w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">
-                          {unreadCount}
-                        </span>
-                      )}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleShareProfile}
-                      className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-navy-400 text-slate-700 dark:text-slate-200 transition-all flex items-center gap-2 shadow-sm"
-                      title="Share Student Profile"
-                    >
-                      {copiedShare ? <Check className="w-4 h-4 text-emerald-500" /> : <Share2 className="w-4 h-4 text-slate-500" />}
-                      <span>{copiedShare ? 'Copied' : 'Share'}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => navigate?.('resume')}
-                      className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-navy-400 text-slate-700 dark:text-slate-200 transition-all flex items-center gap-2 shadow-sm"
-                      title="Open Resume Builder"
-                    >
-                      <FileText className="w-4 h-4 text-amber-500" />
-                      <span>Resume</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => switchTab('settings')}
-                      className="px-4 py-2 rounded-xl text-xs font-semibold bg-navy-600 hover:bg-navy-700 text-white transition-all flex items-center gap-2 shadow-sm shadow-indigo-500/20"
-                    >
-                      <Settings className="w-4 h-4" />
-                      <span>Edit Profile</span>
-                    </button>
-                  </>
-                ) : (
-                  <a
-                    href={`mailto:${profile.personalEmail}`}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-navy-600 hover:bg-navy-700 text-white transition-all flex items-center gap-2 shadow-sm"
-                  >
-                    <Mail className="w-4 h-4" />
-                    <span>Contact Student</span>
-                  </a>
-                )}
-              </div>
             </div>
 
             {/* Student Name, Academic Summary & Bio */}
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-                    {profile.name}
-                  </h1>
-                  <span title="Verified College Student" className="text-indigo-600 dark:text-indigo-400">
-                    <BadgeCheck className="w-5 h-5 fill-indigo-600 text-white dark:fill-indigo-500" />
-                  </span>
-                </div>
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+                  {profile.name}
+                </h1>
                 <p className="text-sm sm:text-base font-medium text-navy-600 dark:text-indigo-400 mt-0.5">
                   {batchYearLabel ? `${degreeBranchLabel} • ${batchYearLabel}` : degreeBranchLabel}
                 </p>
@@ -909,51 +655,6 @@ export function ProfileSettings({
               <p className="text-slate-600 dark:text-slate-300 text-sm max-w-3xl leading-relaxed">
                 {profile.bio}
               </p>
-
-              {/* Career Readiness & Quick Stats Row */}
-              <div className="flex flex-wrap items-center gap-2.5 pt-2">
-                <button
-                  type="button"
-                  onClick={() => switchTab('projects')}
-                  className="profile-stat-pill px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-medium flex items-center gap-1.5 border border-slate-200/70 dark:border-slate-700"
-                >
-                  <FolderGit2 className="w-3.5 h-3.5 text-navy-600 dark:text-indigo-400" />
-                  <strong>{projects.length}</strong>
-                  <span className="text-slate-500 dark:text-slate-400">Projects</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => switchTab('certificates')}
-                  className="profile-stat-pill px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-medium flex items-center gap-1.5 border border-slate-200/70 dark:border-slate-700"
-                >
-                  <Award className="w-3.5 h-3.5 text-amber-500" />
-                  <strong>{certificates.length}</strong>
-                  <span className="text-slate-500 dark:text-slate-400">Credentials</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => navigate?.('score')}
-                  className="profile-stat-pill px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-medium flex items-center gap-1.5 border border-slate-200/70 dark:border-slate-700"
-                  title="View P-CARE Employability Score"
-                >
-                  <Star className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500" />
-                  <strong>{profile.score}/100</strong>
-                  <span className="text-slate-500 dark:text-slate-400">P-CARE</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => navigate?.('passport')}
-                  className="profile-stat-pill px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-medium flex items-center gap-1.5 border border-slate-200/70 dark:border-slate-700"
-                  title="View Career Readiness Passport"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-                  <strong>{profile.completion}%</strong>
-                  <span className="text-slate-500 dark:text-slate-400">Readiness</span>
-                </button>
-              </div>
             </div>
           </div>
 
@@ -990,34 +691,16 @@ export function ProfileSettings({
 
             <button
               type="button"
-              onClick={() => switchTab('certificates')}
+              onClick={() => switchTab('settings')}
               className={`tab-btn py-4 text-sm whitespace-nowrap transition-colors flex items-center gap-2 border-b-2 ${
-                activeTab === 'certificates'
+                activeTab === 'settings'
                   ? 'border-navy-600 text-navy-600 dark:text-indigo-400 dark:border-indigo-400 font-semibold'
                   : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-medium'
               }`}
             >
-              <Award className="w-4 h-4" />
-              <span>Certificates</span>
-              <span className="ml-0.5 px-2 py-0.5 text-[11px] font-semibold rounded-full bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300">
-                {certificates.length}
-              </span>
+              <Settings className="w-4 h-4" />
+              <span>Profile Settings</span>
             </button>
-
-            {isOwnProfile && (
-              <button
-                type="button"
-                onClick={() => switchTab('settings')}
-                className={`tab-btn py-4 text-sm whitespace-nowrap transition-colors flex items-center gap-2 border-b-2 ${
-                  activeTab === 'settings'
-                    ? 'border-navy-600 text-navy-600 dark:text-indigo-400 dark:border-indigo-400 font-semibold'
-                    : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-medium'
-                }`}
-              >
-                <Settings className="w-4 h-4" />
-                <span>Profile Settings</span>
-              </button>
-            )}
           </div>
         </section>
 
@@ -1074,22 +757,20 @@ export function ProfileSettings({
                       <GraduationCap className="w-4 h-4 text-navy-600 dark:text-indigo-400" />
                       <span>Academic & Personal Details</span>
                     </h3>
-                    {isOwnProfile && (
-                      <button
-                        type="button"
-                        onClick={() => switchTab('settings')}
-                        className="text-xs font-medium text-navy-600 dark:text-indigo-400 hover:underline"
-                      >
-                        Edit
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => switchTab('settings')}
+                      className="text-xs font-medium text-navy-600 dark:text-indigo-400 hover:underline"
+                    >
+                      Edit
+                    </button>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-3 text-xs">
                     <div>
-                      <p className="text-slate-400 font-medium">Degree & Branch</p>
+                      <p className="text-slate-400 font-medium">Class</p>
                       <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
-                        {[profile.degreeShort, profile.branch].filter(Boolean).join(' — ') || 'Not specified'}
+                        {profile.degreeShort || 'Not specified'}
                       </p>
                     </div>
                     <div>
@@ -1135,15 +816,13 @@ export function ProfileSettings({
                       <MapPin className="w-4 h-4 text-navy-600 dark:text-indigo-400" />
                       <span>Address Details</span>
                     </h3>
-                    {isOwnProfile && (
-                      <button
-                        type="button"
-                        onClick={() => switchTab('settings')}
-                        className="text-xs font-medium text-navy-600 dark:text-indigo-400 hover:underline"
-                      >
-                        Edit
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => switchTab('settings')}
+                      className="text-xs font-medium text-navy-600 dark:text-indigo-400 hover:underline"
+                    >
+                      Edit
+                    </button>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-3 text-xs">
@@ -1216,81 +895,6 @@ export function ProfileSettings({
                   </div>
                 </div>
 
-                {/* Web & Social Links Card */}
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4 col-span-1 lg:col-span-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                      <Globe className="w-4 h-4 text-navy-600 dark:text-indigo-400" />
-                      <span>External Web & Social Profiles</span>
-                    </h3>
-                    {isOwnProfile && (
-                      <button
-                        type="button"
-                        onClick={() => switchTab('settings')}
-                        className="text-xs font-medium text-navy-600 dark:text-indigo-400 hover:underline"
-                      >
-                        Update Links
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {profile.portfolioUrl && (
-                      <a
-                        href={formatExternalUrl(profile.portfolioUrl)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 hover:border-navy-500 transition-all flex items-center justify-between group"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <Globe className="w-4 h-4 text-navy-600 dark:text-indigo-400 flex-shrink-0" />
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">Portfolio</p>
-                            <p className="text-[11px] text-slate-400 truncate">{profile.portfolioUrl.replace(/^https?:\/\//, '')}</p>
-                          </div>
-                        </div>
-                        <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-navy-600 transition-colors" />
-                      </a>
-                    )}
-
-                    {profile.github && (
-                      <a
-                        href={formatExternalUrl(profile.github)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 hover:border-navy-500 transition-all flex items-center justify-between group"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <Code2 className="w-4 h-4 text-navy-600 dark:text-indigo-400 flex-shrink-0" />
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">GitHub</p>
-                            <p className="text-[11px] text-slate-400 truncate">{profile.github.replace(/^https?:\/\//, '')}</p>
-                          </div>
-                        </div>
-                        <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-navy-600 transition-colors" />
-                      </a>
-                    )}
-
-                    {profile.linkedin && (
-                      <a
-                        href={formatExternalUrl(profile.linkedin)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 hover:border-navy-500 transition-all flex items-center justify-between group"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <Link className="w-4 h-4 text-navy-600 dark:text-indigo-400 flex-shrink-0" />
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">LinkedIn</p>
-                            <p className="text-[11px] text-slate-400 truncate">{profile.linkedin.replace(/^https?:\/\//, '')}</p>
-                          </div>
-                        </div>
-                        <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-navy-600 transition-colors" />
-                      </a>
-                    )}
-                  </div>
-                </div>
-
               </div>
             </div>
           )}
@@ -1311,16 +915,14 @@ export function ProfileSettings({
                       Showcase your academic builds, hackathon prototypes, and personal software projects.
                     </p>
                   </div>
-                  {isOwnProfile && (
-                    <button
-                      type="button"
-                      onClick={handleOpenComposer}
-                      className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-navy-600 hover:bg-navy-700 text-white shadow-sm shadow-indigo-500/20 transition-all flex items-center justify-center gap-2"
-                    >
-                      <PlusCircle className="w-4 h-4" />
-                      <span>Upload Project</span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={handleOpenComposer}
+                    className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-navy-600 hover:bg-navy-700 text-white shadow-sm shadow-indigo-500/20 transition-all flex items-center justify-center gap-2"
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                    <span>Upload Project</span>
+                  </button>
                 </div>
 
                 {/* Search Filter Input */}
@@ -1417,7 +1019,7 @@ export function ProfileSettings({
 
                             {proj.demoUrl ? (
                               <a
-                                href={formatExternalUrl(proj.demoUrl)}
+                                href={proj.demoUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-xs font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white flex items-center gap-1"
@@ -1438,67 +1040,12 @@ export function ProfileSettings({
             </div>
           )}
 
-          {/* TAB 3: CERTIFICATES & CREDENTIALS */}
-          {activeTab === 'certificates' && (
-            <div className="tab-panel space-y-6">
-              <div className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-2">
-                <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Award className="w-5 h-5 text-amber-500" />
-                  <span>Verified Credentials & Certifications</span>
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Institutional course accreditations, verified learning tracks, and industry certificates.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {certificates.map(cert => (
-                  <div
-                    key={cert.id}
-                    className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between space-y-4"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
-                          <Award className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
-                            {cert.title || cert.programTitle}
-                          </h3>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                            {cert.issuer || cert.verifiedBy || 'Podar Pathways'}
-                          </p>
-                        </div>
-                      </div>
-                      <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                        <Check className="w-3 h-3" />
-                        <span>Verified</span>
-                      </span>
-                    </div>
-
-                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-400">
-                      <span>Issued: {cert.date || 'Aug 2026'}</span>
-                      <button
-                        type="button"
-                        onClick={() => showToast('Certificate verified by Podar College Authority.')}
-                        className="text-navy-600 dark:text-indigo-400 font-semibold hover:underline"
-                      >
-                        Verification Proof
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 4: PROFILE SETTINGS */}
-          {activeTab === 'settings' && isOwnProfile && (
+          {/* TAB 3: PROFILE SETTINGS */}
+          {activeTab === 'settings' && (
             <div className="tab-panel">
               <form onSubmit={handleSaveAllSettings} noValidate className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-                {/* Left 2 Columns: Personal, Address, Academic, Social & Skills Cards */}
+                {/* Left 2 Columns: Personal, Address, Academic & Skills Cards */}
                 <div className="lg:col-span-2 space-y-6">
 
                   {/* Card A: Personal Information */}
@@ -1613,61 +1160,7 @@ export function ProfileSettings({
                     </div>
                   </div>
 
-                  {/* Card B: Web & Social Profiles */}
-                  <div className="bg-white dark:bg-slate-900 p-6 sm:p-7 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
-                    <div>
-                      <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                        <Globe className="w-4 h-4 text-navy-600 dark:text-indigo-400" />
-                        <span>Web & Online Presence</span>
-                      </h2>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                        Link your online projects, code repositories, and professional network.
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                          Portfolio Website
-                        </label>
-                        <input
-                          type="text"
-                          value={profile.portfolioUrl}
-                          onChange={(e) => setProfile(prev => ({ ...prev, portfolioUrl: e.target.value }))}
-                          placeholder="e.g. aaravsharma.dev"
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                          GitHub Profile
-                        </label>
-                        <input
-                          type="text"
-                          value={profile.github}
-                          onChange={(e) => setProfile(prev => ({ ...prev, github: e.target.value }))}
-                          placeholder="e.g. github.com/username"
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                          LinkedIn Profile
-                        </label>
-                        <input
-                          type="text"
-                          value={profile.linkedin}
-                          onChange={(e) => setProfile(prev => ({ ...prev, linkedin: e.target.value }))}
-                          placeholder="e.g. linkedin.com/in/username"
-                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Card C: Address Details */}
+                  {/* Card B: Address Details */}
                   <div className="bg-white dark:bg-slate-900 p-6 sm:p-7 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-5">
                     <div>
                       <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
@@ -1757,7 +1250,7 @@ export function ProfileSettings({
                     </div>
                   </div>
 
-                  {/* Card D: Academic & Enrollment Details */}
+                  {/* Card C: Academic & Enrollment Details */}
                   <div className="bg-white dark:bg-slate-900 p-6 sm:p-7 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-5">
                     <div>
                       <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
@@ -1765,14 +1258,14 @@ export function ProfileSettings({
                         <span>Academic & Enrollment Details</span>
                       </h2>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                        Program, branch, and semester details (<span className="text-rose-500 font-bold">*</span> required).
+                        Class and semester details (<span className="text-rose-500 font-bold">*</span> required).
                       </p>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                          Degree <span className="text-rose-500 font-bold">*</span>
+                          Class <span className="text-rose-500 font-bold">*</span>
                         </label>
                         <select
                           value={profile.degreeShort}
@@ -1782,39 +1275,8 @@ export function ProfileSettings({
                             formErrors.degreeShort ? 'border-rose-500 ring-2 ring-rose-500/30' : 'border-slate-200 dark:border-slate-700'
                           } text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500`}
                         >
-                          <option value="">None</option>
-                          <option value="B.Tech">B.Tech</option>
-                          <option value="B.E.">B.E.</option>
-                          <option value="B.Sc">B.Sc</option>
-                          <option value="BCA">BCA</option>
-                          <option value="M.Tech">M.Tech</option>
-                          <option value="MCA">MCA</option>
-                          <option value="Ph.D.">Ph.D.</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                          Branch / Department <span className="text-rose-500 font-bold">*</span>
-                        </label>
-                        <select
-                          value={profile.branch}
-                          onChange={(e) => setProfile(prev => ({ ...prev, branch: e.target.value }))}
-                          required
-                          className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border ${
-                            formErrors.branch ? 'border-rose-500 ring-2 ring-rose-500/30' : 'border-slate-200 dark:border-slate-700'
-                          } text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500`}
-                        >
-                          <option value="">None</option>
-                          <option value="Computer Science & Engineering">Computer Science & Engineering</option>
-                          <option value="Information Technology">Information Technology</option>
-                          <option value="Artificial Intelligence & Data Science">Artificial Intelligence & Data Science</option>
-                          <option value="Electronics & Communication">Electronics & Communication</option>
-                          <option value="Electrical Engineering">Electrical Engineering</option>
-                          <option value="Mechanical Engineering">Mechanical Engineering</option>
-                          <option value="Civil Engineering">Civil Engineering</option>
-                          <option value="Chemical Engineering">Chemical Engineering</option>
-                          <option value="Biotechnology">Biotechnology</option>
+                          <option value="">Select class</option>
+                          {PROFILE_CLASSES.map(className => <option key={className} value={className}>{className}</option>)}
                         </select>
                       </div>
 
@@ -1878,7 +1340,7 @@ export function ProfileSettings({
                     </div>
                   </div>
 
-                  {/* Card E: Technical Skills Manager */}
+                  {/* Card D: Technical Skills Manager */}
                   <div className="bg-white dark:bg-slate-900 p-6 sm:p-7 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
                     <div>
                       <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
@@ -1978,7 +1440,11 @@ export function ProfileSettings({
                         type="button"
                         role="switch"
                         aria-checked={emailAlerts}
-                        onClick={handleToggleEmailAlerts}
+                        onClick={() => {
+                          const next = !emailAlerts;
+                          setEmailAlerts(next);
+                          showToast(`Email alerts ${next ? 'enabled' : 'disabled'}`);
+                        }}
                         className={`w-11 h-6 rounded-full p-0.5 transition-colors flex items-center ${
                           emailAlerts ? 'bg-navy-600' : 'bg-slate-300 dark:bg-slate-700'
                         }`}
@@ -1988,42 +1454,6 @@ export function ProfileSettings({
                             emailAlerts ? 'translate-x-5' : 'translate-x-0'
                           }`}
                         />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Connected Pathways Hub Card */}
-                  <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
-                    <h3 className="text-base font-semibold text-slate-900 dark:text-white">
-                      Pathways Hub Shortcuts
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Directly navigate to your active modules and career tracks.
-                    </p>
-                    <div className="space-y-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => navigate?.('courses')}
-                        className="w-full py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/80 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center justify-between transition-colors"
-                      >
-                        <span>Explore Courses</span>
-                        <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => navigate?.('projects')}
-                        className="w-full py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/80 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center justify-between transition-colors"
-                      >
-                        <span>Campus Projects Feed</span>
-                        <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => navigate?.('opportunities')}
-                        className="w-full py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/80 text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center justify-between transition-colors"
-                      >
-                        <span>Placement Drives & Internships</span>
-                        <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
                       </button>
                     </div>
                   </div>
@@ -2053,146 +1483,6 @@ export function ProfileSettings({
 
         </div>
       </main>
-
-      {/* STUDENT INBOX & NOTIFICATIONS DRAWER MODAL */}
-      {isInboxOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden modal-animate-enter flex flex-col max-h-[85vh]">
-            
-            {/* Inbox Header */}
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-500/15 text-navy-600 dark:text-indigo-400 flex items-center justify-center">
-                  <Bell className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Student Inbox</h3>
-                  <p className="text-[11px] text-slate-400">
-                    {unreadCount > 0 ? `${unreadCount} unread notices` : 'All caught up'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1">
-                {unreadCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={markAllNotificationsRead}
-                    className="p-1.5 text-xs text-navy-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
-                    title="Mark all as read"
-                  >
-                    <CheckCheck className="w-3.5 h-3.5" />
-                    <span>Read all</span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setIsInboxOpen(false)}
-                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Filter Pills */}
-            <div className="px-6 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setInboxFilter('all')}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
-                  inboxFilter === 'all'
-                    ? 'bg-navy-600 text-white'
-                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-                }`}
-              >
-                All ({notifications.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setInboxFilter('unread')}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
-                  inboxFilter === 'unread'
-                    ? 'bg-navy-600 text-white'
-                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-                }`}
-              >
-                Unread ({unreadCount})
-              </button>
-            </div>
-
-            {/* Messages / Notifications List */}
-            <div className="p-4 sm:p-6 overflow-y-auto space-y-3">
-              {notifications
-                .filter(n => (inboxFilter === 'unread' ? !n.read : true))
-                .length === 0 ? (
-                <div className="py-10 text-center space-y-2">
-                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                    No notifications in this filter
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    You have no new notices or messages at the moment.
-                  </p>
-                </div>
-              ) : (
-                notifications
-                  .filter(n => (inboxFilter === 'unread' ? !n.read : true))
-                  .map(n => (
-                    <div
-                      key={n.id}
-                      onClick={() => markSingleNotificationRead(n.id)}
-                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer ${
-                        !n.read
-                          ? 'bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-800'
-                          : 'bg-white dark:bg-slate-800/60 border-slate-200/80 dark:border-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`w-2 h-2 rounded-full ${
-                              !n.read ? 'bg-navy-600 dark:bg-indigo-400' : 'bg-transparent'
-                            }`}
-                          />
-                          <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                            {n.title}
-                          </h4>
-                        </div>
-                        <span className="text-[11px] text-slate-400 whitespace-nowrap">{n.date}</span>
-                      </div>
-                      <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 pl-4 leading-relaxed">
-                        {n.message}
-                      </p>
-                    </div>
-                  ))
-              )}
-            </div>
-
-            {/* Inbox Footer */}
-            <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsInboxOpen(false);
-                  navigate?.('notifications');
-                }}
-                className="text-xs font-semibold text-navy-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
-              >
-                <span>Full Notification Center</span>
-                <ExternalLink className="w-3 h-3" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsInboxOpen(false)}
-                className="px-3.5 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
-              >
-                Close
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
 
       {/* SINGLE-VIEW INSTAGRAM-STYLE PROJECT POST COMPOSER MODAL */}
       {isComposerOpen && (
@@ -2396,10 +1686,12 @@ export function ProfileSettings({
                 <div className="space-y-4">
                   {/* Author Header */}
                   <div className="flex items-center gap-3 pb-2 border-b border-slate-100 dark:border-slate-800">
-                    <img
-                      src={profile.avatar || DEFAULT_STUDENT_PHOTO}
+                    <ProfileAvatar
+                      src={profile.avatar || DEFAULT_STUDENT_AVATAR}
+                      name={profile.name}
                       alt={profile.name}
                       className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700"
+                      style={{ width: '2.25rem', height: '2.25rem' }}
                     />
                     <div className="min-w-0">
                       <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
@@ -2478,10 +1770,10 @@ export function ProfileSettings({
                     <div className="relative">
                       <Link className="w-3.5 h-3.5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input
-                        type="text"
+                        type="url"
                         value={composerState.demoUrl}
                         onChange={(e) => setComposerState(prev => ({ ...prev, demoUrl: e.target.value }))}
-                        placeholder="https://my-project.vercel.app or github.com/..."
+                        placeholder="https://my-project.vercel.app (optional)"
                         className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500"
                       />
                     </div>
@@ -2554,7 +1846,7 @@ export function ProfileSettings({
               <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-3">
                 {selectedProject.demoUrl && (
                   <a
-                    href={formatExternalUrl(selectedProject.demoUrl)}
+                    href={selectedProject.demoUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-4 py-2 rounded-xl text-xs font-semibold bg-navy-600 hover:bg-navy-700 text-white flex items-center gap-1.5 transition-colors"
