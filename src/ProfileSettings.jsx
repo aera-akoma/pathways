@@ -308,6 +308,37 @@ export function ProfileSettings({
     });
   };
 
+  // Projects State
+  const [projects, setProjects] = useState(() => {
+    try {
+      const saved = localStorage.getItem('podar_local_projects');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return INITIAL_PROJECTS;
+  });
+
+  // Selected project for Details Modal
+  const [selectedProject, setSelectedProject] = useState(null);
+
+  // New Project Composer Modal State
+  const [isComposerOpen, setIsComposerOpen] = useState(false);
+  const [composerState, setComposerState] = useState({
+    title: '',
+    description: '',
+    tech: '',
+    demoUrl: '',
+    imageDataUrl: '',
+    useGradientCover: false,
+    aspectRatio: '16:9',
+    filter: 'Original'
+  });
+  const [composerDragOver, setComposerDragOver] = useState(false);
+  const [newSkillInput, setNewSkillInput] = useState('');
+  const [formErrors, setFormErrors] = useState({});
+
   // Close open modals on Escape key press
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -330,38 +361,6 @@ export function ProfileSettings({
       };
     }
   }, [isComposerOpen, selectedProject]);
-
-  // Projects State
-  const [projects, setProjects] = useState(() => {
-    try {
-      const saved = localStorage.getItem('podar_local_projects');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {}
-    return INITIAL_PROJECTS;
-  });
-
-
-  // Selected project for Details Modal
-  const [selectedProject, setSelectedProject] = useState(null);
-
-  // New Project Composer Modal State
-  const [isComposerOpen, setIsComposerOpen] = useState(false);
-  const [composerState, setComposerState] = useState({
-    title: '',
-    description: '',
-    tech: '',
-    demoUrl: '',
-    imageDataUrl: '',
-    useGradientCover: false,
-    aspectRatio: '16:9',
-    filter: 'Original'
-  });
-  const [composerDragOver, setComposerDragOver] = useState(false);
-  const [newSkillInput, setNewSkillInput] = useState('');
-  const [formErrors, setFormErrors] = useState({});
 
   // File Upload Refs
   const coverUploadRef = useRef(null);
