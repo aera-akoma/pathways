@@ -57,6 +57,29 @@ const normalizeDateInput = value => {
   return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
 };
 
+// Ensure external URLs include protocol to avoid relative-path 404s
+const formatExternalUrl = (url) => {
+  if (!url) return '';
+  const trimmed = String(url).trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+};
+
+// Safe date formatter for local calendar display without UTC timezone shift
+const formatDateDisplay = (dateString) => {
+  if (!dateString) return 'Not specified';
+  const raw = String(dateString).trim();
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const [, y, m, d] = match;
+    const date = new Date(Number(y), Number(m) - 1, Number(d));
+    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? 'Not specified' : parsed.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
 const INITIAL_PROJECTS = [
   {
     id: 101,
@@ -123,7 +146,7 @@ export function ProfileSettings({
 
   const [activeTab, setActiveTab] = useState(getTabFromUrl);
 
-  const switchTab = (tabName) => {
+  const switchTab = (tabName, scrollToId = null) => {
     setActiveTab(tabName);
     try {
       const url = new URL(window.location.href);
@@ -134,6 +157,16 @@ export function ProfileSettings({
       }
       window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
     } catch (e) {}
+    if (scrollToId) {
+      setTimeout(() => {
+        const el = document.getElementById(scrollToId);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          el.classList.add('ring-2', 'ring-navy-500/40');
+          setTimeout(() => el.classList.remove('ring-2', 'ring-navy-500/40'), 1500);
+        }
+      }, 100);
+    }
   };
 
   // Dark Mode State
@@ -165,8 +198,26 @@ export function ProfileSettings({
     showToast(nextDark ? 'Dark theme enabled' : 'Light theme enabled');
   };
 
-  // Email alerts toggle state
-  const [emailAlerts, setEmailAlerts] = useState(true);
+  // Email alerts toggle state (synced with notification center)
+  const [emailAlerts, setEmailAlerts] = useState(() => {
+    try {
+      const saved = localStorage.getItem('podar-notifications-settings');
+      if (saved) return JSON.parse(saved).enabled !== false;
+    } catch {}
+    return true;
+  });
+
+  const handleToggleEmailAlerts = () => {
+    const next = !emailAlerts;
+    setEmailAlerts(next);
+    try {
+      const existing = JSON.parse(localStorage.getItem('podar-notifications-settings') || '{}');
+      const updated = { ...existing, enabled: next, jobAlerts: next };
+      localStorage.setItem('podar-notifications-settings', JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent('podar-notifications-changed', { detail: updated }));
+    } catch {}
+    showToast(`Email alerts ${next ? 'enabled' : 'disabled'}`);
+  };
 
   // Toast Notification State
   const [toast, setToast] = useState(null);
@@ -237,19 +288,38 @@ export function ProfileSettings({
     }
   }, [student]);
 
-  // Highlighted skills set for the Overview tab
-  const [highlightedSkills, setHighlightedSkills] = useState(
-    () => new Set(['C++ / DSA', 'React & TypeScript', 'PyTorch'])
-  );
+  // Highlighted skills set for the Overview tab (persisted)
+  const [highlightedSkills, setHighlightedSkills] = useState(() => {
+    try {
+      const saved = localStorage.getItem('podar-highlighted-skills');
+      if (saved) return new Set(JSON.parse(saved));
+    } catch {}
+    return new Set(['C++ / DSA', 'React & TypeScript', 'PyTorch']);
+  });
 
   const toggleSkillHighlight = (skill) => {
     setHighlightedSkills(prev => {
       const next = new Set(prev);
       if (next.has(skill)) next.delete(skill);
       else next.add(skill);
+      try {
+        localStorage.setItem('podar-highlighted-skills', JSON.stringify([...next]));
+      } catch {}
       return next;
     });
   };
+
+  // Close open modals on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setIsComposerOpen(false);
+        setSelectedProject(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Projects State
   const [projects, setProjects] = useState(() => {
@@ -438,7 +508,14 @@ export function ProfileSettings({
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       const firstKey = Object.keys(errors)[0];
-      showToast(`Please fill in required field: ${errors[firstKey]}`, 'error');
+      showToast(`Please check required field: ${errors[firstKey]}`, 'error');
+      setTimeout(() => {
+        const firstErrorEl = document.querySelector('[aria-invalid="true"]');
+        if (firstErrorEl) {
+          firstErrorEl.focus();
+          firstErrorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 50);
       return;
     }
 
@@ -778,7 +855,7 @@ export function ProfileSettings({
                     </h3>
                     <button
                       type="button"
-                      onClick={() => switchTab('settings')}
+                      onClick={() => switchTab('settings', 'settings-academic')}
                       className="profile-edit-btn text-xs font-medium text-navy-600 dark:text-indigo-400"
                     >
                       Edit
@@ -813,7 +890,7 @@ export function ProfileSettings({
                     <div>
                       <p className="text-slate-400 font-medium">Date of Birth</p>
                       <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
-                        {profile.dob ? new Date(`${profile.dob}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not specified'}
+                        {formatDateDisplay(profile.dob)}
                       </p>
                     </div>
                     <div>
@@ -843,7 +920,7 @@ export function ProfileSettings({
                     </h3>
                     <button
                       type="button"
-                      onClick={() => switchTab('settings')}
+                      onClick={() => switchTab('settings', 'settings-address')}
                       className="profile-edit-btn text-xs font-medium text-navy-600 dark:text-indigo-400"
                     >
                       Edit
@@ -905,7 +982,7 @@ export function ProfileSettings({
                             key={skill}
                             type="button"
                             onClick={() => toggleSkillHighlight(skill)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 border ${
+                            className={`profile-skill-chip px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 border ${
                               isPinned
                                 ? 'bg-navy-600 text-white border-navy-600 shadow-sm'
                                 : 'bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-navy-400'
@@ -943,7 +1020,7 @@ export function ProfileSettings({
                   <button
                     type="button"
                     onClick={handleOpenComposer}
-                    className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-navy-600 hover:bg-navy-700 text-white shadow-sm shadow-indigo-500/20 transition-all flex items-center justify-center gap-2"
+                    className="profile-upload-project-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-navy-600 hover:bg-navy-700 text-white shadow-sm shadow-indigo-500/20 transition-all flex items-center justify-center gap-2"
                   >
                     <PlusCircle className="w-4 h-4" />
                     <span>Upload Project</span>
@@ -968,13 +1045,46 @@ export function ProfileSettings({
               {/* Projects Card Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredProjects.length === 0 ? (
-                  <div className="col-span-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-10 text-center space-y-2">
-                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                      No matching projects found
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      Try a different search keyword or upload a new project post.
-                    </p>
+                  <div className="col-span-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-10 text-center space-y-3">
+                    <div className="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-navy-600 dark:text-indigo-400 flex items-center justify-center">
+                      <FolderGit2 className="w-6 h-6" />
+                    </div>
+                    {projectSearchInput.trim() ? (
+                      <>
+                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                          No projects found matching "{projectSearchInput}"
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          Try a different search keyword or clear the search filter.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setProjectSearchInput('')}
+                          className="text-xs font-semibold text-navy-600 dark:text-indigo-400 hover:underline"
+                        >
+                          Clear Search
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                          You haven't uploaded any projects yet
+                        </p>
+                        <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                          Showcase your coursework builds, hackathon creations, and engineering prototypes to build an impressive student portfolio.
+                        </p>
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            onClick={handleOpenComposer}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-navy-600 hover:bg-navy-700 text-white shadow-sm transition-colors"
+                          >
+                            <PlusCircle className="w-4 h-4" />
+                            <span>Upload Your First Project</span>
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ) : (
                   filteredProjects.map(proj => {
@@ -1026,7 +1136,7 @@ export function ProfileSettings({
                               proj.tech.map((t, idx) => (
                                 <span
                                   key={idx}
-                                  className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+                                  className="profile-project-tech-chip px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
                                 >
                                   {t}
                                 </span>
@@ -1037,14 +1147,14 @@ export function ProfileSettings({
                             <button
                               type="button"
                               onClick={() => setSelectedProject(proj)}
-                              className="text-xs font-semibold text-navy-600 dark:text-indigo-400 hover:underline"
+                              className="profile-project-details-btn text-xs font-semibold text-navy-600 dark:text-indigo-400"
                             >
                               View Details
                             </button>
 
                             {proj.demoUrl ? (
                               <a
-                                href={proj.demoUrl}
+                                href={formatExternalUrl(proj.demoUrl)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-xs font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white flex items-center gap-1"
@@ -1074,7 +1184,7 @@ export function ProfileSettings({
                 <div className="lg:col-span-2 space-y-6">
 
                   {/* Card A: Personal Information */}
-                  <div className="bg-white dark:bg-slate-900 p-6 sm:p-7 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-5">
+                  <div id="settings-personal" className="bg-white dark:bg-slate-900 p-6 sm:p-7 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-5 transition-all">
                     <div>
                       <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                         <User className="w-4 h-4 text-navy-600 dark:text-indigo-400" />
@@ -1095,10 +1205,17 @@ export function ProfileSettings({
                           value={profile.name}
                           onChange={(e) => setProfile(prev => ({ ...prev, name: e.target.value }))}
                           required
+                          aria-invalid={Boolean(formErrors.name)}
+                          aria-describedby={formErrors.name ? 'profile-name-error' : undefined}
                           className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border ${
                             formErrors.name ? 'border-rose-500 ring-2 ring-rose-500/30' : 'border-slate-200 dark:border-slate-700'
                           } text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500`}
                         />
+                        {formErrors.name && (
+                          <p id="profile-name-error" className="mt-1 text-xs text-rose-600" role="alert">
+                            {formErrors.name}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
@@ -1114,11 +1231,17 @@ export function ProfileSettings({
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                        Academic Bio
-                      </label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          Academic Bio
+                        </label>
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          {(profile.bio || '').length} / 400
+                        </span>
+                      </div>
                       <textarea
                         rows={2}
+                        maxLength={400}
                         value={profile.bio}
                         onChange={(e) => setProfile(prev => ({ ...prev, bio: e.target.value }))}
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500 resize-none"
@@ -1126,11 +1249,17 @@ export function ProfileSettings({
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                        Career Objective
-                      </label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          Career Objective
+                        </label>
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          {(profile.objective || '').length} / 300
+                        </span>
+                      </div>
                       <textarea
                         rows={2}
+                        maxLength={300}
                         value={profile.objective}
                         onChange={(e) => setProfile(prev => ({ ...prev, objective: e.target.value }))}
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500 resize-none"
@@ -1207,7 +1336,7 @@ export function ProfileSettings({
                   </div>
 
                   {/* Card B: Address Details */}
-                  <div className="bg-white dark:bg-slate-900 p-6 sm:p-7 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-5">
+                  <div id="settings-address" className="bg-white dark:bg-slate-900 p-6 sm:p-7 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-5 transition-all">
                     <div>
                       <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                         <MapPin className="w-4 h-4 text-navy-600 dark:text-indigo-400" />
@@ -1297,7 +1426,7 @@ export function ProfileSettings({
                   </div>
 
                   {/* Card C: Academic & Enrollment Details */}
-                  <div className="bg-white dark:bg-slate-900 p-6 sm:p-7 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-5">
+                  <div id="settings-academic" className="bg-white dark:bg-slate-900 p-6 sm:p-7 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-5 transition-all">
                     <div>
                       <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                         <GraduationCap className="w-4 h-4 text-navy-600 dark:text-indigo-400" />
@@ -1317,6 +1446,8 @@ export function ProfileSettings({
                           value={profile.degreeShort}
                           onChange={(e) => setProfile(prev => ({ ...prev, degreeShort: e.target.value }))}
                           required
+                          aria-invalid={Boolean(formErrors.degreeShort)}
+                          aria-describedby={formErrors.degreeShort ? 'profile-degree-error' : undefined}
                           className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border ${
                             formErrors.degreeShort ? 'border-rose-500 ring-2 ring-rose-500/30' : 'border-slate-200 dark:border-slate-700'
                           } text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500`}
@@ -1324,6 +1455,11 @@ export function ProfileSettings({
                           <option value="">Select class</option>
                           {PROFILE_CLASSES.map(className => <option key={className} value={className}>{className}</option>)}
                         </select>
+                        {formErrors.degreeShort && (
+                          <p id="profile-degree-error" className="mt-1 text-xs text-rose-600" role="alert">
+                            {formErrors.degreeShort}
+                          </p>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
@@ -1335,6 +1471,8 @@ export function ProfileSettings({
                             value={profile.semester}
                             onChange={(e) => setProfile(prev => ({ ...prev, semester: e.target.value }))}
                             required
+                            aria-invalid={Boolean(formErrors.semester)}
+                            aria-describedby={formErrors.semester ? 'profile-semester-error' : undefined}
                             className={`w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border ${
                               formErrors.semester ? 'border-rose-500 ring-2 ring-rose-500/30' : 'border-slate-200 dark:border-slate-700'
                             } text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500`}
@@ -1349,6 +1487,11 @@ export function ProfileSettings({
                             <option value="7th Semester">7th Sem</option>
                             <option value="8th Semester">8th Sem</option>
                           </select>
+                          {formErrors.semester && (
+                            <p id="profile-semester-error" className="mt-1 text-xs text-rose-600" role="alert">
+                              {formErrors.semester}
+                            </p>
+                          )}
                         </div>
 
                         <div>
@@ -1359,6 +1502,8 @@ export function ProfileSettings({
                             value={profile.section}
                             onChange={(e) => setProfile(prev => ({ ...prev, section: e.target.value }))}
                             required
+                            aria-invalid={Boolean(formErrors.section)}
+                            aria-describedby={formErrors.section ? 'profile-section-error' : undefined}
                             className={`w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border ${
                               formErrors.section ? 'border-rose-500 ring-2 ring-rose-500/30' : 'border-slate-200 dark:border-slate-700'
                             } text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500`}
@@ -1369,13 +1514,18 @@ export function ProfileSettings({
                             <option value="Section C">Section C</option>
                             <option value="Section D">Section D</option>
                           </select>
+                          {formErrors.section && (
+                            <p id="profile-section-error" className="mt-1 text-xs text-rose-600" role="alert">
+                              {formErrors.section}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
                   </div>
 
                   {/* Card D: Technical Skills Manager */}
-                  <div className="bg-white dark:bg-slate-900 p-6 sm:p-7 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+                  <div id="settings-skills" className="bg-white dark:bg-slate-900 p-6 sm:p-7 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4 transition-all">
                     <div>
                       <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-navy-600 dark:text-indigo-400" />
@@ -1420,7 +1570,7 @@ export function ProfileSettings({
                           <button
                             type="button"
                             onClick={() => handleRemoveSkill(idx)}
-                            className="hover:text-rose-500 transition-colors"
+                            className="profile-skill-remove hover:text-rose-500 transition-colors"
                             aria-label={`Remove ${skill}`}
                           >
                             <X className="w-3 h-3" />
@@ -1468,11 +1618,7 @@ export function ProfileSettings({
                         type="button"
                         role="switch"
                         aria-checked={emailAlerts}
-                        onClick={() => {
-                          const next = !emailAlerts;
-                          setEmailAlerts(next);
-                          showToast(`Email alerts ${next ? 'enabled' : 'disabled'}`);
-                        }}
+                        onClick={handleToggleEmailAlerts}
                         className={`profile-setting-switch ${emailAlerts ? 'is-on' : ''}`}
                       >
                         <span className="profile-setting-switch-thumb" />
@@ -1508,18 +1654,26 @@ export function ProfileSettings({
 
       {/* SINGLE-VIEW INSTAGRAM-STYLE PROJECT POST COMPOSER MODAL */}
       {isComposerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-3 sm:p-5 overflow-y-auto">
+        <div
+          className="profile-popup-layer fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-3 sm:p-5 overflow-y-auto"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsComposerOpen(false);
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="New Project Post"
+        >
           <form
             onSubmit={handleShareProject}
             noValidate
-            className="bg-white dark:bg-slate-900 rounded-3xl max-w-4xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden my-auto modal-animate-enter"
+            className="profile-project-composer bg-white dark:bg-slate-900 rounded-3xl max-w-4xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden my-auto modal-animate-enter"
           >
             {/* Modal Header */}
             <div className="px-4 sm:px-6 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
               <button
                 type="button"
                 onClick={() => setIsComposerOpen(false)}
-                className="text-xs sm:text-sm font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 px-2 py-1 rounded-lg transition-colors"
+                className="profile-composer-cancel text-xs sm:text-sm font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 px-2 py-1 rounded-lg transition-colors"
               >
                 Cancel
               </button>
@@ -1528,7 +1682,7 @@ export function ProfileSettings({
               </h3>
               <button
                 type="submit"
-                className="text-xs sm:text-sm font-bold text-navy-600 dark:text-indigo-400 hover:text-navy-700 dark:hover:text-indigo-300 px-2.5 py-1 rounded-lg transition-colors"
+                className="profile-composer-share hidden lg:inline-flex text-xs sm:text-sm font-bold text-navy-600 dark:text-indigo-400 hover:text-navy-700 dark:hover:text-indigo-300 px-2.5 py-1 rounded-lg transition-colors"
               >
                 Share
               </button>
@@ -1821,7 +1975,15 @@ export function ProfileSettings({
 
       {/* PROJECT DETAIL MODAL */}
       {selectedProject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
+        <div
+          className="profile-popup-layer fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedProject(null);
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Project Details"
+        >
           <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden modal-animate-enter">
             <div className="h-48 w-full bg-gradient-to-r from-navy-700 to-indigo-600 relative overflow-hidden">
               {selectedProject.image && (
@@ -1836,6 +1998,7 @@ export function ProfileSettings({
                 type="button"
                 onClick={() => setSelectedProject(null)}
                 className="absolute top-3 right-3 p-2 rounded-xl bg-black/50 text-white hover:bg-black/70 transition-colors"
+                aria-label="Close modal"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1868,7 +2031,7 @@ export function ProfileSettings({
               <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-3">
                 {selectedProject.demoUrl && (
                   <a
-                    href={selectedProject.demoUrl}
+                    href={formatExternalUrl(selectedProject.demoUrl)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-4 py-2 rounded-xl text-xs font-semibold bg-navy-600 hover:bg-navy-700 text-white flex items-center gap-1.5 transition-colors"
@@ -2032,7 +2195,11 @@ export function AdminProfileSettings({ session, state, setState, notify, onLogou
       <div className="minimal-item-row" style={{ flexDirection: 'column', alignItems: 'stretch', padding: '24px' }}>
         {/* Photo Upload Card */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px', paddingBottom: '20px', borderBottom: '1px solid #f3f4f6', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative' }}>
+          <div
+            style={{ position: 'relative', cursor: 'pointer' }}
+            onClick={() => fileInputRef.current?.click()}
+            title="Click to change profile photo"
+          >
             <ProfileAvatar
               name={name}
               src={avatar || DEFAULT_ADMIN_AVATAR}
@@ -2046,9 +2213,7 @@ export function AdminProfileSettings({ session, state, setState, notify, onLogou
                 boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
               }}
             />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
+            <div
               style={{
                 position: 'absolute',
                 bottom: '0',
@@ -2062,12 +2227,11 @@ export function AdminProfileSettings({ session, state, setState, notify, onLogou
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: 'pointer'
+                pointerEvents: 'none'
               }}
-              title="Upload new profile photo"
             >
               <Camera size={13} />
-            </button>
+            </div>
           </div>
 
           <div>
@@ -2093,7 +2257,7 @@ export function AdminProfileSettings({ session, state, setState, notify, onLogou
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Camera size={13} style={{ display: 'inline', marginRight: '5px', verticalAlign: 'middle' }} />
-                Upload Photo
+                {avatar !== DEFAULT_ADMIN_AVATAR ? 'Change Photo' : 'Upload Photo'}
               </button>
               {avatar !== DEFAULT_ADMIN_AVATAR && (
                 <button

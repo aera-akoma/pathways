@@ -549,19 +549,19 @@ export function CourseCatalog({
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
-  // Group certificates by Month/Year like Google Photos timeline
+  // Group certificates into a gallery timeline by issue or upload date.
   const groupedTimeline = useMemo(() => {
-    const groups = {};
+    const groups = new Map();
     displayedGalleryCertificates.forEach(cert => {
-      const dateStr = cert.issueDate || '2026-10-24';
-      const dateObj = new Date(dateStr);
-      const groupKey = isNaN(dateObj.getTime())
-        ? 'October 2026'
-        : dateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-      if (!groups[groupKey]) groups[groupKey] = [];
-      groups[groupKey].push(cert);
+      const dateValue = cert.issueDate || cert.createdAt || cert.uploadedAt || cert.date;
+      const dateObj = dateValue ? new Date(dateValue) : null;
+      const groupKey = dateObj && !Number.isNaN(dateObj.getTime())
+        ? dateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        : 'Date not specified';
+      if (!groups.has(groupKey)) groups.set(groupKey, []);
+      groups.get(groupKey).push(cert);
     });
-    return groups;
+    return Array.from(groups.entries());
   }, [displayedGalleryCertificates]);
 
   // Modal Renderers (Used across Courses & Certificates views)
@@ -1058,10 +1058,17 @@ export function CourseCatalog({
         </div>
       </div>
 
-      {/* 4. Certificate Cards Grid */}
-      <div className="gphotos-grid">
+      {/* 4. Certificate Gallery Timeline */}
+      <div className="gphotos-timeline">
         {displayedGalleryCertificates.length > 0 ? (
-          displayedGalleryCertificates.map(cert => {
+          groupedTimeline.map(([dateLabel, groupCertificates]) => (
+            <section className="gphotos-section" key={dateLabel}>
+              <h2 className="gphotos-date-heading">
+                <span>{dateLabel}</span>
+                <span className="gphotos-date-count">{groupCertificates.length}</span>
+              </h2>
+              <div className="gphotos-grid">
+              {groupCertificates.map(cert => {
             const isVerified = cert.status === 'verified';
             const isPending = cert.status === 'pending';
             const isRejected = cert.status === 'rejected';
@@ -1072,7 +1079,9 @@ export function CourseCatalog({
               <div
                 key={cert.id}
                 className={`gphotos-tile ${cert.status}`}
-                style={{ borderRadius: '12px', overflow: 'hidden', border: isRejected ? '1px solid #fecaca' : isPending ? '1px solid #fde68a' : '1px solid #e2e8f0', background: '#ffffff' }}
+                role="button"
+                tabIndex={0}
+                aria-label={`${cert.programTitle || 'Certificate'} for ${cert.studentName || 'student'}, ${cert.status || 'status not specified'}`}
                 onClick={() => {
                   if (isPending) {
                     setPendingInfoCert(cert);
@@ -1081,8 +1090,15 @@ export function CourseCatalog({
                     setShowInfoPane(false);
                   }
                 }}
+                onKeyDown={event => {
+                  if (event.target !== event.currentTarget) return;
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    event.currentTarget.click();
+                  }
+                }}
               >
-                <div className="gphotos-image-wrapper" style={{ position: 'relative', aspectRatio: '16/10', background: '#0f172a' }}>
+                <div className="gphotos-image-wrapper">
                   {(cert.certificateImg || cert.fileData) ? (
                     <img
                       src={cert.certificateImg || cert.fileData}
@@ -1151,7 +1167,10 @@ export function CourseCatalog({
                 )}
               </div>
             );
-          })
+              })}
+              </div>
+            </section>
+          ))
         ) : (
           <div className="gphotos-empty-state" style={{ gridColumn: '1 / -1', padding: '48px 20px', textAlign: 'center', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
             <Award size={48} color="#94a3b8" />

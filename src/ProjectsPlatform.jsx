@@ -1,6 +1,7 @@
 import { ACADEMIC_COURSES, academicCourseOption } from './academicCourses.js';
 import { ProfileAvatar } from './ProfileAvatar.jsx';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { getProjectShareUrl, pushRoute, parseCurrentLocation } from './router.js';
 import {
   Heart,
@@ -583,14 +584,44 @@ export function ProjectsPlatform({ session, student, state, setState, notify, na
 
   return (
     <div className="soc-projects-root">
-      {/* 1. TOP HEADER (Minimal & Clean, zero options) */}
-      <header className="soc-header-bar">
-        <h1 className="soc-page-title">{activeTab === 'students' ? 'Explore Students' : 'Projects'}</h1>
-        <p className="soc-page-subtitle">
-          {activeTab === 'students'
-            ? 'Discover student portfolios, view fellow creators, and connect across campus.'
-            : 'Student builds, technical portfolios and showcased work.'}
-        </p>
+      {/* Project hub heading and quick actions */}
+      <header className="soc-header-bar soc-hub-header">
+        <div className="soc-hub-heading">
+          <span className="soc-hub-eyebrow"><Sparkles size={13} /> PODAR COMMUNITY</span>
+          <h1 className="soc-page-title">{activeTab === 'students' ? 'Student Directory' : 'Student Projects'}</h1>
+          <p className="soc-page-subtitle">
+            {activeTab === 'students'
+              ? 'Discover classmates, their projects, and the skills they are building.'
+              : 'Ideas, experiments, and work built by students across campus.'}
+          </p>
+        </div>
+        <div className="soc-hub-actions">
+          <button
+            type="button"
+            className="soc-hub-notification"
+            aria-label={`Project notifications${unreadNotifCount ? `, ${unreadNotifCount} unread` : ''}`}
+            onClick={() => setNotifDrawerOpen(true)}
+          >
+            <Bell size={17} />
+            {unreadNotifCount > 0 && <span className="soc-hub-notif-count">{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</span>}
+          </button>
+          <button
+            type="button"
+            className="soc-hub-create"
+            onClick={() => { setEditingPost(null); setComposerOpen(true); }}
+          >
+            <Plus size={16} /> <span>Upload Project</span>
+          </button>
+        </div>
+        {activeTab !== 'students' && (
+          <div className="soc-hub-stats" aria-label="Project community stats">
+            <div><strong>{totalPosts || posts.length}</strong><span>projects</span></div>
+            <i />
+            <div><strong>{categories.length}</strong><span>topics</span></div>
+            <i />
+            <div><strong>{topCreators.length}</strong><span>featured creators</span></div>
+          </div>
+        )}
       </header>
 
       {/* Active Filter Indicator */}
@@ -1413,7 +1444,7 @@ function ProjectCard({
           onTouchEnd={handleTouchEnd}
           onDoubleClick={triggerDoubleTapLike}
         >
-          <div className="soc-carousel-slide">
+          <div className={`soc-carousel-slide ${!post.coverAspectRatio || post.coverAspectRatio === 'auto' ? 'is-natural' : ''}`} style={post.coverAspectRatio && post.coverAspectRatio !== 'auto' ? { aspectRatio: post.coverAspectRatio.replace(':', ' / ') } : undefined}>
             <img
               src={images[currentImgIndex]?.imageUrl || images[currentImgIndex]}
               alt={post.title}
@@ -1654,6 +1685,39 @@ const QUICK_TECH_TAGS = [
   'MySQL', 'MongoDB', 'Next.js', 'MachineLearning', 'FastAPI', 'Docker',
   'Firebase', 'Java', 'C++', 'GraphQL'
 ];
+const PROJECT_PHOTO_FILTERS = {
+  Original: 'none',
+  Clarendon: 'contrast(1.15) saturate(1.35)',
+  Juno: 'saturate(1.3) sepia(.1)',
+  Lark: 'brightness(1.08) saturate(.85)',
+  Moon: 'grayscale(.85) contrast(1.1)',
+  Gingham: 'sepia(.08) contrast(.95) brightness(1.05)'
+};
+const PROJECT_GRADIENT_COVER = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#172554"/><stop offset=".52" stop-color="#4338ca"/><stop offset="1" stop-color="#38bdf8"/></linearGradient></defs><rect width="1600" height="900" fill="url(#g)"/><circle cx="1320" cy="140" r="260" fill="#fff" opacity=".08"/><circle cx="180" cy="820" r="340" fill="#fff" opacity=".06"/></svg>')}`;
+
+function applyProjectPhotoFilter(imageData, filterName) {
+  const filter = PROJECT_PHOTO_FILTERS[filterName] || 'none';
+  if (!imageData || filter === 'none' || imageData.startsWith('data:image/svg+xml')) return Promise.resolve(imageData);
+  return new Promise(resolve => {
+    const image = new Image();
+    image.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        const context = canvas.getContext('2d');
+        if (!context) return resolve(imageData);
+        context.filter = filter;
+        context.drawImage(image, 0, 0);
+        resolve(canvas.toDataURL('image/jpeg', .9));
+      } catch {
+        resolve(imageData);
+      }
+    };
+    image.onerror = () => resolve(imageData);
+    image.src = imageData;
+  });
+}
 
 function ProjectComposerModal({
   isOpen,
@@ -1694,7 +1758,21 @@ function ProjectComposerModal({
   });
   const [compressing, setCompressing] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [composerStep, setComposerStep] = useState(0);
+  const [aspectRatio, setAspectRatio] = useState(postToEdit?.coverAspectRatio || 'auto');
+  const [photoFilter, setPhotoFilter] = useState(postToEdit?.photoFilter || 'Original');
+  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const [useGradientCover, setUseGradientCover] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef(null);
+  const photoTouchStart = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [isOpen]);
 
   // Restore saved draft
   const handleRestoreDraft = () => {
@@ -1710,6 +1788,9 @@ function ProjectComposerModal({
       if (d.youtubeUrl) setYoutubeUrl(d.youtubeUrl);
       if (Array.isArray(d.tags)) setTags(d.tags);
       if (Array.isArray(d.images)) setImages(d.images);
+      if (d.coverAspectRatio) setAspectRatio(d.coverAspectRatio);
+      if (d.photoFilter) setPhotoFilter(d.photoFilter);
+      if (d.useGradientCover) setUseGradientCover(true);
       setHasDraft(false);
       notify?.('Draft restored successfully!');
     } catch (e) {
@@ -1741,6 +1822,9 @@ function ProjectComposerModal({
         youtubeUrl,
         tags,
         images,
+        coverAspectRatio: aspectRatio,
+        photoFilter,
+        useGradientCover,
         savedAt: new Date().toISOString()
       };
       localStorage.setItem(DRAFT_KEY, JSON.stringify(draftObj));
@@ -1776,8 +1860,8 @@ function ProjectComposerModal({
   };
 
   // Image Upload with client compression
-  const handleFileChange = async (e) => {
-    const files = Array.from(e.target.files || []);
+  const processProjectFiles = async (fileList) => {
+    const files = Array.from(fileList || []);
     if (files.length === 0) return;
 
     if (images.length + files.length > 8) {
@@ -1786,6 +1870,7 @@ function ProjectComposerModal({
     }
 
     setCompressing(true);
+    setUseGradientCover(false);
     try {
       const newImages = [];
       for (const file of files) {
@@ -1804,6 +1889,8 @@ function ProjectComposerModal({
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
+
+  const handleFileChange = (e) => processProjectFiles(e.target.files);
 
   // Remove image
   const handleRemoveImage = (index) => {
@@ -1833,6 +1920,14 @@ function ProjectComposerModal({
     const cleanedGithub = sanitizeUrl(githubUrl);
     const cleanedYoutube = sanitizeUrl(youtubeUrl);
 
+    const imagesToPublish = images.length ? images : useGradientCover
+      ? [{ imageUrl: PROJECT_GRADIENT_COVER, caption: 'Gradient cover' }]
+      : [];
+    const filteredImages = await Promise.all(imagesToPublish.map(async image => ({
+      ...image,
+      imageUrl: await applyProjectPhotoFilter(image.imageUrl || image, photoFilter)
+    })));
+
     const payload = {
       studentId: currentStudent?.id || '',
       studentName: currentStudent?.name || 'Student',
@@ -1846,7 +1941,10 @@ function ProjectComposerModal({
       githubUrl: cleanedGithub,
       youtubeUrl: cleanedYoutube,
       tags: tags.length > 0 ? tags : ['Project'],
-      images
+      images: filteredImages,
+      coverAspectRatio: aspectRatio,
+      photoFilter,
+      useGradientCover
     };
 
     let savedSuccessfully = false;
@@ -1866,18 +1964,19 @@ function ProjectComposerModal({
         const data = await res.json();
         if (data?.post) {
           savedSuccessfully = true;
+          const savedPost = { ...data.post, coverAspectRatio: aspectRatio, photoFilter };
           // Clear draft
           try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
           // Save to local backup cache
           try {
             const localSaved = JSON.parse(localStorage.getItem('podar_local_projects') || '[]');
             const updated = isEdit
-              ? localSaved.map(p => p.id === data.post.id ? data.post : p)
-              : [data.post, ...localSaved.filter(p => p.id !== data.post.id)];
+              ? localSaved.map(p => p.id === savedPost.id ? savedPost : p)
+              : [savedPost, ...localSaved.filter(p => p.id !== savedPost.id)];
             localStorage.setItem('podar_local_projects', JSON.stringify(updated));
           } catch (e) {}
 
-          onPostSaved(data.post, isEdit);
+          onPostSaved(savedPost, isEdit);
           notify?.(isEdit ? 'Project updated successfully!' : 'Project published to community feed!');
           return;
         }
@@ -1903,6 +2002,8 @@ function ProjectComposerModal({
         youtubeUrl: payload.youtubeUrl,
         tags: payload.tags,
         images: payload.images,
+        coverAspectRatio: payload.coverAspectRatio,
+        photoFilter: payload.photoFilter,
         likesCount: isEdit ? (postToEdit.likesCount || 0) : 0,
         commentsCount: isEdit ? (postToEdit.commentsCount || 0) : 0,
         isLiked: false,
@@ -1927,16 +2028,24 @@ function ProjectComposerModal({
     setPublishing(false);
   };
 
-  return (
-    <div className="soc-modal-backdrop">
-      <div className="soc-modal-card large" onClick={e => e.stopPropagation()}>
+  return createPortal((
+    <div className="soc-modal-backdrop soc-composer-backdrop">
+      <div className={`soc-modal-card large soc-composer-modal${composerStep === 0 ? ' composer-step-media' : composerStep === 1 ? ' composer-step-details' : ' composer-step-caption'}`} onClick={e => e.stopPropagation()}>
         <div className="soc-modal-header">
-          <div>
-            <h3 className="soc-modal-title">{isEdit ? 'Edit Project Post' : 'Create Project Post'}</h3>
-            <p className="soc-modal-subtitle">Share your code, live apps, designs, or prototypes with student peers.</p>
-          </div>
-          <button className="soc-close-btn" onClick={onClose} title="Close"><X size={18} /></button>
+          <button type="button" className="soc-composer-cancel" onClick={() => composerStep > 0 ? setComposerStep(step => step - 1) : onClose()}><span className="composer-cancel-desktop-label">Cancel</span><span className="composer-cancel-mobile-label">{composerStep > 0 ? '‹' : '×'}</span></button>
+          <h3 className="soc-modal-title"><span className="composer-title-desktop">{isEdit ? 'Edit Project Post' : 'New Project Post'}</span><span className="composer-title-mobile">{['New post', 'Edit photo', 'New post'][composerStep]}</span></h3>
+          <button type="submit" form="soc-project-composer-form" className="soc-composer-share composer-desktop-share" disabled={publishing || compressing}>
+            {publishing ? 'Sharing…' : isEdit ? 'Save' : 'Share'}
+          </button>
+          <button type={composerStep < 2 ? 'button' : 'submit'} form="soc-project-composer-form" className="soc-composer-share composer-mobile-next" disabled={publishing || compressing} onClick={() => {
+              if (composerStep === 0 && images.length === 0 && !useGradientCover) { notify?.('Select at least one project photo to continue.'); return; }
+              if (composerStep < 2) setComposerStep(step => step + 1);
+            }}>
+            {publishing ? 'Sharing…' : composerStep < 2 ? 'Next' : isEdit ? 'Save' : 'Share'}
+          </button>
         </div>
+
+        <div className="soc-composer-stepbar" aria-label={`Step ${composerStep + 1} of 3`} />
 
         {/* Draft Recovery Banner */}
         {hasDraft && !isEdit && (
@@ -1953,10 +2062,14 @@ function ProjectComposerModal({
           </div>
         )}
 
-        <form onSubmit={handlePublish} className="soc-composer-form">
+        <form id="soc-project-composer-form" onSubmit={handlePublish} className="soc-composer-form">
           <div className="soc-composer-body">
             {/* Title */}
-            <div className="soc-form-field">
+            <div className="soc-form-field soc-composer-title-field">
+              <div className="soc-composer-author-row">
+                <ProfileAvatar src={currentStudent?.avatar || DEFAULT_STUDENT_AVATAR} name={currentStudent?.name || 'Student'} />
+                <div><strong>{currentStudent?.name || 'Student'}</strong><span>Posting to Student Projects</span></div>
+              </div>
               <label>Project Title *</label>
               <input
                 type="text"
@@ -1968,7 +2081,7 @@ function ProjectComposerModal({
             </div>
 
             {/* Category & Tags Row */}
-            <div className="soc-form-row">
+            <div className="soc-form-row soc-composer-category-row">
               <div className="soc-form-field">
                 <label>Category *</label>
                 <select required aria-label="Project category" value={category} onChange={e => setCategory(e.target.value)}>
@@ -2018,7 +2131,7 @@ function ProjectComposerModal({
             </div>
 
             {/* Quick Tag Recommendations */}
-            <div className="soc-quick-tags-wrap">
+            <div className="soc-quick-tags-wrap soc-composer-quick-tags">
               <span className="soc-quick-tags-label">Quick Suggestions:</span>
               <div className="soc-quick-tags-list">
                 {QUICK_TECH_TAGS.map(t => (
@@ -2036,7 +2149,7 @@ function ProjectComposerModal({
 
             {/* Active Selected Tags Strip */}
             {tags.length > 0 && (
-              <div className="soc-tags-selected-strip">
+              <div className="soc-tags-selected-strip soc-composer-selected-tags">
                 {tags.map(t => (
                   <span key={t} className="soc-selected-tag">
                     #{t}
@@ -2047,7 +2160,7 @@ function ProjectComposerModal({
             )}
 
             {/* Description / Caption */}
-            <div className="soc-form-field">
+            <div className="soc-form-field soc-composer-description-field">
               <label>Project Caption & Description *</label>
               <textarea
                 rows={5}
@@ -2059,10 +2172,10 @@ function ProjectComposerModal({
             </div>
 
             {/* Screenshots & Photos Upload */}
-            <div className="soc-form-field">
+            <div className="soc-form-field soc-composer-media-field">
               <div className="soc-file-header">
-                <label>Project Screenshots & Photos ({images.length}/8)</label>
-                {compressing && <span className="soc-compressing-badge">Optimizing photos...</span>}
+                <label>Project cover & photos ({images.length}/8)</label>
+                {compressing && <span className="soc-compressing-badge">Optimizing photos…</span>}
               </div>
 
               <input
@@ -2074,47 +2187,75 @@ function ProjectComposerModal({
                 style={{ display: 'none' }}
               />
 
-              <div className="soc-image-previews-grid">
-                {images.map((img, idx) => (
-                  <div key={idx} className="soc-img-thumb-card">
-                    <div className="soc-img-thumb-box">
-                      <img src={img.imageUrl || img} alt={`Upload ${idx + 1}`} />
-                      <button
-                        type="button"
-                        className="soc-remove-thumb-btn"
-                        onClick={() => handleRemoveImage(idx)}
-                        title="Remove image"
-                      >
-                        <X size={13} />
+              <div
+                className={`soc-project-dropzone ${dragOver ? 'is-dragging' : ''} ${images.length ? 'has-images' : ''}`}
+                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={e => { e.preventDefault(); setDragOver(false); }}
+                onDrop={e => {
+                  e.preventDefault();
+                  setDragOver(false);
+                  processProjectFiles(e.dataTransfer?.files);
+                }}
+                onClick={() => images.length === 0 && fileInputRef.current?.click()}
+                role="group"
+                aria-label="Project cover photo upload"
+              >
+                {images.length === 0 && useGradientCover ? (
+                  <div className="soc-project-gradient-preview" style={{ aspectRatio: aspectRatio.replace(':', ' / ') }}>
+                    <span>Gradient cover</span>
+                    <button type="button" onClick={e => { e.stopPropagation(); setUseGradientCover(false); }}>Remove</button>
+                  </div>
+                ) : images.length === 0 ? (
+                  <div className="soc-project-drop-prompt">
+                    <div className="soc-project-drop-icon"><Plus size={25} /></div>
+                    <strong>Add photos to your post</strong>
+                    <span>Choose up to 8 project screenshots</span>
+                    <div className="soc-project-drop-actions">
+                      <button type="button" className="soc-project-select-photo" onClick={e => { e.stopPropagation(); fileInputRef.current?.click(); }} disabled={compressing}>
+                        {compressing ? 'Optimizing…' : 'Select photos'}
+                      </button>
+                      <button type="button" className="soc-project-gradient-action" onClick={e => { e.stopPropagation(); setUseGradientCover(true); }}>
+                        Use Gradient Cover
                       </button>
                     </div>
-                    <input
-                      type="text"
-                      className="soc-img-caption-input"
-                      placeholder="Optional screenshot caption..."
-                      value={img.caption || ''}
-                      onChange={e => handleImageCaptionChange(idx, e.target.value)}
-                    />
+                    <small>PNG, JPG, WebP · Up to 8 images</small>
                   </div>
-                ))}
-
-                {images.length < 8 && (
-                  <button
-                    type="button"
-                    className="soc-upload-trigger-btn"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={compressing}
-                  >
-                    <ImageIcon size={24} />
-                    <span>{compressing ? 'Compressing...' : 'Upload Photos'}</span>
-                    <small>Supports PNG, JPG, WebP</small>
-                  </button>
+                ) : (
+                  <div className="soc-project-photo-editor" onTouchStart={e => { photoTouchStart.current = e.touches[0]?.clientX; }} onTouchEnd={e => {
+                    const delta = photoTouchStart.current == null ? 0 : photoTouchStart.current - e.changedTouches[0]?.clientX;
+                    if (Math.abs(delta) > 45) setActivePhotoIndex(index => Math.max(0, Math.min(images.length - 1, index + (delta > 0 ? 1 : -1))));
+                    photoTouchStart.current = null;
+                  }}>
+                    {images[activePhotoIndex] && <div className="soc-project-editor-image-wrap">
+                      <img src={images[activePhotoIndex].imageUrl || images[activePhotoIndex]} alt={images[activePhotoIndex].caption || `Project photo ${activePhotoIndex + 1}`} style={{ filter: PROJECT_PHOTO_FILTERS[photoFilter] || 'none' }} />
+                      <span className="soc-project-photo-count">{activePhotoIndex + 1}/{images.length}</span>
+                      <button type="button" className="soc-project-photo-remove" onClick={() => { handleRemoveImage(activePhotoIndex); setActivePhotoIndex(index => Math.max(0, Math.min(index, images.length - 2))); }} aria-label="Remove photo"><X size={15} /></button>
+                    </div>}
+                    <div className="soc-project-photo-thumbs">
+                      {images.map((img, idx) => <button type="button" key={idx} className={activePhotoIndex === idx ? 'active' : ''} onClick={() => setActivePhotoIndex(idx)} aria-label={`Edit photo ${idx + 1}`}><img src={img.imageUrl || img} alt="" style={{ filter: PROJECT_PHOTO_FILTERS[photoFilter] || 'none' }} /></button>)}
+                      {images.length < 8 && <button type="button" className="soc-project-thumb-add" onClick={() => fileInputRef.current?.click()} disabled={compressing}><Plus size={24} /></button>}
+                    </div>
+                  </div>
                 )}
+              </div>
+
+              <div className="soc-project-image-controls">
+                <div className="soc-project-control-filters">
+                  <span><Sparkles size={13} /> Swipe to choose a filter</span>
+                  <div className="soc-project-filter-carousel">
+                    {Object.keys(PROJECT_PHOTO_FILTERS).map(filter => (
+                      <button key={filter} type="button" className={`soc-project-filter-option ${photoFilter === filter ? 'active' : ''}`} onClick={() => setPhotoFilter(filter)}>
+                        <span className="soc-project-filter-thumb">{images[activePhotoIndex] && <img src={images[activePhotoIndex].imageUrl || images[activePhotoIndex]} alt="" style={{ filter: PROJECT_PHOTO_FILTERS[filter] }} />}</span>
+                        <span>{filter}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* External Links */}
-            <div className="soc-links-input-grid">
+            <div className="soc-links-input-grid soc-composer-links">
               <div className="soc-form-field">
                 <label>
                   <Globe size={13} />
@@ -2168,26 +2309,12 @@ function ProjectComposerModal({
                 Save Draft
               </button>
             )}
-            <button
-              type="button"
-              className="soc-btn-secondary"
-              onClick={onClose}
-              disabled={publishing}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="soc-btn-primary"
-              disabled={publishing || compressing}
-            >
-              {publishing ? 'Publishing...' : isEdit ? 'Save Changes' : 'Publish Project'}
-            </button>
+            <span className="soc-composer-footer-hint">{images.length}/8 photos · All fields marked * are required</span>
           </div>
         </form>
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 // =========================================================================
