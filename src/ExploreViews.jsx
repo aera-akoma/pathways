@@ -74,7 +74,7 @@ export const OPPORTUNITY_LIST = [
 ];
 
 export function OpportunitiesView({ student, state, notify, navigate }) {
-  const currentList = (state?.opportunities && state.opportunities.length > 0) ? state.opportunities : OPPORTUNITY_LIST;
+  const currentList = Array.isArray(state?.opportunities) ? state.opportunities : OPPORTUNITY_LIST;
   const [search, setSearch] = useState('');
   const [appliedIds, setAppliedIds] = useState(() => {
     try {
@@ -104,7 +104,7 @@ export function OpportunitiesView({ student, state, notify, navigate }) {
   };
 
   return (
-    <div className="minimal-explore-container">
+    <div className="minimal-explore-container career-hub career-opportunities">
       <div className="minimal-explore-header">
         <div>
           <h2 className="minimal-explore-title">Opportunities</h2>
@@ -128,6 +128,7 @@ export function OpportunitiesView({ student, state, notify, navigate }) {
 
           return (
             <div key={item.id} className="minimal-explore-card">
+              {item.image && <img className="career-card-image" src={item.image} alt="" loading="lazy" />}
               <div className="minimal-explore-card-top">
                 <span className="minimal-tag-pill">{item.organizer}</span>
                 <span className="minimal-highlight-text">{item.prize}</span>
@@ -162,6 +163,7 @@ export function OpportunitiesView({ student, state, notify, navigate }) {
             </div>
           );
         })}
+        {filtered.length === 0 && <div className="career-empty-state"><Briefcase size={20} /><strong>{search ? 'No matching opportunities' : 'No opportunities yet'}</strong><span>{search ? 'Try another search.' : 'Check back soon for new opportunities.'}</span></div>}
       </div>
 
       {selectedOpp && (
@@ -244,7 +246,7 @@ export const INTERNSHIP_LIST = [
 ];
 
 export function InternshipsView({ student, state, notify, navigate }) {
-  const currentList = (state?.internships && state.internships.length > 0) ? state.internships : INTERNSHIP_LIST;
+  const currentList = Array.isArray(state?.internships) ? state.internships : INTERNSHIP_LIST;
   const [search, setSearch] = useState('');
   const [appliedIds, setAppliedIds] = useState(() => {
     try {
@@ -274,7 +276,7 @@ export function InternshipsView({ student, state, notify, navigate }) {
   };
 
   return (
-    <div className="minimal-explore-container">
+    <div className="minimal-explore-container career-hub career-internships">
       <div className="minimal-explore-header">
         <div>
           <h2 className="minimal-explore-title">Internships</h2>
@@ -298,6 +300,7 @@ export function InternshipsView({ student, state, notify, navigate }) {
 
           return (
             <div key={item.id} className="minimal-explore-card">
+              {item.image && <img className="career-card-image" src={item.image} alt="" loading="lazy" />}
               <div className="minimal-explore-card-top">
                 <span className="minimal-tag-pill">{item.company}</span>
                 <span className="minimal-highlight-text">{item.stipend}</span>
@@ -305,6 +308,10 @@ export function InternshipsView({ student, state, notify, navigate }) {
 
               <h3 className="minimal-card-heading">{item.role}</h3>
               <p className="minimal-card-desc">{item.about}</p>
+
+              <div className="career-skill-list">
+                {(Array.isArray(item.skills) ? item.skills : []).slice(0, 4).map(skill => <span key={skill}>{skill}</span>)}
+              </div>
 
               <div className="minimal-meta-line">
                 <span>{item.duration}</span>
@@ -330,6 +337,7 @@ export function InternshipsView({ student, state, notify, navigate }) {
             </div>
           );
         })}
+        {filtered.length === 0 && <div className="career-empty-state"><GraduationCap size={20} /><strong>{search ? 'No matching internships' : 'No internships available'}</strong><span>{search ? 'Try another search.' : 'New roles will appear here when they are posted.'}</span></div>}
       </div>
 
       {selectedIntern && (
@@ -408,7 +416,7 @@ export const PLACEMENT_DRIVES = [
 ];
 
 export function PlacementsView({ student, state, notify, navigate }) {
-  const currentList = (state?.placements && state.placements.length > 0) ? state.placements : PLACEMENT_DRIVES;
+  const currentList = Array.isArray(state?.placements) ? state.placements : PLACEMENT_DRIVES;
   const [search, setSearch] = useState('');
   const [registeredIds, setRegisteredIds] = useState(() => {
     try {
@@ -438,7 +446,7 @@ export function PlacementsView({ student, state, notify, navigate }) {
   };
 
   return (
-    <div className="minimal-explore-container">
+    <div className="minimal-explore-container career-hub career-placements">
       <div className="minimal-explore-header">
         <div>
           <h2 className="minimal-explore-title">Placements</h2>
@@ -463,6 +471,7 @@ export function PlacementsView({ student, state, notify, navigate }) {
           return (
             <div key={drive.id} className="minimal-drive-row">
               <div className="minimal-drive-info">
+                {drive.image && <img className="career-placement-image" src={drive.image} alt="" loading="lazy" />}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <h3 className="minimal-drive-company">{drive.company}</h3>
                   <span className="minimal-package-badge">{drive.package}</span>
@@ -475,6 +484,7 @@ export function PlacementsView({ student, state, notify, navigate }) {
                   <span>•</span>
                   <span style={{ color: '#4b5563' }}>{drive.eligibility}</span>
                 </div>
+                {drive.about && <p className="career-placement-about">{drive.about}</p>}
               </div>
 
               <div className="minimal-drive-action">
@@ -494,6 +504,7 @@ export function PlacementsView({ student, state, notify, navigate }) {
             </div>
           );
         })}
+        {filtered.length === 0 && <div className="career-empty-state"><Building2 size={20} /><strong>{search ? 'No matching placement drives' : 'No placement drives scheduled'}</strong><span>{search ? 'Try another search.' : 'Check back for upcoming campus drives.'}</span></div>}
       </div>
 
       {selectedDrive && (

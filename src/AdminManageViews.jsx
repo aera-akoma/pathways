@@ -1100,6 +1100,7 @@ export function AdminOpportunitiesView({ state, setState, notify, navigate }) {
   const [mode, setMode] = useState('Campus (Hybrid)');
   const [team, setTeam] = useState('1–4 Members');
   const [summary, setSummary] = useState('');
+  const [image, setImage] = useState('');
 
   const openAddModal = () => {
     setActiveOpp(null);
@@ -1111,6 +1112,7 @@ export function AdminOpportunitiesView({ state, setState, notify, navigate }) {
     setMode('Campus (Hybrid)');
     setTeam('1–4 Members');
     setSummary('');
+    setImage('');
     setModalMode('add');
   };
 
@@ -1124,6 +1126,7 @@ export function AdminOpportunitiesView({ state, setState, notify, navigate }) {
     setMode(opp.mode || 'Campus (Hybrid)');
     setTeam(opp.team || '1–4 Members');
     setSummary(opp.summary || '');
+    setImage(opp.image || '');
     setModalMode('edit');
   };
 
@@ -1150,6 +1153,7 @@ export function AdminOpportunitiesView({ state, setState, notify, navigate }) {
         mode: mode.trim(),
         team: team.trim(),
         summary: summary.trim() || 'Competitive student opportunity.',
+        image: image.trim(),
         createdAt: new Date().toISOString()
       };
 
@@ -1168,7 +1172,8 @@ export function AdminOpportunitiesView({ state, setState, notify, navigate }) {
         deadline: deadline.trim() || activeOpp.deadline,
         mode: mode.trim(),
         team: team.trim(),
-        summary: summary.trim() || activeOpp.summary
+        summary: summary.trim() || activeOpp.summary,
+        image: image.trim()
       };
 
       setState(prev => ({
@@ -1202,7 +1207,7 @@ export function AdminOpportunitiesView({ state, setState, notify, navigate }) {
   }, [opps, search]);
 
   return (
-    <div className="minimal-admin-container">
+    <div className="minimal-admin-container career-admin-hub career-admin-opportunities">
       <div className="minimal-admin-header">
         <div>
           <h2 className="minimal-admin-title">Opportunities</h2>
@@ -1229,6 +1234,7 @@ export function AdminOpportunitiesView({ state, setState, notify, navigate }) {
         {filtered.length > 0 ? (
           filtered.map(opp => (
             <div key={opp.id} className="minimal-item-row">
+              {opp.image && <img className="career-admin-list-image" src={opp.image} alt="" loading="lazy" />}
               <div className="minimal-item-info">
                 <h4 className="minimal-item-title">{opp.title}</h4>
                 <div className="minimal-item-meta">
@@ -1342,13 +1348,18 @@ export function AdminOpportunitiesView({ state, setState, notify, navigate }) {
                   />
                 </div>
                 <div className="minimal-form-group">
-                  <label>Summary</label>
+                  <label>Additional Information</label>
                   <textarea
                     rows={3}
-                    placeholder="Brief description..."
+                    placeholder="Eligibility, application steps, or other useful details..."
                     value={summary}
                     onChange={e => setSummary(e.target.value)}
                   />
+                </div>
+                <div className="minimal-form-group">
+                  <label>Image URL (optional)</label>
+                  <input type="url" placeholder="https://example.com/image.jpg" value={image} onChange={e => setImage(e.target.value)} />
+                  {image && <img className="career-admin-image-preview" src={image} alt="Opportunity preview" />}
                 </div>
               </div>
               <div className="minimal-modal-footer">
@@ -1405,6 +1416,7 @@ export function AdminInternshipsView({ state, setState, notify, navigate }) {
   const [location, setLocation] = useState('Remote');
   const [skills, setSkills] = useState('');
   const [about, setAbout] = useState('');
+  const [image, setImage] = useState('');
 
   const openAddModal = () => {
     setActiveIntern(null);
@@ -1415,6 +1427,7 @@ export function AdminInternshipsView({ state, setState, notify, navigate }) {
     setLocation('Remote');
     setSkills('');
     setAbout('');
+    setImage('');
     setModalMode('add');
   };
 
@@ -1427,6 +1440,7 @@ export function AdminInternshipsView({ state, setState, notify, navigate }) {
     setLocation(item.location || 'Remote');
     setSkills(Array.isArray(item.skills) ? item.skills.join(', ') : (item.skills || ''));
     setAbout(item.about || '');
+    setImage(item.image || '');
     setModalMode('edit');
   };
 
@@ -1454,6 +1468,7 @@ export function AdminInternshipsView({ state, setState, notify, navigate }) {
         location: location.trim(),
         skills: parsedSkills,
         about: about.trim() || 'Corporate internship opportunity.',
+        image: image.trim(),
         createdAt: new Date().toISOString()
       };
 
@@ -1471,7 +1486,8 @@ export function AdminInternshipsView({ state, setState, notify, navigate }) {
         duration: duration.trim(),
         location: location.trim(),
         skills: parsedSkills,
-        about: about.trim() || activeIntern.about
+        about: about.trim() || activeIntern.about,
+        image: image.trim()
       };
 
       setState(prev => ({
@@ -1505,7 +1521,7 @@ export function AdminInternshipsView({ state, setState, notify, navigate }) {
   }, [interns, search]);
 
   return (
-    <div className="minimal-admin-container">
+    <div className="minimal-admin-container career-admin-hub career-admin-internships">
       <div className="minimal-admin-header">
         <div>
           <h2 className="minimal-admin-title">Internships</h2>
@@ -1532,6 +1548,7 @@ export function AdminInternshipsView({ state, setState, notify, navigate }) {
         {filtered.length > 0 ? (
           filtered.map(item => (
             <div key={item.id} className="minimal-item-row">
+              {item.image && <img className="career-admin-list-image" src={item.image} alt="" loading="lazy" />}
               <div className="minimal-item-info">
                 <h4 className="minimal-item-title">{item.role}</h4>
                 <div className="minimal-item-meta">
@@ -1637,13 +1654,18 @@ export function AdminInternshipsView({ state, setState, notify, navigate }) {
                   />
                 </div>
                 <div className="minimal-form-group">
-                  <label>Description</label>
+                  <label>Additional Information</label>
                   <textarea
                     rows={3}
-                    placeholder="Role responsibilities..."
+                    placeholder="Role responsibilities, requirements, or application steps..."
                     value={about}
                     onChange={e => setAbout(e.target.value)}
                   />
+                </div>
+                <div className="minimal-form-group">
+                  <label>Image URL (optional)</label>
+                  <input type="url" placeholder="https://example.com/image.jpg" value={image} onChange={e => setImage(e.target.value)} />
+                  {image && <img className="career-admin-image-preview" src={image} alt="Internship preview" />}
                 </div>
               </div>
               <div className="minimal-modal-footer">
@@ -1700,6 +1722,8 @@ export function AdminPlacementsView({ state, setState, notify, navigate }) {
   const [eligibility, setEligibility] = useState('');
   const [location, setLocation] = useState('On-Campus');
   const [status, setStatus] = useState('Registration Active');
+  const [about, setAbout] = useState('');
+  const [image, setImage] = useState('');
 
   const openAddModal = () => {
     setActivePlacement(null);
@@ -1710,6 +1734,8 @@ export function AdminPlacementsView({ state, setState, notify, navigate }) {
     setEligibility('');
     setLocation('On-Campus');
     setStatus('Registration Active');
+    setAbout('');
+    setImage('');
     setModalMode('add');
   };
 
@@ -1722,6 +1748,8 @@ export function AdminPlacementsView({ state, setState, notify, navigate }) {
     setEligibility(item.eligibility || '');
     setLocation(item.location || 'On-Campus');
     setStatus(item.status || 'Registration Active');
+    setAbout(item.about || '');
+    setImage(item.image || '');
     setModalMode('edit');
   };
 
@@ -1747,6 +1775,8 @@ export function AdminPlacementsView({ state, setState, notify, navigate }) {
         eligibility: eligibility.trim() || 'All eligible students',
         location: location.trim(),
         status,
+        about: about.trim(),
+        image: image.trim(),
         createdAt: new Date().toISOString()
       };
 
@@ -1764,7 +1794,9 @@ export function AdminPlacementsView({ state, setState, notify, navigate }) {
         date: date.trim() || activePlacement.date,
         eligibility: eligibility.trim() || activePlacement.eligibility,
         location: location.trim(),
-        status
+        status,
+        about: about.trim(),
+        image: image.trim()
       };
 
       setState(prev => ({
@@ -1798,7 +1830,7 @@ export function AdminPlacementsView({ state, setState, notify, navigate }) {
   }, [placements, search]);
 
   return (
-    <div className="minimal-admin-container">
+    <div className="minimal-admin-container career-admin-hub career-admin-placements">
       <div className="minimal-admin-header">
         <div>
           <h2 className="minimal-admin-title">Placements</h2>
@@ -1825,6 +1857,7 @@ export function AdminPlacementsView({ state, setState, notify, navigate }) {
         {filtered.length > 0 ? (
           filtered.map(drive => (
             <div key={drive.id} className="minimal-item-row">
+              {drive.image && <img className="career-admin-list-image" src={drive.image} alt="" loading="lazy" />}
               <div className="minimal-item-info">
                 <h4 className="minimal-item-title">{drive.company}</h4>
                 <div className="minimal-item-meta">
@@ -1937,6 +1970,15 @@ export function AdminPlacementsView({ state, setState, notify, navigate }) {
                     value={eligibility}
                     onChange={e => setEligibility(e.target.value)}
                   />
+                </div>
+                <div className="minimal-form-group">
+                  <label>Additional Information</label>
+                  <textarea rows={3} placeholder="Application steps, required documents, or other details..." value={about} onChange={e => setAbout(e.target.value)} />
+                </div>
+                <div className="minimal-form-group">
+                  <label>Image URL (optional)</label>
+                  <input type="url" placeholder="https://example.com/image.jpg" value={image} onChange={e => setImage(e.target.value)} />
+                  {image && <img className="career-admin-image-preview" src={image} alt="Placement drive preview" />}
                 </div>
               </div>
               <div className="minimal-modal-footer">
