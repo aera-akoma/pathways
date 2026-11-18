@@ -15,7 +15,6 @@ import {
   MapPin,
   Code2,
   PlusCircle,
-  Search,
   Sparkles,
   Crop,
   ImagePlus,
@@ -333,7 +332,6 @@ export function ProfileSettings({
     return INITIAL_PROJECTS;
   });
 
-  const [projectSearchInput, setProjectSearchInput] = useState('');
 
   // Selected project for Details Modal
   const [selectedProject, setSelectedProject] = useState(null);
@@ -617,17 +615,6 @@ export function ProfileSettings({
     setIsComposerOpen(false);
     showToast('Project shared to your portfolio!');
   };
-
-  // Filter projects by search
-  const filteredProjects = useMemo(() => {
-    const query = projectSearchInput.trim().toLowerCase();
-    if (!query) return projects;
-    return projects.filter(p =>
-      p.title.toLowerCase().includes(query) ||
-      p.description.toLowerCase().includes(query) ||
-      (Array.isArray(p.tech) && p.tech.some(t => t.toLowerCase().includes(query)))
-    );
-  }, [projects, projectSearchInput]);
 
   // Derived labels
   const degreeBranchLabel = useMemo(() => {
@@ -1005,89 +992,32 @@ export function ProfileSettings({
           {activeTab === 'projects' && (
             <div className="tab-panel space-y-6">
 
-              {/* Top Action Header, Search & Upload Button */}
-              <div className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                      <FolderGit2 className="w-5 h-5 text-navy-600 dark:text-indigo-400" />
-                      <span>Uploaded Student Projects</span>
-                    </h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      Showcase your academic builds, hackathon prototypes, and personal software projects.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleOpenComposer}
-                    className="profile-upload-project-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-navy-600 hover:bg-navy-700 text-white shadow-sm shadow-indigo-500/20 transition-all flex items-center justify-center gap-2"
-                  >
-                    <PlusCircle className="w-4 h-4" />
-                    <span>Upload Project</span>
-                  </button>
-                </div>
-
-                {/* Search Filter Input */}
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
-                  <div className="relative max-w-md">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      value={projectSearchInput}
-                      onChange={(e) => setProjectSearchInput(e.target.value)}
-                      placeholder="Search uploaded projects by title or tech stack..."
-                      className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-navy-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
               {/* Projects Card Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredProjects.length === 0 ? (
+                {projects.length === 0 ? (
                   <div className="col-span-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-10 text-center space-y-3">
                     <div className="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-navy-600 dark:text-indigo-400 flex items-center justify-center">
                       <FolderGit2 className="w-6 h-6" />
                     </div>
-                    {projectSearchInput.trim() ? (
-                      <>
-                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                          No projects found matching "{projectSearchInput}"
-                        </p>
-                        <p className="text-xs text-slate-400">
-                          Try a different search keyword or clear the search filter.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => setProjectSearchInput('')}
-                          className="text-xs font-semibold text-navy-600 dark:text-indigo-400 hover:underline"
-                        >
-                          Clear Search
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                          You haven't uploaded any projects yet
-                        </p>
-                        <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                          Showcase your coursework builds, hackathon creations, and engineering prototypes to build an impressive student portfolio.
-                        </p>
-                        <div className="pt-2">
-                          <button
-                            type="button"
-                            onClick={handleOpenComposer}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-navy-600 hover:bg-navy-700 text-white shadow-sm transition-colors"
-                          >
-                            <PlusCircle className="w-4 h-4" />
-                            <span>Upload Your First Project</span>
-                          </button>
-                        </div>
-                      </>
-                    )}
+                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                      You haven't uploaded any projects yet
+                    </p>
+                    <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                      Showcase your coursework builds, hackathon creations, and engineering prototypes to build an impressive student portfolio.
+                    </p>
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={handleOpenComposer}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-navy-600 hover:bg-navy-700 text-white shadow-sm transition-colors"
+                      >
+                        <PlusCircle className="w-4 h-4" />
+                        <span>Upload Your First Project</span>
+                      </button>
+                    </div>
                   </div>
                 ) : (
-                  filteredProjects.map(proj => {
+                  projects.map(proj => {
                     const cssFilter = FILTER_STYLES[proj.filter] || 'none';
                     return (
                       <article

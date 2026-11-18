@@ -2076,7 +2076,6 @@ function ProjectComposerModal({
                 placeholder="e.g. CampusKart - Peer-to-Peer College Marketplace"
                 value={title}
                 onChange={e => setTitle(e.target.value)}
-                required
               />
             </div>
 
@@ -2084,7 +2083,7 @@ function ProjectComposerModal({
             <div className="soc-form-row soc-composer-category-row">
               <div className="soc-form-field">
                 <label>Category *</label>
-                <select required aria-label="Project category" value={category} onChange={e => setCategory(e.target.value)}>
+                <select aria-label="Project category" value={category} onChange={e => setCategory(e.target.value)}>
                   <option value="">Select a category</option>
                   {category && categories?.length > 0 && !categories.some(item => item.name === category) && <option value={category}>{category}</option>}
                   {(categories && categories.length > 0 ? categories : [
@@ -2167,7 +2166,6 @@ function ProjectComposerModal({
                 placeholder="Share the story behind your project: what problem does it solve, technologies used, challenges overcome, and next steps..."
                 value={description}
                 onChange={e => setDescription(e.target.value)}
-                required
               />
             </div>
 
@@ -2295,6 +2293,40 @@ function ProjectComposerModal({
                 />
               </div>
             </div>
+
+            <section className="soc-mobile-post-details" aria-label="Project post details">
+              <div className="soc-mobile-author">
+                <ProfileAvatar src={currentStudent?.avatar || DEFAULT_STUDENT_AVATAR} name={currentStudent?.name || 'Student'} />
+                <div><strong>{currentStudent?.name || 'Student'}</strong><span>Sharing a project</span></div>
+              </div>
+              <label className="soc-mobile-field-label" htmlFor="mobile-project-title">Project title <span>Required</span></label>
+              <input id="mobile-project-title" className="soc-mobile-input" type="text" placeholder="Give your project a name" value={title} onChange={e => setTitle(e.target.value)} />
+              <label className="soc-mobile-field-label" htmlFor="mobile-project-category">Category <span>Required</span></label>
+              <select id="mobile-project-category" className="soc-mobile-input" value={category} onChange={e => setCategory(e.target.value)}>
+                <option value="">Choose a category</option>
+                {category && categories?.length > 0 && !categories.some(item => item.name === category) && <option value={category}>{category}</option>}
+                {(categories && categories.length > 0 ? categories : [
+                  'Web Development', 'Android Development', 'Artificial Intelligence', 'Machine Learning', 'Python', 'Java', 'C and C++', 'Cybersecurity', 'Database Management', 'Graphic Design', 'Business Projects', 'Marketing', 'Entrepreneurship', 'Other'
+                ].map(name => ({ name }))).map(item => <option key={item.name} value={item.name}>{item.name}</option>)}
+              </select>
+              <label className="soc-mobile-field-label" htmlFor="mobile-project-caption">Caption <span>Required</span></label>
+              <textarea id="mobile-project-caption" className="soc-mobile-caption" placeholder="Tell people what you built, why you built it, and what you learned…" value={description} onChange={e => setDescription(e.target.value)} />
+              <div className="soc-mobile-tag-section">
+                <span className="soc-mobile-field-label">Technologies</span>
+                <div className="soc-mobile-tag-entry">
+                  <input className="soc-mobile-input" type="text" placeholder="Add a technology" value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(); } }} />
+                  <button type="button" onClick={() => handleAddTag()}>Add</button>
+                </div>
+                {tags.length > 0 && <div className="soc-mobile-selected-tags">{tags.map(tag => <button key={tag} type="button" onClick={() => handleRemoveTag(tag)}>#{tag}<X size={12} /></button>)}</div>}
+                <div className="soc-mobile-suggestions">{QUICK_TECH_TAGS.slice(0, 8).map(tag => <button key={tag} type="button" className={tags.includes(tag) ? 'selected' : ''} onClick={() => tags.includes(tag) ? handleRemoveTag(tag) : handleAddTag(tag)}>{tags.includes(tag) ? '✓ ' : '+ '}{tag}</button>)}</div>
+              </div>
+              <details className="soc-mobile-links">
+                <summary><span>Add project links</span><small>Optional</small></summary>
+                <label htmlFor="mobile-project-demo">Live website</label><input id="mobile-project-demo" className="soc-mobile-input" type="text" placeholder="https://your-project.com" value={demoUrl} onChange={e => setDemoUrl(e.target.value)} />
+                <label htmlFor="mobile-project-github">GitHub repository</label><input id="mobile-project-github" className="soc-mobile-input" type="text" placeholder="github.com/you/project" value={githubUrl} onChange={e => setGithubUrl(e.target.value)} />
+                <label htmlFor="mobile-project-video">YouTube demo</label><input id="mobile-project-video" className="soc-mobile-input" type="text" placeholder="youtube.com/watch…" value={youtubeUrl} onChange={e => setYoutubeUrl(e.target.value)} />
+              </details>
+            </section>
           </div>
 
           {/* Footer Actions */}
