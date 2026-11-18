@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import './styles.css';
+import { matchesSearchFields } from './searchUtils.js';
 import {
   Briefcase,
   GraduationCap,
@@ -86,11 +87,7 @@ export function OpportunitiesView({ student, state, notify, navigate }) {
   const [selectedOpp, setSelectedOpp] = useState(null);
 
   const filtered = useMemo(() => {
-    return currentList.filter(item => {
-      return !search.trim() ||
-        item.title.toLowerCase().includes(search.toLowerCase()) ||
-        item.organizer.toLowerCase().includes(search.toLowerCase());
-    });
+    return currentList.filter(item => matchesSearchFields(item, search, ['title', 'organizer', 'category', 'prize', 'deadline', 'mode', 'team', 'summary', 'image']));
   }, [currentList, search]);
 
   const handleApply = (e) => {
@@ -258,11 +255,7 @@ export function InternshipsView({ student, state, notify, navigate }) {
   const [selectedIntern, setSelectedIntern] = useState(null);
 
   const filtered = useMemo(() => {
-    return currentList.filter(item => {
-      return !search.trim() ||
-        item.company.toLowerCase().includes(search.toLowerCase()) ||
-        item.role.toLowerCase().includes(search.toLowerCase());
-    });
+    return currentList.filter(item => matchesSearchFields(item, search, ['company', 'role', 'stipend', 'duration', 'location', 'skills', 'about', 'image']));
   }, [currentList, search]);
 
   const handleApply = (e) => {
@@ -428,11 +421,7 @@ export function PlacementsView({ student, state, notify, navigate }) {
   const [selectedDrive, setSelectedDrive] = useState(null);
 
   const filtered = useMemo(() => {
-    return currentList.filter(d => {
-      return !search.trim() ||
-        d.company.toLowerCase().includes(search.toLowerCase()) ||
-        d.role.toLowerCase().includes(search.toLowerCase());
-    });
+    return currentList.filter(drive => matchesSearchFields(drive, search, ['company', 'role', 'package', 'date', 'eligibility', 'location', 'status', 'about', 'image']));
   }, [currentList, search]);
 
   const handleRegister = (e) => {

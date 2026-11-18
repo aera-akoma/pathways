@@ -1,6 +1,7 @@
 import { ACADEMIC_COURSES, academicCourseOption } from './academicCourses.js';
 import { requestJson, requireRecord } from './api.js';
 import { passwordError, PASSWORD_HINT } from './validation.js';
+import { matchesSearchFields } from './searchUtils.js';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { ProfileAvatar } from './ProfileAvatar.jsx';
 import { DEFAULT_ADMIN_AVATAR, DEFAULT_STUDENT_AVATAR } from './defaultAvatar.js';
@@ -1199,11 +1200,7 @@ export function AdminOpportunitiesView({ state, setState, notify, navigate }) {
   };
 
   const filtered = useMemo(() => {
-    return opps.filter(o => {
-      return !search.trim() ||
-        o.title.toLowerCase().includes(search.toLowerCase()) ||
-        (o.organizer && o.organizer.toLowerCase().includes(search.toLowerCase()));
-    });
+    return opps.filter(item => matchesSearchFields(item, search, ['title', 'organizer', 'category', 'prize', 'deadline', 'mode', 'team', 'summary', 'image']));
   }, [opps, search]);
 
   return (
@@ -1513,11 +1510,7 @@ export function AdminInternshipsView({ state, setState, notify, navigate }) {
   };
 
   const filtered = useMemo(() => {
-    return interns.filter(i => {
-      return !search.trim() ||
-        i.company.toLowerCase().includes(search.toLowerCase()) ||
-        i.role.toLowerCase().includes(search.toLowerCase());
-    });
+    return interns.filter(item => matchesSearchFields(item, search, ['company', 'role', 'stipend', 'duration', 'location', 'skills', 'about', 'image']));
   }, [interns, search]);
 
   return (
@@ -1822,11 +1815,7 @@ export function AdminPlacementsView({ state, setState, notify, navigate }) {
   };
 
   const filtered = useMemo(() => {
-    return placements.filter(p => {
-      return !search.trim() ||
-        p.company.toLowerCase().includes(search.toLowerCase()) ||
-        p.role.toLowerCase().includes(search.toLowerCase());
-    });
+    return placements.filter(item => matchesSearchFields(item, search, ['company', 'role', 'package', 'date', 'eligibility', 'location', 'status', 'about', 'image']));
   }, [placements, search]);
 
   return (

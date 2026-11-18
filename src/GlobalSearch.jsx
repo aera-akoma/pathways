@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { matchesSearchFields, normalizeSearchText } from './searchUtils.js';
 import {
   Search,
   X,
@@ -8,14 +9,12 @@ import {
   Trash2,
   ArrowLeft,
   CornerDownLeft,
-  ArrowRight,
   ChevronRight,
   Sparkles,
   BookOpen,
   Briefcase,
   GraduationCap,
   Building2,
-  Building,
   FileText,
   BarChart3,
   Trophy,
@@ -24,12 +23,8 @@ import {
   LayoutDashboard,
   Users,
   UserRound,
-  Code,
-  Cpu,
-  Globe,
   Award,
   Compass,
-  Layers,
   Target
 } from 'lucide-react';
 
@@ -55,18 +50,19 @@ const TRENDING_TOPICS = [
 // Helper to highlight matching keyword in search results
 function HighlightMatch({ text, query }) {
   if (!query || !text) return <>{text}</>;
-  const cleanQ = query.trim();
-  if (!cleanQ) return <>{text}</>;
+  const terms = normalizeSearchText(query).split(/\s+/).filter(Boolean).sort((a, b) => b.length - a.length);
+  if (!terms.length) return <>{text}</>;
 
   try {
-    const escaped = cleanQ.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escaped = terms.map(term => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
     const regex = new RegExp(`(${escaped})`, 'gi');
+    const testRegex = new RegExp(escaped, 'i');
     const parts = String(text).split(regex);
 
     return (
       <>
         {parts.map((part, i) =>
-          regex.test(part) ? (
+          testRegex.test(part) ? (
             <mark key={i} className="yt-search-highlight">
               {part}
             </mark>
@@ -97,7 +93,14 @@ export function GlobalSearch({ session, state, navigate, notify }) {
     }
   });
 
-  const [liveProjects, setLiveProjects] = useState([]);
+  const [liveProjects, setLiveProjects] = useState(() => {
+    try {
+      const localProjects = JSON.parse(localStorage.getItem('podar_local_projects') || '[]');
+      return Array.isArray(localProjects) ? localProjects : [];
+    } catch {
+      return [];
+    }
+  });
   const [liveCertificates, setLiveCertificates] = useState([]);
 
   const containerRef = useRef(null);
@@ -109,11 +112,30 @@ export function GlobalSearch({ session, state, navigate, notify }) {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.posts && Array.isArray(data.posts)) {
-          setLiveProjects(data.posts);
+          let localProjects = [];
+          try {
+            const saved = JSON.parse(localStorage.getItem('podar_local_projects') || '[]');
+            if (Array.isArray(saved)) localProjects = saved;
+          } catch {}
+          const ids = new Set(data.posts.map(project => String(project.id)));
+          setLiveProjects([...data.posts, ...localProjects.filter(project => !ids.has(String(project.id)))]);
         }
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem('podar_local_projects') || '[]');
+      if (Array.isArray(saved)) {
+        setLiveProjects(prev => {
+          const savedIds = new Set(saved.map(project => String(project.id)));
+          return [...saved, ...prev.filter(project => !savedIds.has(String(project.id)))];
+        });
+      }
+    } catch {}
+  }, [isOpen]);
 
   // Fetch live certificates from PHP API
   useEffect(() => {
@@ -166,7 +188,12 @@ export function GlobalSearch({ session, state, navigate, notify }) {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        inputRef.current?.focus();
+        if (window.matchMedia('(max-width: 768px)').matches) {
+          setIsMobileSearchActive(true);
+          setTimeout(() => mobileInputRef.current?.focus(), 0);
+        } else {
+          inputRef.current?.focus();
+        }
         setIsOpen(true);
       } else if (e.key === 'Escape') {
         setIsOpen(false);
@@ -186,11 +213,11 @@ export function GlobalSearch({ session, state, navigate, notify }) {
         setIsFocused(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('pointerdown', handleClickOutside);
+    return () => document.removeEventListener('pointerdown', handleClickOutside);
   }, []);
 
-  const q = query.trim().toLowerCase();
+  const q = normalizeSearchText(query);
 
   // 1. Pages & Workspaces
   const allPages = [
@@ -222,19 +249,21 @@ export function GlobalSearch({ session, state, navigate, notify }) {
 
   // 2. Opportunities, Internships & Contests
   const allOpportunities = [
-    { title: 'Frontend React Developer Internship', company: 'Tech Innovation Labs', tags: 'React • TypeScript • Remote • ₹25k/mo', type: 'Internship', page: 'opportunities', icon: Code },
-    { title: 'Software development internship', company: 'Tech Innovation Labs', tags: 'Java • React • Remote • 3 months', type: 'Internship', page: 'opportunities', icon: Briefcase },
-    { title: 'Data Science & Analytics Internship', company: 'DataWave Insights', tags: 'Python • SQL • Tableau • Hybrid Mumbai', type: 'Internship', page: 'opportunities', icon: BarChart3 },
-    { title: 'AI Innovation Challenge 2026', company: 'Open Innovation Challenge', tags: 'AI • Machine Learning • Hackathon', type: 'Hackathon', page: 'opportunities', icon: Sparkles },
-    { title: 'Podar Startupthon 2026', company: 'Podar Education Network', tags: 'Think • Innovate • Impact • Grants', type: 'Startupthon', page: 'opportunities', icon: Target },
-    { title: 'Cloud & DevOps Engineering Associate', company: 'CloudScale Technologies', tags: 'AWS • Docker • Kubernetes • 6 months', type: 'Internship', page: 'opportunities', icon: Cpu },
-    { title: 'Cybersecurity & Ethical Hacking Fellowship', company: 'CyberDefend Security', tags: 'VAPT • Network Security • Cert Provided', type: 'Fellowship', page: 'opportunities', icon: ShieldCheck },
-    { title: 'Mobile App Developer (Flutter & React Native)', company: 'AppStudio Solutions', tags: 'iOS • Android • Cross-Platform', type: 'Internship', page: 'opportunities', icon: Globe },
-    { title: 'UI/UX Product Design Challenge', company: 'CreativePulse Studio', tags: 'Figma • Design Systems • Wireframing', type: 'Design Challenge', page: 'opportunities', icon: Layers },
-    { title: 'Smart India Hackathon (SIH 2026)', company: 'Ministry of Education & AICTE', tags: 'National Contest • Innovation • Cash Prizes', type: 'Hackathon', page: 'opportunities', icon: Trophy },
-    { title: 'Podar Campus Placement Drive 2026', company: 'Podar Placement Cell', tags: 'BCA / BSc / BBA Final Year • On-Campus', type: 'Placements', page: 'placements', icon: Building2 },
-    { title: 'Tata Consultancy Services (TCS)', company: 'TCS Digital & Ninja', tags: 'Campus Recruitment • ₹7.5 LPA • Mumbai / Pune', type: 'Placements', page: 'placements', icon: Building2 },
-    { title: 'Infosys Springboard', company: 'Infosys Technologies', tags: 'Systems Engineer & Specialist Programmer', type: 'Placements', page: 'placements', icon: Building2 },
+    ...(Array.isArray(state?.opportunities) ? state.opportunities : []).map(item => ({
+      id: item.id, title: item.title || 'Opportunity', company: item.organizer || item.company || '',
+      tags: [item.category, item.prize, item.deadline, item.mode, item.team, item.summary].filter(Boolean).join(' • '),
+      type: item.category || 'Opportunity', page: 'opportunities', icon: Trophy
+    })),
+    ...(Array.isArray(state?.internships) ? state.internships : []).map(item => ({
+      id: item.id, title: item.role || 'Internship', company: item.company || '',
+      tags: [item.stipend, item.duration, item.location, ...(Array.isArray(item.skills) ? item.skills : []), item.about].filter(Boolean).join(' • '),
+      type: 'Internship', page: 'internships', icon: Briefcase
+    })),
+    ...(Array.isArray(state?.placements) ? state.placements : []).map(item => ({
+      id: item.id, title: item.role || item.company || 'Placement drive', company: item.company || '',
+      tags: [item.package, item.date, item.eligibility, item.location, item.status, item.about].filter(Boolean).join(' • '),
+      type: 'Placement', page: 'placements', icon: Building2
+    }))
   ];
 
   // 3. Courses (State + Defaults)
@@ -293,27 +322,27 @@ export function GlobalSearch({ session, state, navigate, notify }) {
 
   // 7. Filter items when query is present
   const matchedPages = q && (activeTab === 'all' || activeTab === 'tools')
-    ? allPages.filter((p) => p.title.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q) || p.category.toLowerCase().includes(q))
+    ? allPages.filter((p) => (activeTab !== 'tools' || ['Overview', 'AI Tools', 'Roadmap', 'Assessments', 'Career Assets', 'Account'].includes(p.category)) && matchesSearchFields(p, q, ['title', 'desc', 'category']))
     : [];
 
   const matchedCourses = q && (activeTab === 'all' || activeTab === 'courses')
-    ? allCourses.filter((c) => c.title.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q))
+    ? allCourses.filter((c) => matchesSearchFields(c, q, ['title', 'desc', 'category']))
     : [];
 
   const matchedProjects = q && (activeTab === 'all' || activeTab === 'projects')
-    ? formattedProjects.filter((p) => p.title.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q))
+    ? formattedProjects.filter((p) => matchesSearchFields(p, q, ['title', 'desc', 'category']))
     : [];
 
   const matchedOpps = q && (activeTab === 'all' || activeTab === 'opportunities')
-    ? allOpportunities.filter((o) => o.title.toLowerCase().includes(q) || o.company.toLowerCase().includes(q) || o.tags.toLowerCase().includes(q) || o.type.toLowerCase().includes(q))
+    ? allOpportunities.filter((item) => matchesSearchFields(item, q, ['title', 'company', 'tags', 'type']))
     : [];
 
   const matchedCerts = q && (activeTab === 'all' || activeTab === 'certificates')
-    ? formattedCertificates.filter((c) => c.title.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q))
+    ? formattedCertificates.filter((c) => matchesSearchFields(c, q, ['title', 'desc', 'category', 'badge']))
     : [];
 
   const matchedStudents = q && (activeTab === 'all' || activeTab === 'students')
-    ? students.filter((s) => s.title.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q))
+    ? students.filter((s) => matchesSearchFields(s, q, ['title', 'desc', 'category']))
     : [];
 
   // Organized categorized groups
@@ -329,12 +358,8 @@ export function GlobalSearch({ session, state, navigate, notify }) {
   const flatResults = groups.flatMap((g) => g.items.map((item) => ({ ...item, groupType: g.type })));
   const totalCount = flatResults.length;
 
-  const handleSelect = (page, itemTitle) => {
-    if (itemTitle) {
-      saveHistory(itemTitle);
-    } else if (query.trim()) {
-      saveHistory(query.trim());
-    }
+  const handleSelect = (page, itemTitle, historyTerm = itemTitle) => {
+    if (historyTerm || query.trim()) saveHistory(historyTerm || query.trim());
 
     if (page && navigate) {
       navigate(page);
@@ -356,45 +381,50 @@ export function GlobalSearch({ session, state, navigate, notify }) {
       return;
     }
 
-    saveHistory(trimmed);
-
     // If a suggestion is highlighted via arrow keys
     if (flatResults.length > 0 && selectedIndex >= 0 && selectedIndex < flatResults.length) {
       const selected = flatResults[selectedIndex];
-      handleSelect(selected.page || selected.id, selected.title || selected.name);
+      handleSelect(selected.page || selected.id, selected.title || selected.name, trimmed);
       return;
     }
 
     // If there are search matches, pick the top result
     if (flatResults.length > 0) {
       const top = flatResults[0];
-      handleSelect(top.page || top.id, top.title || top.name);
+      handleSelect(top.page || top.id, top.title || top.name, trimmed);
       return;
     }
 
     // Smart semantic navigation fallback
-    const lower = trimmed.toLowerCase();
+    const lower = normalizeSearchText(trimmed);
+    let targetPage = null;
     if (lower.includes('project')) {
-      navigate('projects');
+      targetPage = 'projects';
     } else if (lower.includes('course') || lower.includes('meta') || lower.includes('aws') || lower.includes('python') || lower.includes('google')) {
-      navigate('courses');
+      targetPage = 'courses';
     } else if (lower.includes('cert') || lower.includes('badge')) {
-      navigate('certificates');
+      targetPage = 'certificates';
     } else if (lower.includes('resume') || lower.includes('cv')) {
-      navigate('resume');
+      targetPage = 'resume';
     } else if (lower.includes('coach') || lower.includes('ai') || lower.includes('chat')) {
-      navigate('coach');
+      targetPage = 'coach';
     } else if (lower.includes('roadmap') || lower.includes('dsa')) {
-      navigate('roadmap');
+      targetPage = 'roadmap';
     } else if (lower.includes('score') || lower.includes('p-care')) {
-      navigate('score');
-    } else if (lower.includes('intern') || lower.includes('job') || lower.includes('placement')) {
-      navigate('opportunities');
+      targetPage = 'score';
+    } else if (lower.includes('intern')) {
+      targetPage = 'internships';
+    } else if (lower.includes('placement') || lower.includes('campus drive')) {
+      targetPage = 'placements';
+    } else if (lower.includes('opportunit') || lower.includes('hackathon') || lower.includes('fellowship') || lower.includes('job')) {
+      targetPage = 'opportunities';
     } else if (session?.role === 'admin' && (lower.includes('student') || lower.includes('roster'))) {
-      navigate('students');
-    } else {
-      navigate('dashboard');
+      targetPage = 'students';
     }
+
+    saveHistory(trimmed);
+    if (!targetPage) return;
+    navigate(targetPage);
 
     setIsOpen(false);
     setIsMobileSearchActive(false);
@@ -427,18 +457,18 @@ export function GlobalSearch({ session, state, navigate, notify }) {
   // Filter Tabs
   const tabs = [
     { id: 'all', label: 'All', count: totalCount },
-    { id: 'courses', label: 'Courses', count: allCourses.filter((c) => c.title.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q)).length },
-    { id: 'projects', label: 'Projects', count: formattedProjects.filter((p) => p.title.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q)).length },
-    { id: 'opportunities', label: 'Opportunities', count: allOpportunities.filter((o) => o.title.toLowerCase().includes(q) || o.company.toLowerCase().includes(q)).length },
-    { id: 'certificates', label: 'Certificates', count: formattedCertificates.filter((c) => c.title.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q)).length },
-    { id: 'tools', label: 'Tools', count: allPages.filter((p) => p.title.toLowerCase().includes(q) || p.desc.toLowerCase().includes(q)).length }
+    { id: 'courses', label: 'Courses', count: allCourses.filter((c) => matchesSearchFields(c, q, ['title', 'desc', 'category'])).length },
+    { id: 'projects', label: 'Projects', count: formattedProjects.filter((p) => matchesSearchFields(p, q, ['title', 'desc', 'category'])).length },
+    { id: 'opportunities', label: 'Opportunities', count: allOpportunities.filter((item) => matchesSearchFields(item, q, ['title', 'company', 'tags', 'type'])).length },
+    { id: 'certificates', label: 'Certificates', count: formattedCertificates.filter((c) => matchesSearchFields(c, q, ['title', 'desc', 'category', 'badge'])).length },
+    { id: 'tools', label: 'Tools', count: allPages.filter((p) => ['Overview', 'AI Tools', 'Roadmap', 'Assessments', 'Career Assets', 'Account'].includes(p.category) && matchesSearchFields(p, q, ['title', 'desc', 'category'])).length }
   ];
 
   if (session?.role === 'admin') {
     tabs.push({
       id: 'students',
       label: 'Students',
-      count: students.filter((s) => s.title.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q)).length
+      count: students.filter((s) => matchesSearchFields(s, q, ['title', 'desc', 'category'])).length
     });
   }
 
@@ -502,6 +532,7 @@ export function GlobalSearch({ session, state, navigate, notify }) {
               onChange={(e) => {
                 const val = e.target.value;
                 setQuery(val);
+              setActiveTab('all');
                 setIsOpen(true);
                 setSelectedIndex(0);
               }}
@@ -526,9 +557,9 @@ export function GlobalSearch({ session, state, navigate, notify }) {
                 className="yt-search-clear-btn"
                 onClick={() => {
                   setQuery('');
+                  setActiveTab('all');
                   setSelectedIndex(0);
-                  inputRef.current?.focus();
-                  mobileInputRef.current?.focus();
+                  (isMobileSearchActive ? mobileInputRef : inputRef).current?.focus();
                 }}
                 title="Clear search"
                 aria-label="Clear search"
@@ -609,8 +640,10 @@ export function GlobalSearch({ session, state, navigate, notify }) {
                             className="yt-history-row"
                             onClick={() => {
                               setQuery(term);
-                              inputRef.current?.focus();
-                              handleSelect(null, term);
+                              setActiveTab('all');
+                              setSelectedIndex(0);
+                              setIsOpen(true);
+                              (isMobileSearchActive ? mobileInputRef : inputRef).current?.focus();
                             }}
                           >
                             <div className="yt-history-left">
@@ -678,6 +711,7 @@ export function GlobalSearch({ session, state, navigate, notify }) {
                         className="yt-suggestion-chip"
                         onClick={() => {
                           setQuery(chip);
+                          setActiveTab('all');
                           setSelectedIndex(0);
                         }}
                       >

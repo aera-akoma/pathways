@@ -15233,6 +15233,13 @@ to {
   position: fixed !important;
   inset: 0 !important;
   z-index: 2147483000 !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.profile-popup-layer {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
 }
 
 @media (max-width: 640px) {

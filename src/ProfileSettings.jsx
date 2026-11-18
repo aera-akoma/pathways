@@ -320,6 +320,17 @@ export function ProfileSettings({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Lock body scrolling when modal overlays are active
+  useEffect(() => {
+    if (isComposerOpen || selectedProject) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
+    }
+  }, [isComposerOpen, selectedProject]);
+
   // Projects State
   const [projects, setProjects] = useState(() => {
     try {
@@ -651,22 +662,36 @@ export function ProfileSettings({
           <div
             onClick={() => coverUploadRef.current?.click()}
             title="Click to change cover banner"
-            className="relative h-44 sm:h-56 w-full bg-gradient-to-r from-slate-900 via-indigo-900 to-navy-600 overflow-hidden group cursor-pointer"
+            className="relative h-36 sm:h-52 md:h-60 w-full bg-gradient-to-r from-slate-900 via-indigo-900 to-navy-600 overflow-hidden group cursor-pointer"
           >
             <img
               src={profile.cover || DEFAULT_COVER_IMAGE}
               alt="University Campus Banner"
               className="w-full h-full object-cover object-center opacity-85 transition-transform duration-700 group-hover:scale-105"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent"></div>
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-950/20 to-transparent"></div>
 
-            {/* Hover Camera Overlay */}
-            <div className="absolute inset-0 bg-black/45 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col items-center justify-center gap-1.5 text-white pointer-events-none">
+            {/* Desktop Hover Camera Overlay */}
+            <div className="hidden sm:flex absolute inset-0 bg-black/45 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex-col items-center justify-center gap-1.5 text-white pointer-events-none">
               <div className="w-11 h-11 rounded-full bg-white/15 border border-white/25 flex items-center justify-center">
                 <Camera className="w-5 h-5 text-white" />
               </div>
               <span className="text-xs font-medium tracking-wide">Change Banner</span>
             </div>
+
+            {/* Mobile Visible Camera Badge (Tap to Change Banner) */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                coverUploadRef.current?.click();
+              }}
+              className="sm:hidden absolute bottom-2.5 right-2.5 px-2.5 py-1 rounded-lg bg-black/60 backdrop-blur-md text-white text-[11px] font-medium flex items-center gap-1.5 shadow-md active:scale-95 transition-transform"
+              aria-label="Change banner photo"
+            >
+              <Camera className="w-3.5 h-3.5" />
+              <span>Change Cover</span>
+            </button>
             <input
               type="file"
               ref={coverUploadRef}
@@ -678,17 +703,17 @@ export function ProfileSettings({
           </div>
 
           {/* Student Profile Info Section */}
-          <div className="px-6 sm:px-8 pb-6">
-            <div className="relative flex flex-col sm:flex-row sm:items-end sm:justify-between -mt-14 sm:-mt-16 mb-5 gap-4">
+          <div className="px-4 sm:px-8 pb-6">
+            <div className="relative flex flex-col sm:flex-row sm:items-end sm:justify-between -mt-12 sm:-mt-16 mb-4 sm:mb-5 gap-3 sm:gap-4">
 
-              {/* Circular Student Avatar */}
+              {/* Circular Student Avatar with Mobile Badge */}
               <div
                 onClick={(e) => {
                   e.stopPropagation();
                   avatarUploadRef.current?.click();
                 }}
                 title="Click to change profile photo"
-                className="relative inline-block w-28 h-28 sm:w-32 sm:h-32 rounded-full group cursor-pointer"
+                className="relative inline-block w-24 h-24 sm:w-32 sm:h-32 rounded-full group cursor-pointer flex-shrink-0"
               >
                 <ProfileAvatar
                   src={profile.avatar || DEFAULT_STUDENT_AVATAR}
@@ -697,10 +722,23 @@ export function ProfileSettings({
                   className="w-full h-full object-cover rounded-full border-4 border-white dark:border-slate-900 shadow-lg bg-slate-200 dark:bg-slate-800"
                 />
 
-                {/* Avatar Hover Camera Overlay */}
-                <div className="absolute inset-1 rounded-full bg-black/45 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center text-white pointer-events-none">
+                {/* Desktop Hover Camera Overlay */}
+                <div className="hidden sm:flex absolute inset-1 rounded-full bg-black/45 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 items-center justify-center text-white pointer-events-none">
                   <Camera className="w-6 h-6 text-white" />
                 </div>
+
+                {/* Mobile Camera Badge */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    avatarUploadRef.current?.click();
+                  }}
+                  className="sm:hidden absolute bottom-0 right-0 p-1.5 rounded-full bg-navy-600 text-white shadow-md border-2 border-white dark:border-slate-900 active:scale-95 transition-transform"
+                  aria-label="Change profile photo"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                </button>
                 <input
                   type="file"
                   ref={avatarUploadRef}
@@ -709,6 +747,26 @@ export function ProfileSettings({
                   onChange={handleAvatarUpload}
                   className="hidden"
                 />
+              </div>
+
+              {/* Header Quick Actions (Upload Project & Edit Profile) */}
+              <div className="flex items-center gap-2 pt-1 sm:pt-0 sm:self-end w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={handleOpenComposer}
+                  className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl text-xs font-semibold bg-navy-600 hover:bg-navy-700 text-white shadow-sm flex items-center justify-center gap-1.5 transition-all active:scale-95 whitespace-nowrap"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>Upload Project</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchTab('settings')}
+                  className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-1.5 transition-all active:scale-95 whitespace-nowrap"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  <span>Edit Profile</span>
+                </button>
               </div>
             </div>
 
@@ -991,6 +1049,27 @@ export function ProfileSettings({
           {/* TAB 2: PROJECTS */}
           {activeTab === 'projects' && (
             <div className="tab-panel space-y-6">
+
+              {/* Projects Action Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+                <div>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <FolderGit2 className="w-5 h-5 text-navy-600 dark:text-indigo-400" />
+                    <span>My Coursework & Projects</span>
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Showcase engineering prototypes, coursework builds, and hackathon projects.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleOpenComposer}
+                  className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-semibold bg-navy-600 hover:bg-navy-700 text-white shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>Upload Project</span>
+                </button>
+              </div>
 
               {/* Projects Card Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1574,6 +1653,24 @@ export function ProfileSettings({
                     </button>
                   </div>
 
+                  {/* Mobile Floating / Sticky Quick Save Bar */}
+                  <div className="lg:hidden sticky bottom-4 z-30 p-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl flex items-center gap-2">
+                    <button
+                      type="submit"
+                      className="profile-save-button flex-1 py-2.5 text-xs font-semibold flex items-center justify-center gap-2"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>Save Changes</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResetDefaults}
+                      className="profile-reset-button py-2.5 px-3 text-xs"
+                    >
+                      Reset
+                    </button>
+                  </div>
+
                 </div>
               </form>
             </div>
@@ -1585,7 +1682,7 @@ export function ProfileSettings({
       {/* SINGLE-VIEW INSTAGRAM-STYLE PROJECT POST COMPOSER MODAL */}
       {isComposerOpen && (
         <div
-          className="profile-popup-layer fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-3 sm:p-5 overflow-y-auto"
+          className="profile-popup-layer fixed inset-0 z-[2147483000] overflow-y-auto bg-slate-950/75 backdrop-blur-sm p-2 sm:p-4 md:p-6 flex items-start sm:items-center justify-center overscroll-contain"
           onClick={(e) => {
             if (e.target === e.currentTarget) setIsComposerOpen(false);
           }}
@@ -1596,10 +1693,10 @@ export function ProfileSettings({
           <form
             onSubmit={handleShareProject}
             noValidate
-            className="profile-project-composer bg-white dark:bg-slate-900 rounded-3xl max-w-4xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden my-auto modal-animate-enter"
+            className="profile-project-composer bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl max-w-4xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col modal-animate-enter"
           >
-            {/* Modal Header */}
-            <div className="px-4 sm:px-6 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900">
+            {/* Modal Header (Sticky / Non-shrinking) */}
+            <div className="px-4 sm:px-6 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-white dark:bg-slate-900 flex-shrink-0">
               <button
                 type="button"
                 onClick={() => setIsComposerOpen(false)}
@@ -1612,14 +1709,14 @@ export function ProfileSettings({
               </h3>
               <button
                 type="submit"
-                className="profile-composer-share hidden lg:inline-flex text-xs sm:text-sm font-bold text-navy-600 dark:text-indigo-400 hover:text-navy-700 dark:hover:text-indigo-300 px-2.5 py-1 rounded-lg transition-colors"
+                className="profile-composer-share inline-flex text-xs sm:text-sm font-bold text-navy-600 dark:text-indigo-400 hover:text-navy-700 dark:hover:text-indigo-300 px-2.5 py-1 rounded-lg transition-colors"
               >
                 Share
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div className="grid grid-cols-1 lg:grid-cols-12">
+            {/* Modal Scrollable Body */}
+            <div className="overflow-y-auto flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12">
 
               {/* Left Pane: Media Dropzone, Aspect Ratio & Filters */}
               <div className="lg:col-span-7 bg-slate-100/80 dark:bg-slate-950/70 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 p-4 sm:p-5 flex flex-col justify-between gap-4">
@@ -1906,7 +2003,7 @@ export function ProfileSettings({
       {/* PROJECT DETAIL MODAL */}
       {selectedProject && (
         <div
-          className="profile-popup-layer fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4"
+          className="profile-popup-layer fixed inset-0 z-[2147483000] overflow-y-auto bg-slate-950/75 backdrop-blur-sm p-3 sm:p-4 flex items-start sm:items-center justify-center overscroll-contain"
           onClick={(e) => {
             if (e.target === e.currentTarget) setSelectedProject(null);
           }}
@@ -1914,8 +2011,8 @@ export function ProfileSettings({
           aria-modal="true"
           aria-label="Project Details"
         >
-          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden modal-animate-enter">
-            <div className="h-48 w-full bg-gradient-to-r from-navy-700 to-indigo-600 relative overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden my-auto modal-animate-enter">
+            <div className="h-44 sm:h-52 w-full bg-gradient-to-r from-navy-700 to-indigo-600 relative overflow-hidden flex-shrink-0">
               {selectedProject.image && (
                 <img
                   src={selectedProject.image}
@@ -1927,23 +2024,23 @@ export function ProfileSettings({
               <button
                 type="button"
                 onClick={() => setSelectedProject(null)}
-                className="absolute top-3 right-3 p-2 rounded-xl bg-black/50 text-white hover:bg-black/70 transition-colors"
+                className="absolute top-3 right-3 p-2 rounded-xl bg-black/60 hover:bg-black/80 text-white transition-colors shadow-md"
                 aria-label="Close modal"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-slate-400">
                   Uploaded {selectedProject.date}
                 </span>
               </div>
-              <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+              <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white leading-snug">
                 {selectedProject.title}
               </h3>
-              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
                 {selectedProject.description || 'No description provided.'}
               </p>
               <div className="flex flex-wrap gap-1.5 pt-1">
@@ -1957,20 +2054,27 @@ export function ProfileSettings({
                     </span>
                   ))}
               </div>
+            </div>
 
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-3">
-                {selectedProject.demoUrl && (
-                  <a
-                    href={formatExternalUrl(selectedProject.demoUrl)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-navy-600 hover:bg-navy-700 text-white flex items-center gap-1.5 transition-colors"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span>Open Project Link</span>
-                  </a>
-                )}
-              </div>
+            <div className="p-4 sm:p-5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-900/50 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setSelectedProject(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
+              >
+                Close
+              </button>
+              {selectedProject.demoUrl && (
+                <a
+                  href={formatExternalUrl(selectedProject.demoUrl)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-navy-600 hover:bg-navy-700 text-white flex items-center gap-1.5 transition-colors shadow-sm"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Open Project Link</span>
+                </a>
+              )}
             </div>
           </div>
         </div>
